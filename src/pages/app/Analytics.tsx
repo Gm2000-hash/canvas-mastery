@@ -690,6 +690,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
           <span className="ml-auto">Click a standard code to reveal its substandards.</span>
         </div>
       </CardContent>
+      )}
     </Card>
   );
 }
