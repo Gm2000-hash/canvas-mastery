@@ -305,7 +305,23 @@ export default function Review() {
     loadAll();
   }
 
-  // Standards relevant to this teacher's disciplines (for the override picker)
+  async function bulkTagByQuestion() {
+    const targets = Array.from(selected)
+      .map((id) => assignments.find((a) => a.id === id))
+      .filter((a): a is Assignment => !!a && a.kind === "quiz" && (questionCountByAssignment[a.id] ?? 0) > 0);
+    if (targets.length === 0) { toast.info("Pick one or more synced quizzes first"); return; }
+    setBulkBusy(true);
+    let ok = 0;
+    for (const a of targets.slice(0, 10)) {
+      try {
+        const { data, error } = await supabase.functions.invoke("tag-question-standards", { body: { assignment_id: a.id } });
+        if (!error && !(data as any)?.error) ok++;
+      } catch { /* continue */ }
+    }
+    setBulkBusy(false);
+    toast.success(`Question-tagged ${ok} of ${Math.min(targets.length, 10)} quizzes`);
+    loadAll();
+  }
   const teachStandards = useMemo(() => {
     const keys = new Set(disciplines.map((d) => `${d.state}|${d.subject}|${d.grade}`));
     return allStandards.filter((s) => keys.has(`${s.state}|${s.subject}|${s.grade}`));
