@@ -41,6 +41,15 @@ export default function Standards() {
     supabase.from("profiles").select("state, default_subject, default_grade").maybeSingle().then(({ data }) => setProfile(data as any));
   }, []);
 
+  // If the user changes scope (State/National), drop a framework filter that no
+  // longer fits — otherwise the dropdown would show an empty/invisible value.
+  useEffect(() => {
+    if (frameworkFilter === "ALL") return;
+    const meta = getFramework(frameworkFilter);
+    if (scopeFilter === "STATE" && meta.national) setFrameworkFilter("ALL");
+    if (scopeFilter === "NATIONAL" && !meta.national) setFrameworkFilter("ALL");
+  }, [scopeFilter, frameworkFilter]);
+
   // Distinct frameworks/subjects/grades present in the loaded rows for filter chip options
   const presentFrameworks = useMemo(() => {
     const s = new Set<string>();
