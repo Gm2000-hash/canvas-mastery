@@ -633,6 +633,25 @@ export type Database = {
           subject: string
         }[]
       }
+      analytics_class_matrix: {
+        Args: { _course_id: string }
+        Returns: {
+          attempts: number
+          code: string
+          computed_at: string
+          description: string
+          framework: string
+          grade: string
+          mastered: boolean
+          mastery_score: number
+          parent_code: string
+          standard_id: string
+          student_id: string
+          student_name: string
+          student_sortable: string
+          subject: string
+        }[]
+      }
       analytics_mastery_distribution: {
         Args: { _course_id?: string; _subject?: string }
         Returns: {
