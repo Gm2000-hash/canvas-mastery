@@ -147,6 +147,7 @@ export type Database = {
           canvas_course_id: number
           course_code: string | null
           created_at: string
+          discipline_id: string | null
           id: string
           last_synced_at: string | null
           name: string
@@ -157,6 +158,7 @@ export type Database = {
           canvas_course_id: number
           course_code?: string | null
           created_at?: string
+          discipline_id?: string | null
           id?: string
           last_synced_at?: string | null
           name: string
@@ -167,13 +169,22 @@ export type Database = {
           canvas_course_id?: number
           course_code?: string | null
           created_at?: string
+          discipline_id?: string | null
           id?: string
           last_synced_at?: string | null
           name?: string
           teacher_id?: string
           term?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "courses_discipline_id_fkey"
+            columns: ["discipline_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_disciplines"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mastery_snapshots: {
         Row: {
@@ -521,6 +532,39 @@ export type Database = {
           },
         ]
       }
+      teacher_disciplines: {
+        Row: {
+          created_at: string
+          grade: string
+          id: string
+          is_default: boolean
+          state: string
+          subject: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          grade: string
+          id?: string
+          is_default?: boolean
+          state: string
+          subject: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          grade?: string
+          id?: string
+          is_default?: boolean
+          state?: string
+          subject?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       teacher_settings: {
         Row: {
           attempt_window: number
@@ -555,6 +599,16 @@ export type Database = {
           last_sync_at: string
           teacher_id: string
           updated_at: string
+        }[]
+      }
+      get_effective_discipline: {
+        Args: { _course_id: string }
+        Returns: {
+          grade: string
+          id: string
+          state: string
+          subject: string
+          teacher_id: string
         }[]
       }
     }
