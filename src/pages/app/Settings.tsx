@@ -48,10 +48,11 @@ export default function Settings() {
   const [seedingDiscId, setSeedingDiscId] = useState<string | null>(null);
 
   async function load() {
-    const [{ data: profile }, { data: ccRows }, { data: settings }] = await Promise.all([
+    const [{ data: profile }, { data: ccRows }, { data: settings }, { data: discs }] = await Promise.all([
       supabase.from("profiles").select("*").maybeSingle(),
       supabase.rpc("get_canvas_connection_status"),
       supabase.from("teacher_settings").select("*").maybeSingle(),
+      supabase.from("teacher_disciplines").select("id, state, subject, grade, is_default").order("created_at"),
     ]);
     if (profile) {
       setDisplayName(profile.display_name ?? "");
@@ -68,6 +69,7 @@ export default function Settings() {
       setThreshold(Math.round((settings.mastery_threshold ?? 0.8) * 100));
       setWindowN(settings.attempt_window ?? 3);
     }
+    setDisciplines((discs ?? []) as Discipline[]);
   }
 
   useEffect(() => {
