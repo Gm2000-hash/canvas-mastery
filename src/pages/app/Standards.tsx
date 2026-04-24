@@ -27,6 +27,7 @@ export default function Standards() {
   const [rows, setRows] = useState<Standard[]>([]);
   const [filter, setFilter] = useState("");
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
+  const [scopeFilter, setScopeFilter] = useState<"ALL" | "STATE" | "NATIONAL">("ALL");
   const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
   const [gradeFilter, setGradeFilter] = useState<string>("ALL");
   const [profile, setProfile] = useState<{ state: string | null; default_subject: string | null; default_grade: string | null } | null>(null);
