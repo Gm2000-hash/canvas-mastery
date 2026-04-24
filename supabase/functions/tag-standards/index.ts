@@ -1,6 +1,7 @@
 // AI-powered standards tagging for assignments.
 // Input: { assignment_id }
-// Reads the assignment + teacher's standards library, asks Lovable AI to pick the most relevant ones,
+// Resolves the assignment's effective discipline (course-level mapping or teacher default),
+// loads candidate standards for THAT discipline, asks Lovable AI to pick the best matches,
 // and writes ai_suggested rows into assignment_standards.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -41,7 +42,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: assignment, error: aErr } = await admin
-      .from("assignments").select("id, name, description, teacher_id").eq("id", assignment_id).single();
+      .from("assignments").select("id, name, description, teacher_id, course_id").eq("id", assignment_id).single();
     if (aErr || !assignment) throw new Error("Assignment not found");
     if (assignment.teacher_id !== teacherId) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
@@ -49,20 +50,52 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: profile } = await admin
-      .from("profiles").select("state, default_subject, default_grade").eq("id", teacherId).single();
+    // Resolve effective discipline: course mapping → teacher default → profile fallback
+    let state: string | null = null;
+    let subject: string | null = null;
+    let grade: string | null = null;
 
-    // Candidate standards: everything the teacher can see (shared + own) for their default state/subject/grade
-    let q = admin.from("standards").select("id, code, description, subject, grade, state");
-    if (profile?.state) q = q.eq("state", profile.state);
-    if (profile?.default_subject) q = q.eq("subject", profile.default_subject);
-    if (profile?.default_grade) q = q.eq("grade", profile.default_grade);
-    const { data: standards, error: sErr } = await q.limit(500);
+    const { data: course } = await admin
+      .from("courses").select("discipline_id").eq("id", assignment.course_id).maybeSingle();
+
+    let disciplineId: string | null = course?.discipline_id ?? null;
+    if (!disciplineId) {
+      const { data: def } = await admin
+        .from("teacher_disciplines").select("id, state, subject, grade")
+        .eq("teacher_id", teacherId).eq("is_default", true).maybeSingle();
+      if (def) {
+        disciplineId = def.id;
+        state = def.state; subject = def.subject; grade = def.grade;
+      }
+    } else {
+      const { data: d } = await admin
+        .from("teacher_disciplines").select("state, subject, grade").eq("id", disciplineId).maybeSingle();
+      if (d) { state = d.state; subject = d.subject; grade = d.grade; }
+    }
+
+    // Profile fallback (legacy, before disciplines were introduced)
+    if (!state || !subject || !grade) {
+      const { data: profile } = await admin
+        .from("profiles").select("state, default_subject, default_grade").eq("id", teacherId).maybeSingle();
+      state ??= profile?.state ?? null;
+      subject ??= profile?.default_subject ?? null;
+      grade ??= profile?.default_grade ?? null;
+    }
+
+    if (!state || !subject || !grade) {
+      return new Response(JSON.stringify({
+        error: "No discipline set. Add a discipline in Settings (or assign one to this course).",
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { data: standards, error: sErr } = await admin
+      .from("standards").select("id, code, description")
+      .eq("state", state).eq("subject", subject).eq("grade", grade).limit(500);
     if (sErr) throw sErr;
     if (!standards || standards.length === 0) {
-      return new Response(JSON.stringify({ error: "No standards available. Set your state/subject/grade and seed standards first." }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({
+        error: `No standards found for ${state} ${subject} grade ${grade}. Seed them in Settings.`,
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const codeToId = new Map(standards.map((s) => [s.code, s.id]));
@@ -73,7 +106,7 @@ Deno.serve(async (req) => {
       `You are an expert curriculum specialist. Given an assignment, choose the 1–3 state standards from the candidate list that BEST match what the assignment assesses. Only use codes that appear EXACTLY in the candidate list. Be conservative — if nothing fits well, return fewer or none.`;
 
     const userPrompt =
-      `STATE: ${profile?.state ?? "?"}\nSUBJECT: ${profile?.default_subject ?? "?"}\nGRADE: ${profile?.default_grade ?? "?"}\n\n` +
+      `STATE: ${state}\nSUBJECT: ${subject}\nGRADE: ${grade}\n\n` +
       `ASSIGNMENT NAME: ${assignment.name}\n` +
       `ASSIGNMENT DESCRIPTION: ${assignment.description ?? "(none)"}\n\n` +
       `CANDIDATE STANDARDS:\n${candidateList}`;
@@ -141,7 +174,6 @@ Deno.serve(async (req) => {
       try { matches = JSON.parse(toolCall.function.arguments).matches ?? []; } catch (e) { console.error("parse args", e); }
     }
 
-    // Insert ai_suggested rows (skip duplicates)
     const rows = matches
       .map((m) => {
         const sid = codeToId.get(m.standard_code);
@@ -164,7 +196,7 @@ Deno.serve(async (req) => {
       if (insErr) console.error("insert suggestions", insErr);
     }
 
-    return new Response(JSON.stringify({ success: true, suggestions: matches }), {
+    return new Response(JSON.stringify({ success: true, suggestions: matches, discipline: { state, subject, grade } }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

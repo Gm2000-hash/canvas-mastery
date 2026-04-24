@@ -1,5 +1,11 @@
 // Pulls courses, students, assignments, and submissions from Canvas
 // and upserts them into the teacher's tables.
+//
+// Optional body:
+//   {
+//     course_ids?: number[];                                    // limit sync to these Canvas course IDs
+//     discipline_assignments?: { canvas_course_id: number; discipline_id: string | null }[];
+//   }
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -61,6 +67,20 @@ Deno.serve(async (req) => {
     }
     const teacherId = userData.user.id;
 
+    let body: any = {};
+    try { body = req.method === "POST" ? await req.json() : {}; } catch { /* empty body ok */ }
+    const courseIdFilter: Set<number> | null = Array.isArray(body?.course_ids) && body.course_ids.length
+      ? new Set(body.course_ids.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n)))
+      : null;
+    const disciplineMap = new Map<number, string | null>();
+    if (Array.isArray(body?.discipline_assignments)) {
+      for (const a of body.discipline_assignments) {
+        if (a && Number.isFinite(Number(a.canvas_course_id))) {
+          disciplineMap.set(Number(a.canvas_course_id), a.discipline_id ?? null);
+        }
+      }
+    }
+
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: creds, error: cErr } = await admin
       .from("canvas_credentials").select("base_url, api_token").eq("teacher_id", teacherId).maybeSingle();
@@ -73,17 +93,30 @@ Deno.serve(async (req) => {
 
     const stats = { courses: 0, students: 0, assignments: 0, submissions: 0 };
 
-    // 1) Courses (active teacher enrollment)
-    const courses = await canvasFetchAll<any>(creds, "/api/v1/courses?enrollment_type=teacher&enrollment_state=active&state[]=available");
+    // 1) Courses (active teacher enrollment by default; if course_ids provided we widen state filter)
+    const allCourses = courseIdFilter
+      ? await canvasFetchAll<any>(creds, "/api/v1/courses?enrollment_type=teacher&include[]=term&state[]=available&state[]=completed&state[]=unpublished")
+      : await canvasFetchAll<any>(creds, "/api/v1/courses?enrollment_type=teacher&enrollment_state=active&state[]=available&include[]=term");
+
+    const courses = courseIdFilter ? allCourses.filter((c) => courseIdFilter.has(Number(c.id))) : allCourses;
+
     for (const c of courses) {
-      const { data: courseRow, error: insErr } = await admin.from("courses").upsert({
+      const overrideDiscipline = disciplineMap.has(Number(c.id)) ? disciplineMap.get(Number(c.id)) : undefined;
+
+      const upsertRow: Record<string, unknown> = {
         teacher_id: teacherId,
         canvas_course_id: c.id,
         name: c.name ?? `Course ${c.id}`,
         course_code: c.course_code ?? null,
         term: c.term?.name ?? null,
         last_synced_at: new Date().toISOString(),
-      }, { onConflict: "teacher_id,canvas_course_id" }).select("id").single();
+      };
+      // Only set discipline_id when caller explicitly provided one (allows null to clear)
+      if (overrideDiscipline !== undefined) upsertRow.discipline_id = overrideDiscipline;
+
+      const { data: courseRow, error: insErr } = await admin
+        .from("courses").upsert(upsertRow, { onConflict: "teacher_id,canvas_course_id" })
+        .select("id").single();
       if (insErr) { console.error("course upsert", insErr); continue; }
       stats.courses++;
       const courseId = courseRow!.id as string;
@@ -152,7 +185,6 @@ Deno.serve(async (req) => {
         .filter(Boolean) as any[];
 
       if (subRows.length) {
-        // Chunk to avoid huge payloads
         for (let i = 0; i < subRows.length; i += 500) {
           const chunk = subRows.slice(i, i + 500);
           const { error: subErr } = await admin.from("submissions").upsert(chunk, { onConflict: "assignment_id,student_id" });
