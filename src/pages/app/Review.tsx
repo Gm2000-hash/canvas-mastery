@@ -418,6 +418,11 @@ export default function Review() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium truncate">{a.name}</span>
                           <Badge variant="outline" className="text-[10px] uppercase">{a.kind}</Badge>
+                          {isQuiz && qCount > 0 && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {qCount} question{qCount === 1 ? "" : "s"}
+                            </Badge>
+                          )}
                           {course && <span className="text-xs text-muted-foreground truncate">{course.name}</span>}
                           {disc && (
                             <Badge variant="outline" className="text-[10px] bg-accent/5 text-accent border-accent/30">
