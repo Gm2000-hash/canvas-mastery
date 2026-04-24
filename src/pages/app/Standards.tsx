@@ -48,9 +48,25 @@ export default function Standards() {
     return Array.from(s);
   }, [rows]);
 
+  // Per-subject breakdown so teachers can see "what coverage do I have for Science?
+  // → 24 NGSS (national) + 12 Idaho (state)" at a glance.
+  const subjectBreakdown = useMemo(() => {
+    const map = new Map<string, Map<string, number>>();
+    rows.forEach((r) => {
+      const fw = r.framework ?? "STATE";
+      if (!map.has(r.subject)) map.set(r.subject, new Map());
+      const inner = map.get(r.subject)!;
+      inner.set(fw, (inner.get(fw) ?? 0) + 1);
+    });
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [rows]);
+
   const visible = rows.filter((r) => {
     const fw = r.framework ?? "STATE";
+    const meta = getFramework(fw);
     if (frameworkFilter !== "ALL" && fw !== frameworkFilter) return false;
+    if (scopeFilter === "STATE" && meta.national) return false;
+    if (scopeFilter === "NATIONAL" && !meta.national) return false;
     if (subjectFilter !== "ALL" && r.subject !== subjectFilter) return false;
     if (gradeFilter !== "ALL" && r.grade !== gradeFilter) return false;
     if (filter) {
@@ -59,6 +75,21 @@ export default function Standards() {
     }
     return true;
   });
+
+  // Color palette for framework badges so each library is instantly recognizable.
+  const fwBadgeClass = (fwId: string) => {
+    const meta = getFramework(fwId);
+    if (!meta.national) return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30";
+    switch (meta.id) {
+      case "NGSS": return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
+      case "CCSS_MATH": return "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30";
+      case "CCSS_ELA": return "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30";
+      case "C3_SS": return "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30";
+      case "AP": return "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30";
+      case "IB": return "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30";
+      default: return "bg-muted text-muted-foreground border-border";
+    }
+  };
 
   return (
     <div className="space-y-6">
