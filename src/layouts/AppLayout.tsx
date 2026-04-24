@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 import { BookMarked, CheckCheck, GraduationCap, LayoutDashboard, ListChecks, Settings as SettingsIcon, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -33,7 +34,9 @@ export default function AppLayout() {
   }
 
   return (
+    <SyncProvider>
     <div className="min-h-screen flex bg-paper">
+      <SyncStatusPill />
       <aside className="w-60 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col">
         <Link to="/app" className="px-6 py-6 border-b border-sidebar-border">
           <div className="font-display text-2xl font-semibold text-sidebar-foreground">StandardsTrack</div>
@@ -80,5 +83,6 @@ export default function AppLayout() {
         </div>
       </main>
     </div>
+    </SyncProvider>
   );
 }

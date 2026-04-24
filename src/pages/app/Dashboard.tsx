@@ -4,13 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { GraduationCap, ListChecks, BookMarked, Sparkles, RefreshCw, AlertCircle } from "lucide-react";
-import { toast } from "sonner";
+import { useSync } from "@/contexts/SyncContext";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ courses: 0, students: 0, assignments: 0, taggedAssignments: 0, standards: 0 });
   const [canvasConnected, setCanvasConnected] = useState<boolean | null>(null);
   const [profileReady, setProfileReady] = useState<boolean | null>(null);
-  const [syncing, setSyncing] = useState(false);
+  const { syncing, runCanvasSync } = useSync();
 
   async function load() {
     const [{ count: courses }, { count: students }, { count: assignments }, { count: tagged }, { count: standards }, { data: ccRows }, { data: profile }] = await Promise.all([
@@ -34,15 +34,15 @@ export default function Dashboard() {
     setProfileReady(!!(profile?.state && profile?.default_subject && profile?.default_grade));
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const onDone = () => load();
+    window.addEventListener("canvas-sync:done", onDone);
+    return () => window.removeEventListener("canvas-sync:done", onDone);
+  }, []);
 
   async function syncNow() {
-    setSyncing(true);
-    const { data, error } = await supabase.functions.invoke("canvas-sync");
-    setSyncing(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success(`Synced: ${data.stats.courses} courses, ${data.stats.students} students, ${data.stats.assignments} assignments`);
-    load();
+    await runCanvasSync();
   }
 
   const needsSetup = canvasConnected === false || profileReady === false;
