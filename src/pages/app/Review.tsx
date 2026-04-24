@@ -395,6 +395,10 @@ export default function Review() {
               const course = courseById.get(a.course_id);
               const disc = course?.discipline_id ? disciplineById.get(course.discipline_id) : null;
               const isActive = idx === activeIdx;
+              const qCount = questionCountByAssignment[a.id] ?? 0;
+              const isQuiz = a.kind === "quiz";
+              const isExpanded = expandedQuestions.has(a.id);
+              const qBusy = questionTagBusy.has(a.id);
               return (
                 <Card
                   key={a.id}
