@@ -14,16 +14,566 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      assignment_standards: {
+        Row: {
+          ai_suggested: boolean
+          assignment_id: string
+          confidence: number | null
+          confirmed: boolean
+          created_at: string
+          id: string
+          rationale: string | null
+          standard_id: string
+          teacher_id: string
+        }
+        Insert: {
+          ai_suggested?: boolean
+          assignment_id: string
+          confidence?: number | null
+          confirmed?: boolean
+          created_at?: string
+          id?: string
+          rationale?: string | null
+          standard_id: string
+          teacher_id: string
+        }
+        Update: {
+          ai_suggested?: boolean
+          assignment_id?: string
+          confidence?: number | null
+          confirmed?: boolean
+          created_at?: string
+          id?: string
+          rationale?: string | null
+          standard_id?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_standards_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_standards_standard_id_fkey"
+            columns: ["standard_id"]
+            isOneToOne: false
+            referencedRelation: "standards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assignments: {
+        Row: {
+          canvas_assignment_id: number
+          canvas_quiz_id: number | null
+          course_id: string
+          created_at: string
+          description: string | null
+          due_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["assignment_kind"]
+          name: string
+          points_possible: number | null
+          teacher_id: string
+        }
+        Insert: {
+          canvas_assignment_id: number
+          canvas_quiz_id?: number | null
+          course_id: string
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["assignment_kind"]
+          name: string
+          points_possible?: number | null
+          teacher_id: string
+        }
+        Update: {
+          canvas_assignment_id?: number
+          canvas_quiz_id?: number | null
+          course_id?: string
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["assignment_kind"]
+          name?: string
+          points_possible?: number | null
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      canvas_credentials: {
+        Row: {
+          api_token: string
+          base_url: string
+          created_at: string
+          last_sync_at: string | null
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          api_token: string
+          base_url: string
+          created_at?: string
+          last_sync_at?: string | null
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          api_token?: string
+          base_url?: string
+          created_at?: string
+          last_sync_at?: string | null
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      courses: {
+        Row: {
+          canvas_course_id: number
+          course_code: string | null
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          name: string
+          teacher_id: string
+          term: string | null
+        }
+        Insert: {
+          canvas_course_id: number
+          course_code?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          name: string
+          teacher_id: string
+          term?: string | null
+        }
+        Update: {
+          canvas_course_id?: number
+          course_code?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          name?: string
+          teacher_id?: string
+          term?: string | null
+        }
+        Relationships: []
+      }
+      mastery_snapshots: {
+        Row: {
+          attempts: number
+          computed_at: string
+          id: string
+          mastered: boolean
+          mastery_score: number
+          standard_id: string
+          student_id: string
+          teacher_id: string
+        }
+        Insert: {
+          attempts?: number
+          computed_at?: string
+          id?: string
+          mastered?: boolean
+          mastery_score: number
+          standard_id: string
+          student_id: string
+          teacher_id: string
+        }
+        Update: {
+          attempts?: number
+          computed_at?: string
+          id?: string
+          mastered?: boolean
+          mastery_score?: number
+          standard_id?: string
+          student_id?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mastery_snapshots_standard_id_fkey"
+            columns: ["standard_id"]
+            isOneToOne: false
+            referencedRelation: "standards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mastery_snapshots_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          default_grade: string | null
+          default_subject: string | null
+          display_name: string | null
+          id: string
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_grade?: string | null
+          default_subject?: string | null
+          display_name?: string | null
+          id: string
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_grade?: string | null
+          default_subject?: string | null
+          display_name?: string | null
+          id?: string
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      question_responses: {
+        Row: {
+          correct: boolean | null
+          created_at: string
+          id: string
+          points: number | null
+          points_possible: number | null
+          question_id: string
+          student_id: string
+          teacher_id: string
+        }
+        Insert: {
+          correct?: boolean | null
+          created_at?: string
+          id?: string
+          points?: number | null
+          points_possible?: number | null
+          question_id: string
+          student_id: string
+          teacher_id: string
+        }
+        Update: {
+          correct?: boolean | null
+          created_at?: string
+          id?: string
+          points?: number | null
+          points_possible?: number | null
+          question_id?: string
+          student_id?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_responses_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "question_responses_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      question_standards: {
+        Row: {
+          ai_suggested: boolean
+          confidence: number | null
+          confirmed: boolean
+          created_at: string
+          id: string
+          question_id: string
+          rationale: string | null
+          standard_id: string
+          teacher_id: string
+        }
+        Insert: {
+          ai_suggested?: boolean
+          confidence?: number | null
+          confirmed?: boolean
+          created_at?: string
+          id?: string
+          question_id: string
+          rationale?: string | null
+          standard_id: string
+          teacher_id: string
+        }
+        Update: {
+          ai_suggested?: boolean
+          confidence?: number | null
+          confirmed?: boolean
+          created_at?: string
+          id?: string
+          question_id?: string
+          rationale?: string | null
+          standard_id?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_standards_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "question_standards_standard_id_fkey"
+            columns: ["standard_id"]
+            isOneToOne: false
+            referencedRelation: "standards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_questions: {
+        Row: {
+          assignment_id: string
+          canvas_question_id: number
+          created_at: string
+          id: string
+          points_possible: number | null
+          position: number | null
+          question_text: string | null
+          teacher_id: string
+        }
+        Insert: {
+          assignment_id: string
+          canvas_question_id: number
+          created_at?: string
+          id?: string
+          points_possible?: number | null
+          position?: number | null
+          question_text?: string | null
+          teacher_id: string
+        }
+        Update: {
+          assignment_id?: string
+          canvas_question_id?: number
+          created_at?: string
+          id?: string
+          points_possible?: number | null
+          position?: number | null
+          question_text?: string | null
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_questions_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      standards: {
+        Row: {
+          code: string
+          created_at: string
+          description: string
+          grade: string
+          id: string
+          state: string
+          subject: string
+          teacher_id: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description: string
+          grade: string
+          id?: string
+          state: string
+          subject: string
+          teacher_id?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string
+          grade?: string
+          id?: string
+          state?: string
+          subject?: string
+          teacher_id?: string | null
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          canvas_user_id: number
+          course_id: string
+          created_at: string
+          id: string
+          name: string
+          sortable_name: string | null
+          teacher_id: string
+        }
+        Insert: {
+          canvas_user_id: number
+          course_id: string
+          created_at?: string
+          id?: string
+          name: string
+          sortable_name?: string | null
+          teacher_id: string
+        }
+        Update: {
+          canvas_user_id?: number
+          course_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sortable_name?: string | null
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submissions: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          graded_at: string | null
+          id: string
+          percentage: number | null
+          points_possible: number | null
+          score: number | null
+          student_id: string
+          submitted_at: string | null
+          teacher_id: string
+          workflow_state: string | null
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          graded_at?: string | null
+          id?: string
+          percentage?: number | null
+          points_possible?: number | null
+          score?: number | null
+          student_id: string
+          submitted_at?: string | null
+          teacher_id: string
+          workflow_state?: string | null
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          graded_at?: string | null
+          id?: string
+          percentage?: number | null
+          points_possible?: number | null
+          score?: number | null
+          student_id?: string
+          submitted_at?: string | null
+          teacher_id?: string
+          workflow_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teacher_settings: {
+        Row: {
+          attempt_window: number
+          mastery_threshold: number
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_window?: number
+          mastery_threshold?: number
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_window?: number
+          mastery_threshold?: number
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      canvas_connection_status: {
+        Row: {
+          base_url: string | null
+          connected: boolean | null
+          last_sync_at: string | null
+          teacher_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          base_url?: string | null
+          connected?: never
+          last_sync_at?: string | null
+          teacher_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          base_url?: string | null
+          connected?: never
+          last_sync_at?: string | null
+          teacher_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      assignment_kind: "assignment" | "quiz"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +700,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      assignment_kind: ["assignment", "quiz"],
+    },
   },
 } as const
