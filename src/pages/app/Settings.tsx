@@ -38,6 +38,15 @@ export default function Settings() {
   // Standards seeding
   const [seeding, setSeeding] = useState(false);
 
+  // Disciplines (multi)
+  type Discipline = { id: string; state: string; subject: string; grade: string; is_default: boolean };
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [newState, setNewState] = useState("");
+  const [newSubject, setNewSubject] = useState("");
+  const [newGrade, setNewGrade] = useState("");
+  const [addingDisc, setAddingDisc] = useState(false);
+  const [seedingDiscId, setSeedingDiscId] = useState<string | null>(null);
+
   async function load() {
     const [{ data: profile }, { data: ccRows }, { data: settings }] = await Promise.all([
       supabase.from("profiles").select("*").maybeSingle(),
