@@ -13,13 +13,13 @@ export default function Dashboard() {
   const [syncing, setSyncing] = useState(false);
 
   async function load() {
-    const [{ count: courses }, { count: students }, { count: assignments }, { count: tagged }, { count: standards }, { data: cc }, { data: profile }] = await Promise.all([
+    const [{ count: courses }, { count: students }, { count: assignments }, { count: tagged }, { count: standards }, { data: ccRows }, { data: profile }] = await Promise.all([
       supabase.from("courses").select("id", { count: "exact", head: true }),
       supabase.from("students").select("id", { count: "exact", head: true }),
       supabase.from("assignments").select("id", { count: "exact", head: true }),
       supabase.from("assignment_standards").select("assignment_id", { count: "exact", head: true }).eq("confirmed", true),
       supabase.from("standards").select("id", { count: "exact", head: true }),
-      supabase.from("canvas_connection_status").select("connected").maybeSingle(),
+      supabase.rpc("get_canvas_connection_status"),
       supabase.from("profiles").select("state, default_subject, default_grade").maybeSingle(),
     ]);
     setStats({
@@ -29,6 +29,7 @@ export default function Dashboard() {
       taggedAssignments: tagged ?? 0,
       standards: standards ?? 0,
     });
+    const cc = Array.isArray(ccRows) ? ccRows[0] : null;
     setCanvasConnected(!!cc?.connected);
     setProfileReady(!!(profile?.state && profile?.default_subject && profile?.default_grade));
   }
