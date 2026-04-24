@@ -338,7 +338,11 @@ function masteryColor(score: number | null | undefined): string {
   return "bg-red-500/15 text-red-700 dark:text-red-300";
 }
 
-function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => void }) {
+function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
+  course: ClassRow;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+}) {
   const [data, setData] = useState<MatrixRow[] | null>(null);
   const [studentFilter, setStudentFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
@@ -347,11 +351,11 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    setData(null);
-    setExpanded(new Set());
+    if (collapsed) return; // defer fetch until the teacher opens the panel
+    if (data !== null) return;
     supabase.rpc("analytics_class_matrix", { _course_id: course.course_id })
       .then(({ data }) => setData((data as any) ?? []));
-  }, [course.course_id]);
+  }, [course.course_id, collapsed, data]);
 
   // Distinct students and standards out of the long-form rows.
   const { students, standards, valueByPair, subjects, frameworks } = useMemo(() => {
