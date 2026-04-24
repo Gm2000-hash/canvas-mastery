@@ -1,0 +1,16 @@
+project_id = "kxdsormjkkgaeobovqag"
+
+[functions.canvas-save-token]
+verify_jwt = true
+
+[functions.canvas-sync]
+verify_jwt = true
+
+[functions.tag-standards]
+verify_jwt = true
+
+[functions.seed-standards]
+verify_jwt = true
+
+[functions.recompute-mastery]
+verify_jwt = true
