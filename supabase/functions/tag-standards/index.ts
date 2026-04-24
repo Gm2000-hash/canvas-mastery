@@ -103,13 +103,18 @@ Deno.serve(async (req) => {
     const codes = standards.map((s) => s.code);
 
     const sysPrompt =
-      `You are an expert curriculum specialist. Given an assignment, choose the 1–3 state standards from the candidate list that BEST match what the assignment assesses. Only use codes that appear EXACTLY in the candidate list. Be conservative — if nothing fits well, return fewer or none.`;
+      `You are an expert curriculum specialist. Given an assignment (or assessment question), choose the 1–3 state standards from the candidate list that BEST match what is being assessed. ` +
+      `Only use codes that appear EXACTLY in the candidate list. Be conservative — if nothing fits well, return fewer or none.\n\n` +
+      `EVIDENCE REQUIREMENT (STRICT): For every standard you propose, you MUST extract at least 8 distinct key words or short key phrases (1–4 words each) drawn from BOTH the assignment text AND the standard's description that justify the match. ` +
+      `These keywords should be the specific concepts, skills, verbs, nouns, or domain terms that overlap (e.g., "linear equation", "slope", "two variables", "graph", "solve", "y-intercept", "table of values", "system"). ` +
+      `Do not repeat the same word; do not use generic filler ("the", "students", "learn"). If you cannot find at least 8 substantive overlapping keywords for a standard, DO NOT include that standard in the matches.`;
 
     const userPrompt =
       `STATE: ${state}\nSUBJECT: ${subject}\nGRADE: ${grade}\n\n` +
       `ASSIGNMENT NAME: ${assignment.name}\n` +
       `ASSIGNMENT DESCRIPTION: ${assignment.description ?? "(none)"}\n\n` +
-      `CANDIDATE STANDARDS:\n${candidateList}`;
+      `CANDIDATE STANDARDS:\n${candidateList}\n\n` +
+      `Remember: each match needs ≥ 8 substantive keywords/phrases drawn from both the assignment and the standard description. Drop any standard that doesn't meet this bar.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -136,8 +141,14 @@ Deno.serve(async (req) => {
                       standard_code: { type: "string", enum: codes },
                       confidence: { type: "number", minimum: 0, maximum: 1 },
                       rationale: { type: "string" },
+                      keywords: {
+                        type: "array",
+                        description: "At least 8 distinct key words/short phrases (1-4 words) drawn from BOTH the assignment text and the standard description that justify the match.",
+                        items: { type: "string", minLength: 2 },
+                        minItems: 8,
+                      },
                     },
-                    required: ["standard_code", "confidence", "rationale"],
+                    required: ["standard_code", "confidence", "rationale", "keywords"],
                     additionalProperties: false,
                   },
                   maxItems: 3,
@@ -169,15 +180,20 @@ Deno.serve(async (req) => {
 
     const aiJson = await aiRes.json();
     const toolCall = aiJson.choices?.[0]?.message?.tool_calls?.[0];
-    let matches: Array<{ standard_code: string; confidence: number; rationale: string }> = [];
+    let matches: Array<{ standard_code: string; confidence: number; rationale: string; keywords?: string[] }> = [];
     if (toolCall?.function?.arguments) {
       try { matches = JSON.parse(toolCall.function.arguments).matches ?? []; } catch (e) { console.error("parse args", e); }
     }
 
     const rows = matches
-      .map((m) => {
+      .map((m: any) => {
         const sid = codeToId.get(m.standard_code);
         if (!sid) return null;
+        // Enforce: drop matches that didn't supply ≥ 8 distinct substantive keywords.
+        const kws: string[] = Array.isArray(m.keywords) ? m.keywords : [];
+        const distinct = Array.from(new Set(kws.map((k) => String(k).trim().toLowerCase()).filter((k) => k.length >= 2)));
+        if (distinct.length < 8) return null;
+        const rationale = `${m.rationale}\n\nKey evidence: ${distinct.slice(0, 16).join(", ")}`;
         return {
           teacher_id: teacherId,
           assignment_id,
@@ -185,7 +201,7 @@ Deno.serve(async (req) => {
           ai_suggested: true,
           confirmed: false,
           confidence: m.confidence,
-          rationale: m.rationale,
+          rationale,
         };
       })
       .filter(Boolean) as any[];
