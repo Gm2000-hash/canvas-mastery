@@ -544,33 +544,19 @@ export type Database = {
       }
     }
     Views: {
-      canvas_connection_status: {
-        Row: {
-          base_url: string | null
-          connected: boolean | null
-          last_sync_at: string | null
-          teacher_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          base_url?: string | null
-          connected?: never
-          last_sync_at?: string | null
-          teacher_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          base_url?: string | null
-          connected?: never
-          last_sync_at?: string | null
-          teacher_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_canvas_connection_status: {
+        Args: never
+        Returns: {
+          base_url: string
+          connected: boolean
+          last_sync_at: string
+          teacher_id: string
+          updated_at: string
+        }[]
+      }
     }
     Enums: {
       assignment_kind: "assignment" | "quiz"
