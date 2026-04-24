@@ -39,20 +39,24 @@ export default function Settings() {
   const [seeding, setSeeding] = useState(false);
 
   // Disciplines (multi)
-  type Discipline = { id: string; state: string; subject: string; grade: string; is_default: boolean };
+  type Discipline = { id: string; state: string; subject: string; grade: string; is_default: boolean; framework: string | null };
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  // Multi-pick add form
+  const [newFramework, setNewFramework] = useState<FrameworkId>("STATE");
   const [newState, setNewState] = useState("");
-  const [newSubject, setNewSubject] = useState("");
-  const [newGrade, setNewGrade] = useState("");
+  const [newSubjects, setNewSubjects] = useState<string[]>([]);
+  const [newGrades, setNewGrades] = useState<string[]>([]);
   const [addingDisc, setAddingDisc] = useState(false);
   const [seedingDiscId, setSeedingDiscId] = useState<string | null>(null);
+  // Edit dialog
+  const [editing, setEditing] = useState<Discipline | null>(null);
 
   async function load() {
     const [{ data: profile }, { data: ccRows }, { data: settings }, { data: discs }] = await Promise.all([
       supabase.from("profiles").select("*").maybeSingle(),
       supabase.rpc("get_canvas_connection_status"),
       supabase.from("teacher_settings").select("*").maybeSingle(),
-      supabase.from("teacher_disciplines").select("id, state, subject, grade, is_default").order("created_at"),
+      supabase.from("teacher_disciplines").select("id, state, subject, grade, is_default, framework").order("created_at"),
     ]);
     if (profile) {
       setDisplayName(profile.display_name ?? "");
