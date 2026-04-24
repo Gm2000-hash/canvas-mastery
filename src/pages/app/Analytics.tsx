@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, ResponsiveContainer, Legend } from "recharts";
-import { BarChart3, TrendingUp, Users, GraduationCap, BookMarked, ListChecks, Layers, HelpCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, BarChart3, TrendingUp, GraduationCap, BookMarked, ListChecks, Layers, HelpCircle, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getFramework, FRAMEWORKS } from "@/lib/frameworks";
 import { Link } from "react-router-dom";
 
