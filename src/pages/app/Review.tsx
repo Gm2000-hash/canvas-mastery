@@ -391,6 +391,10 @@ export default function Review() {
                 <Button size="sm" variant="outline" onClick={bulkRejectAll} disabled={bulkBusy}>
                   <X className="h-3.5 w-3.5 mr-1" /> Reject all suggestions
                 </Button>
+                <Button size="sm" variant="outline" onClick={bulkTagByQuestion} disabled={bulkBusy}>
+                  {bulkBusy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ListChecks className="h-3.5 w-3.5 mr-1" />}
+                  Tag by question (quizzes)
+                </Button>
                 <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear selection</Button>
               </CardContent>
             </Card>
