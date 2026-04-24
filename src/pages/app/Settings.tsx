@@ -123,7 +123,7 @@ export default function Settings() {
     if (!state || !subject || !grade) { toast.error("Save your state/subject/grade first"); return; }
     setSeeding(true);
     const { data, error } = await supabase.functions.invoke("seed-standards", {
-      body: { state, subject, grade },
+      body: { framework: "STATE", state, subject, grade },
     });
     setSeeding(false);
     if (error) { toast.error((error as any).message ?? "Failed"); return; }
@@ -147,23 +147,51 @@ export default function Settings() {
   }
 
   // ----- Disciplines (multi) -----
-  async function addDiscipline() {
-    if (!newState || !newSubject || !newGrade) { toast.error("Pick state, subject, and grade"); return; }
+  async function addDisciplines() {
+    const fw = getFramework(newFramework);
+    if (!fw.national && !newState) { toast.error("Pick a state"); return; }
+    if (newSubjects.length === 0 || newGrades.length === 0) {
+      toast.error("Pick at least one subject and one grade");
+      return;
+    }
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
     setAddingDisc(true);
+
+    const stateForRow = fw.national ? (newState || "") : newState;
     const isFirst = disciplines.length === 0;
-    const { error } = await supabase.from("teacher_disciplines").insert({
-      teacher_id: u.user.id,
-      state: newState,
-      subject: newSubject,
-      grade: newGrade,
-      is_default: isFirst,
-    });
+    const rows: Array<{
+      teacher_id: string; state: string; subject: string; grade: string;
+      is_default: boolean; framework: string;
+    }> = [];
+    for (const s of newSubjects) {
+      for (const g of newGrades) {
+        rows.push({
+          teacher_id: u.user.id,
+          state: stateForRow,
+          subject: s,
+          grade: g,
+          framework: newFramework,
+          is_default: false,
+        });
+      }
+    }
+    if (isFirst && rows.length > 0) rows[0].is_default = true;
+
+    // Insert one-by-one so duplicates (unique-index violation) don't block the rest
+    let inserted = 0, dupes = 0, failed = 0;
+    for (const r of rows) {
+      const { error } = await supabase.from("teacher_disciplines").insert(r);
+      if (!error) inserted++;
+      else if ((error as any).code === "23505") dupes++;
+      else failed++;
+    }
     setAddingDisc(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Discipline added");
-    setNewState(""); setNewSubject(""); setNewGrade("");
+    if (inserted > 0) toast.success(`Added ${inserted} discipline${inserted === 1 ? "" : "s"}${dupes ? ` · ${dupes} already existed` : ""}`);
+    else if (dupes > 0) toast.info(`All ${dupes} already existed`);
+    if (failed > 0) toast.error(`${failed} failed to add`);
+
+    setNewSubjects([]); setNewGrades([]);
     load();
   }
 
@@ -187,17 +215,38 @@ export default function Settings() {
     load();
   }
 
-  async function seedDiscipline(d: Discipline) {
+  async function saveEditDiscipline(updated: Discipline) {
+    const { error } = await supabase.from("teacher_disciplines").update({
+      framework: updated.framework ?? "STATE",
+      state: updated.state,
+      subject: updated.subject,
+      grade: updated.grade,
+    }).eq("id", updated.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Discipline updated");
+    setEditing(null);
+    load();
+  }
+
+  async function seedDiscipline(d: Discipline, replace = false) {
     setSeedingDiscId(d.id);
     const { data, error } = await supabase.functions.invoke("seed-standards", {
-      body: { state: d.state, subject: d.subject, grade: d.grade },
+      body: {
+        framework: d.framework ?? "STATE",
+        state: d.state,
+        subject: d.subject,
+        grade: d.grade,
+        replace,
+      },
     });
     setSeedingDiscId(null);
     if (error) { toast.error((error as any).message ?? "Failed"); return; }
     if ((data as any)?.error) { toast.error((data as any).error); return; }
-    if ((data as any).skipped) toast.info(`Already seeded (${(data as any).existing} standards)`);
+    if ((data as any).skipped) toast.info(`Already seeded (${(data as any).existing} standards). Use Re-seed to replace.`);
     else toast.success(`Seeded ${(data as any).inserted} standards`);
   }
+
+  const newFrameworkMeta = useMemo(() => getFramework(newFramework), [newFramework]);
 
   return (
     <div className="space-y-8 max-w-3xl">
