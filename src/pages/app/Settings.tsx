@@ -524,3 +524,126 @@ export default function Settings() {
     </div>
   );
 }
+
+// ----- Helper components -----
+
+function ChipMultiSelect({
+  options, selected, onChange, gridCols = 4,
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  gridCols?: number;
+}) {
+  const set = new Set(selected);
+  function toggle(v: string) {
+    const next = new Set(set);
+    if (next.has(v)) next.delete(v); else next.add(v);
+    // Preserve original option order
+    onChange(options.filter((o) => next.has(o)));
+  }
+  return (
+    <div
+      className="grid gap-1.5"
+      style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}
+    >
+      {options.map((o) => {
+        const active = set.has(o);
+        return (
+          <button
+            key={o}
+            type="button"
+            onClick={() => toggle(o)}
+            className={
+              "px-2 py-1 rounded-md text-xs border transition-colors " +
+              (active
+                ? "bg-accent text-accent-foreground border-accent"
+                : "bg-background text-foreground/80 border-border hover:bg-muted")
+            }
+          >
+            {o}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function EditDisciplineDialog({
+  discipline, onClose, onSave,
+}: {
+  discipline: { id: string; state: string; subject: string; grade: string; framework: string | null; is_default: boolean };
+  onClose: () => void;
+  onSave: (d: { id: string; state: string; subject: string; grade: string; framework: string | null; is_default: boolean }) => void;
+}) {
+  const [framework, setFramework] = useState<FrameworkId>((discipline.framework as FrameworkId) || "STATE");
+  const [stateVal, setStateVal] = useState(discipline.state || "");
+  const [subjectVal, setSubjectVal] = useState(discipline.subject);
+  const [gradeVal, setGradeVal] = useState(discipline.grade);
+  const fwMeta = getFramework(framework);
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit discipline</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label className="text-xs">Standards framework</Label>
+            <Select value={framework} onValueChange={(v) => setFramework(v as FrameworkId)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FRAMEWORKS.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">{fwMeta.description}</p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">State {fwMeta.national && <span className="text-muted-foreground">(opt.)</span>}</Label>
+              <Select value={stateVal} onValueChange={setStateVal}>
+                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Subject</Label>
+              <Select value={subjectVal} onValueChange={setSubjectVal}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Grade</Label>
+              <Select value={gradeVal} onValueChange={setGradeVal}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            onClick={() => onSave({
+              ...discipline,
+              framework,
+              state: fwMeta.national ? stateVal : stateVal,
+              subject: subjectVal,
+              grade: gradeVal,
+            })}
+            disabled={!subjectVal || !gradeVal || (!fwMeta.national && !stateVal)}
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
