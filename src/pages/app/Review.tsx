@@ -51,6 +51,11 @@ export default function Review() {
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [tagsByAssignment, setTagsByAssignment] = useState<Record<string, Tag[]>>({});
+  const [questionCountByAssignment, setQuestionCountByAssignment] = useState<Record<string, number>>({});
+  const [questionsByAssignment, setQuestionsByAssignment] = useState<Record<string, QuizQuestion[]>>({});
+  const [qTagsByQuestion, setQTagsByQuestion] = useState<Record<string, QTag[]>>({});
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
+  const [questionTagBusy, setQuestionTagBusy] = useState<Set<string>>(new Set());
   const [allStandards, setAllStandards] = useState<{ id: string; code: string; description: string; state: string; subject: string; grade: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
