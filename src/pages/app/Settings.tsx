@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { Check, ExternalLink, Loader2 } from "lucide-react";
+import { Check, ExternalLink, Loader2, Star, Trash2, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 const SUBJECTS = ["Math", "ELA", "Science", "Social Studies"];
 const GRADES = ["6", "7", "8"];
