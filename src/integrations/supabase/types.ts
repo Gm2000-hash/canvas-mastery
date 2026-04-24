@@ -409,6 +409,7 @@ export type Database = {
           code: string
           created_at: string
           description: string
+          framework: string | null
           grade: string
           id: string
           state: string
@@ -419,6 +420,7 @@ export type Database = {
           code: string
           created_at?: string
           description: string
+          framework?: string | null
           grade: string
           id?: string
           state: string
@@ -429,6 +431,7 @@ export type Database = {
           code?: string
           created_at?: string
           description?: string
+          framework?: string | null
           grade?: string
           id?: string
           state?: string
@@ -535,6 +538,7 @@ export type Database = {
       teacher_disciplines: {
         Row: {
           created_at: string
+          framework: string | null
           grade: string
           id: string
           is_default: boolean
@@ -545,6 +549,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          framework?: string | null
           grade: string
           id?: string
           is_default?: boolean
@@ -555,6 +560,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          framework?: string | null
           grade?: string
           id?: string
           is_default?: boolean
@@ -604,6 +610,7 @@ export type Database = {
       get_effective_discipline: {
         Args: { _course_id: string }
         Returns: {
+          framework: string
           grade: string
           id: string
           state: string

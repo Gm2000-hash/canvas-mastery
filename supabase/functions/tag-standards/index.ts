@@ -54,6 +54,7 @@ Deno.serve(async (req) => {
     let state: string | null = null;
     let subject: string | null = null;
     let grade: string | null = null;
+    let framework: string | null = null;
 
     const { data: course } = await admin
       .from("courses").select("discipline_id").eq("id", assignment.course_id).maybeSingle();
@@ -61,16 +62,17 @@ Deno.serve(async (req) => {
     let disciplineId: string | null = course?.discipline_id ?? null;
     if (!disciplineId) {
       const { data: def } = await admin
-        .from("teacher_disciplines").select("id, state, subject, grade")
+        .from("teacher_disciplines").select("id, state, subject, grade, framework")
         .eq("teacher_id", teacherId).eq("is_default", true).maybeSingle();
       if (def) {
         disciplineId = def.id;
         state = def.state; subject = def.subject; grade = def.grade;
+        framework = (def as any).framework ?? null;
       }
     } else {
       const { data: d } = await admin
-        .from("teacher_disciplines").select("state, subject, grade").eq("id", disciplineId).maybeSingle();
-      if (d) { state = d.state; subject = d.subject; grade = d.grade; }
+        .from("teacher_disciplines").select("state, subject, grade, framework").eq("id", disciplineId).maybeSingle();
+      if (d) { state = d.state; subject = d.subject; grade = d.grade; framework = (d as any).framework ?? null; }
     }
 
     // Profile fallback (legacy, before disciplines were introduced)
@@ -88,13 +90,26 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: standards, error: sErr } = await admin
-      .from("standards").select("id, code, description")
-      .eq("state", state).eq("subject", subject).eq("grade", grade).limit(500);
+    // Load candidate standards — prefer the discipline's framework, with a
+    // graceful fallback to (state, subject, grade) so legacy NULL-framework
+    // libraries still match.
+    let stdQuery = admin.from("standards").select("id, code, description, framework")
+      .eq("subject", subject).eq("grade", grade).limit(500);
+    if (framework && framework !== "STATE") {
+      stdQuery = stdQuery.eq("framework", framework);
+    } else {
+      stdQuery = stdQuery.eq("state", state);
+    }
+    let { data: standards, error: sErr } = await stdQuery;
     if (sErr) throw sErr;
     if (!standards || standards.length === 0) {
+      const fb = await admin.from("standards").select("id, code, description, framework")
+        .eq("state", state).eq("subject", subject).eq("grade", grade).limit(500);
+      standards = fb.data ?? [];
+    }
+    if (!standards || standards.length === 0) {
       return new Response(JSON.stringify({
-        error: `No standards found for ${state} ${subject} grade ${grade}. Seed them in Settings.`,
+        error: `No standards found for ${framework ?? "STATE"} ${state} ${subject} grade ${grade}. Seed them in Settings.`,
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
