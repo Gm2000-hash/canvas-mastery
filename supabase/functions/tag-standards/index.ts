@@ -103,13 +103,18 @@ Deno.serve(async (req) => {
     const codes = standards.map((s) => s.code);
 
     const sysPrompt =
-      `You are an expert curriculum specialist. Given an assignment, choose the 1–3 state standards from the candidate list that BEST match what the assignment assesses. Only use codes that appear EXACTLY in the candidate list. Be conservative — if nothing fits well, return fewer or none.`;
+      `You are an expert curriculum specialist. Given an assignment (or assessment question), choose the 1–3 state standards from the candidate list that BEST match what is being assessed. ` +
+      `Only use codes that appear EXACTLY in the candidate list. Be conservative — if nothing fits well, return fewer or none.\n\n` +
+      `EVIDENCE REQUIREMENT (STRICT): For every standard you propose, you MUST extract at least 8 distinct key words or short key phrases (1–4 words each) drawn from BOTH the assignment text AND the standard's description that justify the match. ` +
+      `These keywords should be the specific concepts, skills, verbs, nouns, or domain terms that overlap (e.g., "linear equation", "slope", "two variables", "graph", "solve", "y-intercept", "table of values", "system"). ` +
+      `Do not repeat the same word; do not use generic filler ("the", "students", "learn"). If you cannot find at least 8 substantive overlapping keywords for a standard, DO NOT include that standard in the matches.`;
 
     const userPrompt =
       `STATE: ${state}\nSUBJECT: ${subject}\nGRADE: ${grade}\n\n` +
       `ASSIGNMENT NAME: ${assignment.name}\n` +
       `ASSIGNMENT DESCRIPTION: ${assignment.description ?? "(none)"}\n\n` +
-      `CANDIDATE STANDARDS:\n${candidateList}`;
+      `CANDIDATE STANDARDS:\n${candidateList}\n\n` +
+      `Remember: each match needs ≥ 8 substantive keywords/phrases drawn from both the assignment and the standard description. Drop any standard that doesn't meet this bar.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
