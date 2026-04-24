@@ -20,7 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
-  Check, Sparkles, Trash2, X, Loader2, Filter, ChevronUp, ChevronDown, Replace,
+  Check, Sparkles, Trash2, X, Loader2, Filter, ChevronUp, ChevronDown, Replace, ListChecks, ChevronRight,
 } from "lucide-react";
 
 type Course = { id: string; name: string; discipline_id: string | null };
@@ -36,12 +36,26 @@ type Tag = {
 };
 type StatusFilter = "untagged" | "ai" | "confirmed" | "all";
 type SortKey = "recent" | "due" | "alpha";
+type QuizQuestion = {
+  id: string; assignment_id: string; position: number | null;
+  question_text: string | null; points_possible: number | null;
+};
+type QTag = {
+  id: string; question_id: string; standard_id: string;
+  ai_suggested: boolean; confirmed: boolean; confidence: number | null; rationale: string | null;
+  standards: { code: string; description: string } | null;
+};
 
 export default function Review() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [tagsByAssignment, setTagsByAssignment] = useState<Record<string, Tag[]>>({});
+  const [questionCountByAssignment, setQuestionCountByAssignment] = useState<Record<string, number>>({});
+  const [questionsByAssignment, setQuestionsByAssignment] = useState<Record<string, QuizQuestion[]>>({});
+  const [qTagsByQuestion, setQTagsByQuestion] = useState<Record<string, QTag[]>>({});
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
+  const [questionTagBusy, setQuestionTagBusy] = useState<Set<string>>(new Set());
   const [allStandards, setAllStandards] = useState<{ id: string; code: string; description: string; state: string; subject: string; grade: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -69,21 +83,47 @@ export default function Review() {
 
     if ((a ?? []).length) {
       const ids = (a ?? []).map((x) => x.id);
-      const { data: tags } = await supabase
-        .from("assignment_standards")
-        .select("id, assignment_id, standard_id, ai_suggested, confirmed, confidence, rationale, standards ( code, description )")
-        .in("assignment_id", ids);
+      const [{ data: tags }, { data: qs }] = await Promise.all([
+        supabase
+          .from("assignment_standards")
+          .select("id, assignment_id, standard_id, ai_suggested, confirmed, confidence, rationale, standards ( code, description )")
+          .in("assignment_id", ids),
+        supabase
+          .from("quiz_questions")
+          .select("id, assignment_id")
+          .in("assignment_id", ids),
+      ]);
       const map: Record<string, Tag[]> = {};
       for (const t of (tags as any[]) ?? []) {
         (map[t.assignment_id] ??= []).push(t as Tag);
       }
       setTagsByAssignment(map);
+      const counts: Record<string, number> = {};
+      for (const q of (qs as any[]) ?? []) counts[q.assignment_id] = (counts[q.assignment_id] ?? 0) + 1;
+      setQuestionCountByAssignment(counts);
     } else {
       setTagsByAssignment({});
+      setQuestionCountByAssignment({});
     }
     setLoading(false);
   }
   useEffect(() => { loadAll(); }, []);
+
+  // Lazy-load question detail + per-question tags for one assignment
+  async function loadQuestionsFor(assignmentId: string) {
+    const [{ data: qs }, { data: qts }] = await Promise.all([
+      supabase.from("quiz_questions")
+        .select("id, assignment_id, position, question_text, points_possible")
+        .eq("assignment_id", assignmentId).order("position"),
+      supabase.from("question_standards")
+        .select("id, question_id, standard_id, ai_suggested, confirmed, confidence, rationale, standards ( code, description ), quiz_questions!inner ( assignment_id )")
+        .eq("quiz_questions.assignment_id", assignmentId),
+    ]);
+    setQuestionsByAssignment((m) => ({ ...m, [assignmentId]: (qs ?? []) as QuizQuestion[] }));
+    const tagMap: Record<string, QTag[]> = {};
+    for (const t of (qts as any[]) ?? []) (tagMap[t.question_id] ??= []).push(t as QTag);
+    setQTagsByQuestion((m) => ({ ...m, ...tagMap }));
+  }
 
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
   const disciplineById = useMemo(() => new Map(disciplines.map((d) => [d.id, d])), [disciplines]);
@@ -191,6 +231,38 @@ export default function Review() {
     loadAll();
   }
 
+  async function aiSuggestByQuestion(assignmentId: string) {
+    setQuestionTagBusy((p) => new Set(p).add(assignmentId));
+    const { data, error } = await supabase.functions.invoke("tag-question-standards", { body: { assignment_id: assignmentId } });
+    setQuestionTagBusy((p) => { const n = new Set(p); n.delete(assignmentId); return n; });
+    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if ((data as any)?.error) { toast.error((data as any).error); return; }
+    const qn = (data as any).questions_tagged ?? 0;
+    const rn = (data as any).assignment_rollup_count ?? 0;
+    toast.success(`Tagged ${qn} question${qn === 1 ? "" : "s"} → ${rn} assignment-level standard${rn === 1 ? "" : "s"}`);
+    setExpandedQuestions((p) => new Set(p).add(assignmentId));
+    await loadQuestionsFor(assignmentId);
+    loadAll();
+  }
+
+  async function toggleExpand(assignmentId: string) {
+    setExpandedQuestions((p) => {
+      const n = new Set(p);
+      if (n.has(assignmentId)) n.delete(assignmentId);
+      else { n.add(assignmentId); loadQuestionsFor(assignmentId); }
+      return n;
+    });
+  }
+
+  async function confirmQTag(t: QTag, assignmentId: string) {
+    const { error } = await supabase.from("question_standards").update({ confirmed: true }).eq("id", t.id);
+    if (error) toast.error(error.message); else loadQuestionsFor(assignmentId);
+  }
+  async function removeQTag(t: QTag, assignmentId: string) {
+    const { error } = await supabase.from("question_standards").delete().eq("id", t.id);
+    if (error) toast.error(error.message); else loadQuestionsFor(assignmentId);
+  }
+
   async function bulkConfirmAll() {
     if (selected.size === 0) return;
     setBulkBusy(true);
@@ -233,7 +305,23 @@ export default function Review() {
     loadAll();
   }
 
-  // Standards relevant to this teacher's disciplines (for the override picker)
+  async function bulkTagByQuestion() {
+    const targets = Array.from(selected)
+      .map((id) => assignments.find((a) => a.id === id))
+      .filter((a): a is Assignment => !!a && a.kind === "quiz" && (questionCountByAssignment[a.id] ?? 0) > 0);
+    if (targets.length === 0) { toast.info("Pick one or more synced quizzes first"); return; }
+    setBulkBusy(true);
+    let ok = 0;
+    for (const a of targets.slice(0, 10)) {
+      try {
+        const { data, error } = await supabase.functions.invoke("tag-question-standards", { body: { assignment_id: a.id } });
+        if (!error && !(data as any)?.error) ok++;
+      } catch { /* continue */ }
+    }
+    setBulkBusy(false);
+    toast.success(`Question-tagged ${ok} of ${Math.min(targets.length, 10)} quizzes`);
+    loadAll();
+  }
   const teachStandards = useMemo(() => {
     const keys = new Set(disciplines.map((d) => `${d.state}|${d.subject}|${d.grade}`));
     return allStandards.filter((s) => keys.has(`${s.state}|${s.subject}|${s.grade}`));
@@ -303,6 +391,10 @@ export default function Review() {
                 <Button size="sm" variant="outline" onClick={bulkRejectAll} disabled={bulkBusy}>
                   <X className="h-3.5 w-3.5 mr-1" /> Reject all suggestions
                 </Button>
+                <Button size="sm" variant="outline" onClick={bulkTagByQuestion} disabled={bulkBusy}>
+                  {bulkBusy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ListChecks className="h-3.5 w-3.5 mr-1" />}
+                  Tag by question (quizzes)
+                </Button>
                 <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear selection</Button>
               </CardContent>
             </Card>
@@ -323,6 +415,10 @@ export default function Review() {
               const course = courseById.get(a.course_id);
               const disc = course?.discipline_id ? disciplineById.get(course.discipline_id) : null;
               const isActive = idx === activeIdx;
+              const qCount = questionCountByAssignment[a.id] ?? 0;
+              const isQuiz = a.kind === "quiz";
+              const isExpanded = expandedQuestions.has(a.id);
+              const qBusy = questionTagBusy.has(a.id);
               return (
                 <Card
                   key={a.id}
@@ -342,6 +438,11 @@ export default function Review() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium truncate">{a.name}</span>
                           <Badge variant="outline" className="text-[10px] uppercase">{a.kind}</Badge>
+                          {isQuiz && qCount > 0 && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {qCount} question{qCount === 1 ? "" : "s"}
+                            </Badge>
+                          )}
                           {course && <span className="text-xs text-muted-foreground truncate">{course.name}</span>}
                           {disc && (
                             <Badge variant="outline" className="text-[10px] bg-accent/5 text-accent border-accent/30">
@@ -409,6 +510,30 @@ export default function Review() {
                               <Sparkles className="h-3 w-3 mr-1" /> AI suggest
                             </Button>
                           )}
+                          {isQuiz && qCount > 0 && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 text-xs"
+                                disabled={qBusy}
+                                onClick={(e) => { e.stopPropagation(); aiSuggestByQuestion(a.id); }}
+                                title="Run the 8-keyword matcher on each question, then roll up to the assignment"
+                              >
+                                {qBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ListChecks className="h-3 w-3 mr-1" />}
+                                Tag by question
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 text-xs"
+                                onClick={(e) => { e.stopPropagation(); toggleExpand(a.id); }}
+                              >
+                                <ChevronRight className={`h-3 w-3 mr-1 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                                {isExpanded ? "Hide" : "Show"} questions
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col gap-1 shrink-0">
@@ -420,6 +545,69 @@ export default function Review() {
                         </Button>
                       </div>
                     </div>
+
+                    {isQuiz && isExpanded && (
+                      <div className="mt-3 ml-7 border-l-2 border-muted pl-3 space-y-2">
+                        {!questionsByAssignment[a.id] ? (
+                          <div className="text-xs text-muted-foreground py-2 flex items-center gap-2">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Loading questions…
+                          </div>
+                        ) : questionsByAssignment[a.id].length === 0 ? (
+                          <div className="text-xs text-muted-foreground py-2">No questions synced for this quiz.</div>
+                        ) : (
+                          questionsByAssignment[a.id].map((q) => {
+                            const qTags = qTagsByQuestion[q.id] ?? [];
+                            const qConfirmed = qTags.filter((t) => t.confirmed);
+                            const qSuggested = qTags.filter((t) => t.ai_suggested && !t.confirmed);
+                            return (
+                              <div key={q.id} className="text-xs border rounded-md p-2" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-start gap-2">
+                                  <span className="font-mono text-muted-foreground shrink-0">Q{q.position ?? "?"}</span>
+                                  <span className="line-clamp-2 flex-1">{q.question_text ?? <em className="text-muted-foreground">(no text)</em>}</span>
+                                  {q.points_possible != null && (
+                                    <span className="shrink-0 text-muted-foreground">{q.points_possible} pts</span>
+                                  )}
+                                </div>
+                                {(qConfirmed.length > 0 || qSuggested.length > 0) && (
+                                  <div className="mt-1.5 flex flex-wrap gap-1">
+                                    {qConfirmed.map((t) => (
+                                      <Badge key={t.id} className="bg-mastery-high/10 text-mastery-high border-mastery-high/30 text-[10px]" variant="outline">
+                                        <Check className="h-2.5 w-2.5 mr-0.5" /> {t.standards?.code}
+                                        <button onClick={() => removeQTag(t, a.id)} className="ml-1 opacity-70 hover:opacity-100">
+                                          <Trash2 className="h-2.5 w-2.5" />
+                                        </button>
+                                      </Badge>
+                                    ))}
+                                    {qSuggested.map((t) => (
+                                      <Tooltip key={t.id}>
+                                        <TooltipTrigger asChild>
+                                          <div className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/5 px-1.5 py-0.5 text-[10px]">
+                                            <Sparkles className="h-2.5 w-2.5 text-accent" />
+                                            <span className="font-mono">{t.standards?.code}</span>
+                                            {t.confidence != null && <span className="text-muted-foreground">{Math.round(t.confidence * 100)}%</span>}
+                                            <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={() => confirmQTag(t, a.id)} title="Confirm">
+                                              <Check className="h-2.5 w-2.5 text-mastery-high" />
+                                            </Button>
+                                            <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={() => removeQTag(t, a.id)} title="Reject">
+                                              <X className="h-2.5 w-2.5" />
+                                            </Button>
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-sm">
+                                          <div className="font-medium">{t.standards?.code}</div>
+                                          <div className="text-xs mb-1">{t.standards?.description}</div>
+                                          {t.rationale && <div className="text-xs italic opacity-80 whitespace-pre-wrap">"{t.rationale}"</div>}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );

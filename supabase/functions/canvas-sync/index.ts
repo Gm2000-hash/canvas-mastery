@@ -153,6 +153,42 @@ Deno.serve(async (req) => {
         if (aErr) console.error("assignments upsert", aErr); else stats.assignments += aRows.length;
       }
 
+      // 3b) Quiz questions for any quiz assignments
+      // (Classic Quizzes API; New Quizzes are not exposed here. Failures are non-fatal.)
+      const quizAssignments = assignments.filter((a) => a.quiz_id);
+      if (quizAssignments.length) {
+        // Build canvas_assignment_id -> internal assignment.id map (re-read after upsert)
+        const { data: assignMapForQ } = await admin
+          .from("assignments").select("id, canvas_assignment_id").eq("course_id", courseId);
+        const aIdByCanvas = new Map((assignMapForQ ?? []).map((r) => [Number(r.canvas_assignment_id), r.id as string]));
+        for (const qa of quizAssignments) {
+          const internalAid = aIdByCanvas.get(Number(qa.id));
+          if (!internalAid) continue;
+          let questions: any[] = [];
+          try {
+            questions = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/quizzes/${qa.quiz_id}/questions`);
+          } catch (e) {
+            console.warn(`quiz ${qa.quiz_id} questions fetch failed`, (e as Error).message);
+            continue;
+          }
+          const qRows = questions.map((q, i) => ({
+            teacher_id: teacherId,
+            assignment_id: internalAid,
+            canvas_question_id: q.id,
+            position: q.position ?? i + 1,
+            question_text: q.question_text
+              ? String(q.question_text).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000)
+              : null,
+            points_possible: q.points_possible ?? null,
+          }));
+          if (qRows.length) {
+            const { error: qErr } = await admin.from("quiz_questions")
+              .upsert(qRows, { onConflict: "assignment_id,canvas_question_id" });
+            if (qErr) console.error("quiz_questions upsert", qErr);
+          }
+        }
+      }
+
       // Build student/assignment ID maps for submissions
       const { data: studentMap } = await admin.from("students").select("id, canvas_user_id").eq("course_id", courseId);
       const { data: assignMap } = await admin.from("assignments").select("id, canvas_assignment_id").eq("course_id", courseId);
