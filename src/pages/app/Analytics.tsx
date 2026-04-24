@@ -606,7 +606,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
           <div className="space-y-3">
             <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
               <strong>No confirmed standards for this course yet.</strong> Tag assessments on{" "}
-              <Link to="/app/tag-review" className="underline font-medium">Tag Review</Link>{" "}
+              <Link to="/app/review" className="underline font-medium">Tag Review</Link>{" "}
               and run mastery to populate the matrix below.
             </div>
             <div className="overflow-auto border rounded-lg max-h-[70vh]">
