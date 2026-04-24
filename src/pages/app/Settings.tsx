@@ -38,11 +38,21 @@ export default function Settings() {
   // Standards seeding
   const [seeding, setSeeding] = useState(false);
 
+  // Disciplines (multi)
+  type Discipline = { id: string; state: string; subject: string; grade: string; is_default: boolean };
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [newState, setNewState] = useState("");
+  const [newSubject, setNewSubject] = useState("");
+  const [newGrade, setNewGrade] = useState("");
+  const [addingDisc, setAddingDisc] = useState(false);
+  const [seedingDiscId, setSeedingDiscId] = useState<string | null>(null);
+
   async function load() {
-    const [{ data: profile }, { data: ccRows }, { data: settings }] = await Promise.all([
+    const [{ data: profile }, { data: ccRows }, { data: settings }, { data: discs }] = await Promise.all([
       supabase.from("profiles").select("*").maybeSingle(),
       supabase.rpc("get_canvas_connection_status"),
       supabase.from("teacher_settings").select("*").maybeSingle(),
+      supabase.from("teacher_disciplines").select("id, state, subject, grade, is_default").order("created_at"),
     ]);
     if (profile) {
       setDisplayName(profile.display_name ?? "");
@@ -59,6 +69,7 @@ export default function Settings() {
       setThreshold(Math.round((settings.mastery_threshold ?? 0.8) * 100));
       setWindowN(settings.attempt_window ?? 3);
     }
+    setDisciplines((discs ?? []) as Discipline[]);
   }
 
   useEffect(() => {
@@ -129,6 +140,59 @@ export default function Settings() {
     });
     setSavingSettings(false);
     if (error) toast.error(error.message); else toast.success("Settings saved");
+  }
+
+  // ----- Disciplines (multi) -----
+  async function addDiscipline() {
+    if (!newState || !newSubject || !newGrade) { toast.error("Pick state, subject, and grade"); return; }
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    setAddingDisc(true);
+    const isFirst = disciplines.length === 0;
+    const { error } = await supabase.from("teacher_disciplines").insert({
+      teacher_id: u.user.id,
+      state: newState,
+      subject: newSubject,
+      grade: newGrade,
+      is_default: isFirst,
+    });
+    setAddingDisc(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Discipline added");
+    setNewState(""); setNewSubject(""); setNewGrade("");
+    load();
+  }
+
+  async function removeDiscipline(id: string) {
+    const { error } = await supabase.from("teacher_disciplines").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Discipline removed");
+    load();
+  }
+
+  async function makeDefault(id: string) {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { error: e1 } = await supabase
+      .from("teacher_disciplines").update({ is_default: false }).eq("teacher_id", u.user.id).eq("is_default", true);
+    if (e1) { toast.error(e1.message); return; }
+    const { error: e2 } = await supabase
+      .from("teacher_disciplines").update({ is_default: true }).eq("id", id);
+    if (e2) { toast.error(e2.message); return; }
+    toast.success("Default discipline updated");
+    load();
+  }
+
+  async function seedDiscipline(d: Discipline) {
+    setSeedingDiscId(d.id);
+    const { data, error } = await supabase.functions.invoke("seed-standards", {
+      body: { state: d.state, subject: d.subject, grade: d.grade },
+    });
+    setSeedingDiscId(null);
+    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if ((data as any)?.error) { toast.error((data as any).error); return; }
+    if ((data as any).skipped) toast.info(`Already seeded (${(data as any).existing} standards)`);
+    else toast.success(`Seeded ${(data as any).inserted} standards`);
   }
 
   return (
@@ -215,6 +279,90 @@ export default function Settings() {
               {canvasConnected ? "Update token" : "Connect Canvas"}
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* DISCIPLINES (multi) */}
+      <Card id="disciplines">
+        <CardHeader>
+          <CardTitle>Disciplines</CardTitle>
+          <CardDescription>
+            Add every state · subject · grade combination you teach. Each course on the Courses page can be tagged with one of these so the AI uses the right standards library when tagging assignments.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {disciplines.length === 0 ? (
+            <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+              No disciplines yet. Add your first below.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {disciplines.map((d) => (
+                <div key={d.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{d.subject}</span>
+                    <span className="text-muted-foreground">·</span>
+                    <span>Grade {d.grade}</span>
+                    <span className="text-muted-foreground">·</span>
+                    <span>{d.state}</span>
+                    {d.is_default && (
+                      <Badge variant="outline" className="text-[10px] gap-1">
+                        <Star className="h-2.5 w-2.5" /> default
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {!d.is_default && (
+                      <Button size="sm" variant="ghost" onClick={() => makeDefault(d.id)} title="Make default">
+                        <Star className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => seedDiscipline(d)}
+                      disabled={seedingDiscId === d.id}
+                      title="Seed standards for this discipline"
+                    >
+                      {seedingDiscId === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Seed standards"}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => removeDiscipline(d.id)} title="Remove">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid sm:grid-cols-4 gap-2 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">State</Label>
+              <Select value={newState} onValueChange={setNewState}>
+                <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Subject</Label>
+              <Select value={newSubject} onValueChange={setNewSubject}>
+                <SelectTrigger><SelectValue placeholder="Subject" /></SelectTrigger>
+                <SelectContent>{SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Grade</Label>
+              <Select value={newGrade} onValueChange={setNewGrade}>
+                <SelectTrigger><SelectValue placeholder="Grade" /></SelectTrigger>
+                <SelectContent>{GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <Button onClick={addDiscipline} disabled={addingDisc || !newState || !newSubject || !newGrade}>
+              <Plus className="h-4 w-4 mr-1" /> Add
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
