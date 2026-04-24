@@ -963,14 +963,13 @@ function QuestionsView({ courseId }: { courseId: string | null }) {
   );
 }
 
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="py-10 text-center text-muted-foreground">
-      <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-60" />
-      <p className="text-sm">{message}</p>
-      <p className="text-xs mt-2">
-        Need to set things up? Visit <Link to="/app/courses" className="underline">Courses</Link>, <Link to="/app/review" className="underline">Tag Review</Link>, or <Link to="/app/mastery" className="underline">Mastery</Link>.
-      </p>
-    </div>
-  );
-}
+const EmptyState = forwardRef<HTMLDivElement, { message: string }>(({ message }, ref) => (
+  <div ref={ref} className="py-10 text-center text-muted-foreground">
+    <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-60" />
+    <p className="text-sm">{message}</p>
+    <p className="text-xs mt-2">
+      Need to set things up? Visit <Link to="/app/courses" className="underline">Courses</Link>, <Link to="/app/review" className="underline">Tag Review</Link>, or <Link to="/app/mastery" className="underline">Mastery</Link>.
+    </p>
+  </div>
+));
+EmptyState.displayName = "EmptyState";
