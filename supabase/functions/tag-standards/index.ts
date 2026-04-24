@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
 
     const aiJson = await aiRes.json();
     const toolCall = aiJson.choices?.[0]?.message?.tool_calls?.[0];
-    let matches: Array<{ standard_code: string; confidence: number; rationale: string }> = [];
+    let matches: Array<{ standard_code: string; confidence: number; rationale: string; keywords?: string[] }> = [];
     if (toolCall?.function?.arguments) {
       try { matches = JSON.parse(toolCall.function.arguments).matches ?? []; } catch (e) { console.error("parse args", e); }
     }
