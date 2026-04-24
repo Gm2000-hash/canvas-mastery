@@ -80,20 +80,18 @@ export default function Analytics() {
         </div>
       </div>
 
-      <Tabs defaultValue="trends" className="space-y-4">
+      <Tabs defaultValue="classes" className="space-y-4">
         <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="trends"><TrendingUp className="h-4 w-4 mr-1.5" /> Mastery by subject</TabsTrigger>
           <TabsTrigger value="classes"><GraduationCap className="h-4 w-4 mr-1.5" /> Classes</TabsTrigger>
-          <TabsTrigger value="students"><Users className="h-4 w-4 mr-1.5" /> Students</TabsTrigger>
+          <TabsTrigger value="trends"><TrendingUp className="h-4 w-4 mr-1.5" /> Mastery by subject</TabsTrigger>
           <TabsTrigger value="standards"><BookMarked className="h-4 w-4 mr-1.5" /> Standards</TabsTrigger>
           <TabsTrigger value="assignments"><ListChecks className="h-4 w-4 mr-1.5" /> Assessments</TabsTrigger>
           <TabsTrigger value="levels"><Layers className="h-4 w-4 mr-1.5" /> Mastery levels</TabsTrigger>
           <TabsTrigger value="questions"><HelpCircle className="h-4 w-4 mr-1.5" /> Questions</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="classes"><ClassesView courseFilter={courseFilter} /></TabsContent>
         <TabsContent value="trends"><TrendsView courseId={courseFilter} subjects={subjects} /></TabsContent>
-        <TabsContent value="classes"><ClassesView /></TabsContent>
-        <TabsContent value="students"><StudentsView courseId={courseFilter} /></TabsContent>
         <TabsContent value="standards"><StandardsView courseId={courseFilter} subjects={subjects} /></TabsContent>
         <TabsContent value="assignments"><AssignmentsView courseId={courseFilter} /></TabsContent>
         <TabsContent value="levels"><LevelsView courseId={courseFilter} subjects={subjects} /></TabsContent>
