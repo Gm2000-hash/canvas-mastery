@@ -186,9 +186,14 @@ Deno.serve(async (req) => {
     }
 
     const rows = matches
-      .map((m) => {
+      .map((m: any) => {
         const sid = codeToId.get(m.standard_code);
         if (!sid) return null;
+        // Enforce: drop matches that didn't supply ≥ 8 distinct substantive keywords.
+        const kws: string[] = Array.isArray(m.keywords) ? m.keywords : [];
+        const distinct = Array.from(new Set(kws.map((k) => String(k).trim().toLowerCase()).filter((k) => k.length >= 2)));
+        if (distinct.length < 8) return null;
+        const rationale = `${m.rationale}\n\nKey evidence: ${distinct.slice(0, 16).join(", ")}`;
         return {
           teacher_id: teacherId,
           assignment_id,
@@ -196,7 +201,7 @@ Deno.serve(async (req) => {
           ai_suggested: true,
           confirmed: false,
           confidence: m.confidence,
-          rationale: m.rationale,
+          rationale,
         };
       })
       .filter(Boolean) as any[];
