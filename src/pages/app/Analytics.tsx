@@ -220,41 +220,45 @@ function TrendsView({ courseId, subjects }: { courseId: string | null; subjects:
   );
 }
 
-// ───────────────────────── Classes (with drill-in matrix) ─────────────────────────
+// ───────────────────────── Classes (summary + auto matrices) ─────────────────────────
 function ClassesView({ courseFilter }: { courseFilter: string | null }) {
   const [rows, setRows] = useState<ClassRow[] | null>(null);
-  const [selected, setSelected] = useState<ClassRow | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     supabase.rpc("analytics_class_breakdown").then(({ data }) => setRows((data as any) ?? []));
   }, []);
 
-  // Honor the global course filter: if the teacher narrowed at the top,
-  // pre-select that class (still gives them the back arrow to return).
-  useEffect(() => {
-    if (!courseFilter || !rows) return;
-    const match = rows.find((r) => r.course_id === courseFilter);
-    if (match) setSelected(match);
-  }, [courseFilter, rows]);
+  // Honor the global course filter at the top of the page.
+  const visibleRows = useMemo(() => {
+    if (!rows) return rows;
+    if (!courseFilter) return rows;
+    return rows.filter((r) => r.course_id === courseFilter);
+  }, [rows, courseFilter]);
 
-  if (selected) {
+  function toggle(courseId: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(courseId)) next.delete(courseId); else next.add(courseId);
+      return next;
+    });
+  }
+
+  if (rows === null) return <Skeleton className="h-40 w-full" />;
+  if (visibleRows && visibleRows.length === 0) {
     return (
-      <ClassMatrixView
-        course={selected}
-        onBack={() => setSelected(null)}
-      />
+      <Card><CardContent className="py-10"><EmptyState message="No courses match your filter yet." /></CardContent></Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Active classes</CardTitle>
-        <CardDescription>Click a class to see every student plotted against the standards covered in that course.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {rows === null ? <Skeleton className="h-40 w-full" /> :
-         rows.length === 0 ? <EmptyState message="No courses imported yet." /> : (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Active classes</CardTitle>
+          <CardDescription>Each class shows its student-by-standard mastery table below. Use the chevron to collapse a class.</CardDescription>
+        </CardHeader>
+        <CardContent>
           <Table>
             <TableHeader><TableRow>
               <TableHead>Course</TableHead><TableHead>Subject</TableHead><TableHead>Framework</TableHead>
@@ -263,12 +267,16 @@ function ClassesView({ courseFilter }: { courseFilter: string | null }) {
               <TableHead></TableHead>
             </TableRow></TableHeader>
             <TableBody>
-              {rows.map((r) => {
+              {visibleRows!.map((r) => {
                 const fw = getFramework(r.framework);
+                const isCollapsed = collapsed.has(r.course_id);
                 return (
                   <TableRow
                     key={r.course_id}
-                    onClick={() => setSelected(r)}
+                    onClick={() => {
+                      const el = document.getElementById(`class-matrix-${r.course_id}`);
+                      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
                     className="cursor-pointer hover:bg-muted/50"
                   >
                     <TableCell className="font-medium">{r.course_name}</TableCell>
@@ -279,8 +287,8 @@ function ClassesView({ courseFilter }: { courseFilter: string | null }) {
                     <TableCell className="text-right tabular-nums">{pct(r.avg_mastery)}</TableCell>
                     <TableCell className="text-right tabular-nums">{pct(r.pct_mastered)}</TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="ghost" className="h-7" onClick={(e) => { e.stopPropagation(); setSelected(r); }}>
-                        View students <ArrowRight className="h-3 w-3 ml-1" />
+                      <Button size="sm" variant="ghost" className="h-7" onClick={(e) => { e.stopPropagation(); toggle(r.course_id); }}>
+                        {isCollapsed ? "Show table" : "Hide table"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -288,9 +296,19 @@ function ClassesView({ courseFilter }: { courseFilter: string | null }) {
               })}
             </TableBody>
           </Table>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {visibleRows!.map((r) => (
+        <div key={r.course_id} id={`class-matrix-${r.course_id}`}>
+          <ClassMatrixView
+            course={r}
+            collapsed={collapsed.has(r.course_id)}
+            onToggleCollapsed={() => toggle(r.course_id)}
+          />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -320,7 +338,11 @@ function masteryColor(score: number | null | undefined): string {
   return "bg-red-500/15 text-red-700 dark:text-red-300";
 }
 
-function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => void }) {
+function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
+  course: ClassRow;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+}) {
   const [data, setData] = useState<MatrixRow[] | null>(null);
   const [studentFilter, setStudentFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
@@ -329,11 +351,11 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    setData(null);
-    setExpanded(new Set());
+    if (collapsed) return; // defer fetch until the teacher opens the panel
+    if (data !== null) return;
     supabase.rpc("analytics_class_matrix", { _course_id: course.course_id })
       .then(({ data }) => setData((data as any) ?? []));
-  }, [course.course_id]);
+  }, [course.course_id, collapsed, data]);
 
   // Distinct students and standards out of the long-form rows.
   const { students, standards, valueByPair, subjects, frameworks } = useMemo(() => {
@@ -504,9 +526,13 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
       <CardHeader>
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>
-            <Button variant="ghost" size="sm" onClick={onBack} className="mb-2 -ml-2 h-7">
-              <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to classes
-            </Button>
+            {onToggleCollapsed && (
+              <Button variant="ghost" size="sm" onClick={onToggleCollapsed} className="mb-2 -ml-2 h-7">
+                {collapsed
+                  ? <><ChevronRight className="h-3.5 w-3.5 mr-1" /> Show student table</>
+                  : <><ChevronDown className="h-3.5 w-3.5 mr-1" /> Hide student table</>}
+              </Button>
+            )}
             <CardTitle>{course.course_name}</CardTitle>
             <CardDescription>
               Mastery for every active student against the standards covered in this course.
@@ -552,6 +578,7 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
           </div>
         </div>
       </CardHeader>
+      {!collapsed && (
       <CardContent>
         {data === null ? <Skeleton className="h-60 w-full" /> :
          visibleStudents.length === 0 ? <EmptyState message="No students match this filter." /> :
@@ -663,6 +690,7 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
           <span className="ml-auto">Click a standard code to reveal its substandards.</span>
         </div>
       </CardContent>
+      )}
     </Card>
   );
 }
