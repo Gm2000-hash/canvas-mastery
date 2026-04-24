@@ -254,15 +254,16 @@ export default function Review() {
     });
   }
 
-  async function confirmQTag(t: QTag) {
+  async function confirmQTag(t: QTag, assignmentId: string) {
     const { error } = await supabase.from("question_standards").update({ confirmed: true }).eq("id", t.id);
-    if (error) toast.error(error.message);
-    else loadQuestionsFor(t.question_id ? (questionsByAssignment[Object.keys(questionsByAssignment).find((aid) => questionsByAssignment[aid].some((q) => q.id === t.question_id)) ?? ""]?.[0]?.assignment_id ?? "") : "");
+    if (error) toast.error(error.message); else loadQuestionsFor(assignmentId);
   }
   async function removeQTag(t: QTag, assignmentId: string) {
     const { error } = await supabase.from("question_standards").delete().eq("id", t.id);
     if (error) toast.error(error.message); else loadQuestionsFor(assignmentId);
   }
+
+  async function bulkConfirmAll() {
     if (selected.size === 0) return;
     setBulkBusy(true);
     const ids = Array.from(selected).flatMap((aid) =>
