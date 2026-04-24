@@ -115,6 +115,7 @@ export default function Auth() {
                 <TabsTrigger value="signup">Create account</TabsTrigger>
               </TabsList>
               <TabsContent value="signin">
+                {googleButton}
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="si-email">Email</Label>
