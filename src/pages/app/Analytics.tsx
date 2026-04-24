@@ -526,9 +526,13 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
       <CardHeader>
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>
-            <Button variant="ghost" size="sm" onClick={onBack} className="mb-2 -ml-2 h-7">
-              <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to classes
-            </Button>
+            {onToggleCollapsed && (
+              <Button variant="ghost" size="sm" onClick={onToggleCollapsed} className="mb-2 -ml-2 h-7">
+                {collapsed
+                  ? <><ChevronRight className="h-3.5 w-3.5 mr-1" /> Show student table</>
+                  : <><ChevronDown className="h-3.5 w-3.5 mr-1" /> Hide student table</>}
+              </Button>
+            )}
             <CardTitle>{course.course_name}</CardTitle>
             <CardDescription>
               Mastery for every active student against the standards covered in this course.
