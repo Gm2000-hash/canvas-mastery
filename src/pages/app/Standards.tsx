@@ -41,6 +41,15 @@ export default function Standards() {
     supabase.from("profiles").select("state, default_subject, default_grade").maybeSingle().then(({ data }) => setProfile(data as any));
   }, []);
 
+  // If the user changes scope (State/National), drop a framework filter that no
+  // longer fits — otherwise the dropdown would show an empty/invisible value.
+  useEffect(() => {
+    if (frameworkFilter === "ALL") return;
+    const meta = getFramework(frameworkFilter);
+    if (scopeFilter === "STATE" && meta.national) setFrameworkFilter("ALL");
+    if (scopeFilter === "NATIONAL" && !meta.national) setFrameworkFilter("ALL");
+  }, [scopeFilter, frameworkFilter]);
+
   // Distinct frameworks/subjects/grades present in the loaded rows for filter chip options
   const presentFrameworks = useMemo(() => {
     const s = new Set<string>();
@@ -174,12 +183,23 @@ export default function Standards() {
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Framework</Label>
           <Select value={frameworkFilter} onValueChange={setFrameworkFilter}>
-            <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[200px] h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All frameworks</SelectItem>
-              {presentFrameworks.map((f) => (
-                <SelectItem key={f} value={f}>{getFramework(f).label}</SelectItem>
-              ))}
+              {FRAMEWORKS
+                .filter((f) => {
+                  if (scopeFilter === "STATE") return !f.national;
+                  if (scopeFilter === "NATIONAL") return f.national;
+                  return true;
+                })
+                .map((f) => {
+                  const isPresent = presentFrameworks.includes(f.id);
+                  return (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.label}{!isPresent && " (not seeded)"}
+                    </SelectItem>
+                  );
+                })}
             </SelectContent>
           </Select>
         </div>
