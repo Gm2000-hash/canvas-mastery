@@ -490,6 +490,30 @@ export default function Review() {
                               <Sparkles className="h-3 w-3 mr-1" /> AI suggest
                             </Button>
                           )}
+                          {isQuiz && qCount > 0 && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 text-xs"
+                                disabled={qBusy}
+                                onClick={(e) => { e.stopPropagation(); aiSuggestByQuestion(a.id); }}
+                                title="Run the 8-keyword matcher on each question, then roll up to the assignment"
+                              >
+                                {qBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ListChecks className="h-3 w-3 mr-1" />}
+                                Tag by question
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 text-xs"
+                                onClick={(e) => { e.stopPropagation(); toggleExpand(a.id); }}
+                              >
+                                <ChevronRight className={`h-3 w-3 mr-1 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                                {isExpanded ? "Hide" : "Show"} questions
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col gap-1 shrink-0">
@@ -501,6 +525,69 @@ export default function Review() {
                         </Button>
                       </div>
                     </div>
+
+                    {isQuiz && isExpanded && (
+                      <div className="mt-3 ml-7 border-l-2 border-muted pl-3 space-y-2">
+                        {!questionsByAssignment[a.id] ? (
+                          <div className="text-xs text-muted-foreground py-2 flex items-center gap-2">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Loading questions…
+                          </div>
+                        ) : questionsByAssignment[a.id].length === 0 ? (
+                          <div className="text-xs text-muted-foreground py-2">No questions synced for this quiz.</div>
+                        ) : (
+                          questionsByAssignment[a.id].map((q) => {
+                            const qTags = qTagsByQuestion[q.id] ?? [];
+                            const qConfirmed = qTags.filter((t) => t.confirmed);
+                            const qSuggested = qTags.filter((t) => t.ai_suggested && !t.confirmed);
+                            return (
+                              <div key={q.id} className="text-xs border rounded-md p-2" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-start gap-2">
+                                  <span className="font-mono text-muted-foreground shrink-0">Q{q.position ?? "?"}</span>
+                                  <span className="line-clamp-2 flex-1">{q.question_text ?? <em className="text-muted-foreground">(no text)</em>}</span>
+                                  {q.points_possible != null && (
+                                    <span className="shrink-0 text-muted-foreground">{q.points_possible} pts</span>
+                                  )}
+                                </div>
+                                {(qConfirmed.length > 0 || qSuggested.length > 0) && (
+                                  <div className="mt-1.5 flex flex-wrap gap-1">
+                                    {qConfirmed.map((t) => (
+                                      <Badge key={t.id} className="bg-mastery-high/10 text-mastery-high border-mastery-high/30 text-[10px]" variant="outline">
+                                        <Check className="h-2.5 w-2.5 mr-0.5" /> {t.standards?.code}
+                                        <button onClick={() => removeQTag(t, a.id)} className="ml-1 opacity-70 hover:opacity-100">
+                                          <Trash2 className="h-2.5 w-2.5" />
+                                        </button>
+                                      </Badge>
+                                    ))}
+                                    {qSuggested.map((t) => (
+                                      <Tooltip key={t.id}>
+                                        <TooltipTrigger asChild>
+                                          <div className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/5 px-1.5 py-0.5 text-[10px]">
+                                            <Sparkles className="h-2.5 w-2.5 text-accent" />
+                                            <span className="font-mono">{t.standards?.code}</span>
+                                            {t.confidence != null && <span className="text-muted-foreground">{Math.round(t.confidence * 100)}%</span>}
+                                            <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={() => confirmQTag(t, a.id)} title="Confirm">
+                                              <Check className="h-2.5 w-2.5 text-mastery-high" />
+                                            </Button>
+                                            <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={() => removeQTag(t, a.id)} title="Reject">
+                                              <X className="h-2.5 w-2.5" />
+                                            </Button>
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-sm">
+                                          <div className="font-medium">{t.standards?.code}</div>
+                                          <div className="text-xs mb-1">{t.standards?.description}</div>
+                                          {t.rationale && <div className="text-xs italic opacity-80 whitespace-pre-wrap">"{t.rationale}"</div>}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
