@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
-import { BookMarked, GraduationCap, LayoutDashboard, ListChecks, Settings as SettingsIcon, Sparkles } from "lucide-react";
+import { BookMarked, CheckCheck, GraduationCap, LayoutDashboard, ListChecks, Settings as SettingsIcon, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/app/courses", label: "Courses", icon: GraduationCap },
   { to: "/app/assignments", label: "Assignments", icon: ListChecks },
+  { to: "/app/review", label: "Tag Review", icon: CheckCheck },
   { to: "/app/standards", label: "Standards", icon: BookMarked },
   { to: "/app/mastery", label: "Mastery", icon: Sparkles },
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },
