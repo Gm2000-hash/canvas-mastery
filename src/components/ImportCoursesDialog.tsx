@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Download, Loader2, RefreshCw, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useSync } from "@/contexts/SyncContext";
 
 type CanvasCourse = {
   canvas_course_id: number;
@@ -28,12 +29,12 @@ type Discipline = { id: string; state: string; subject: string; grade: string; i
 export function ImportCoursesDialog({ onImported }: { onImported?: () => void }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [courses, setCourses] = useState<CanvasCourse[] | null>(null);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [disciplineByCourse, setDisciplineByCourse] = useState<Record<number, string>>({});
   const [filter, setFilter] = useState("");
+  const { syncing: importing, runCanvasSync } = useSync();
 
   async function load() {
     setLoading(true);
@@ -80,20 +81,15 @@ export function ImportCoursesDialog({ onImported }: { onImported?: () => void })
       canvas_course_id: cid,
       discipline_id: disciplineByCourse[cid] || null,
     }));
-    setImporting(true);
-    const { data, error } = await supabase.functions.invoke("canvas-sync", {
-      body: {
-        course_ids: Array.from(selected),
-        discipline_assignments: assignments,
-      },
-    });
-    setImporting(false);
-    if (error) { toast.error((error as any).message ?? "Import failed"); return; }
-    if ((data as any)?.error) { toast.error((data as any).error); return; }
-    const s = (data as any).stats;
-    toast.success(`Imported ${s.courses} course${s.courses === 1 ? "" : "s"} · ${s.students} students · ${s.assignments} assignments`);
-    onImported?.();
+    // Close immediately — the global sync pill keeps the user informed
+    // and the sync continues even if they navigate away.
     setOpen(false);
+    onImported?.();
+    await runCanvasSync({
+      course_ids: Array.from(selected),
+      discipline_assignments: assignments,
+    });
+    onImported?.();
   }
 
   const filtered = (courses ?? []).filter((c) => {
