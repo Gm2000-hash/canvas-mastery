@@ -322,14 +322,15 @@ function masteryColor(score: number | null | undefined): string {
 
 function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => void }) {
   const [data, setData] = useState<MatrixRow[] | null>(null);
-  const [grouping, setGrouping] = useState<"sub" | "parent">("sub");
   const [studentFilter, setStudentFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
   const [sortBy, setSortBy] = useState<"code" | "weak" | "strong">("code");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setData(null);
+    setExpanded(new Set());
     supabase.rpc("analytics_class_matrix", { _course_id: course.course_id })
       .then(({ data }) => setData((data as any) ?? []));
   }, [course.course_id]);
@@ -370,37 +371,37 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
     });
   }, [standards, subjectFilter, frameworkFilter]);
 
-  // Build the columns. In "parent" mode, group substandards by their parent
-  // code and store the underlying substandard ids for averaging in cells.
-  type Column = { key: string; label: string; childCount: number; standardIds: string[]; subject: string; framework: string; description?: string };
-  const columns = useMemo<Column[]>(() => {
-    if (grouping === "sub") {
-      return filteredStandards.map((s) => ({
-        key: s.id, label: s.code, childCount: 1, standardIds: [s.id],
-        subject: s.subject, framework: s.framework, description: s.description,
-      }));
-    }
-    const groups = new Map<string, Column>();
+  // Group substandards by their parent code into top-level columns.
+  type ParentGroup = {
+    key: string;            // parent_code
+    label: string;
+    subject: string;
+    framework: string;
+    children: { id: string; code: string; description: string }[]; // substandards
+  };
+  const parentGroups = useMemo<ParentGroup[]>(() => {
+    const groups = new Map<string, ParentGroup>();
     filteredStandards.forEach((s) => {
-      const existing = groups.get(s.parent_code);
-      if (existing) {
-        existing.childCount += 1;
-        existing.standardIds.push(s.id);
+      const g = groups.get(s.parent_code);
+      if (g) {
+        g.children.push({ id: s.id, code: s.code, description: s.description });
       } else {
         groups.set(s.parent_code, {
-          key: s.parent_code, label: s.parent_code, childCount: 1,
-          standardIds: [s.id], subject: s.subject, framework: s.framework,
+          key: s.parent_code, label: s.parent_code,
+          subject: s.subject, framework: s.framework,
+          children: [{ id: s.id, code: s.code, description: s.description }],
         });
       }
     });
+    // Sort children alphanumerically inside each group.
+    groups.forEach((g) => g.children.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })));
     return Array.from(groups.values());
-  }, [filteredStandards, grouping]);
+  }, [filteredStandards]);
 
-  // Compute the score a given student has on a given column (averaging
-  // substandard scores when grouping is enabled), ignoring nulls.
-  function cellValue(studentId: string, col: Column): { score: number | null; covered: number; total: number; attempts: number; lastAt: string | null } {
+  // Compute the average score for a student across a list of standard ids.
+  function avgFor(studentId: string, standardIds: string[]): { score: number | null; covered: number; total: number; attempts: number; lastAt: string | null } {
     let sum = 0, n = 0, attempts = 0, lastAt: string | null = null;
-    for (const sid of col.standardIds) {
+    for (const sid of standardIds) {
       const v = valueByPair.get(`${studentId}|${sid}`);
       if (v?.mastery_score != null) {
         sum += Number(v.mastery_score);
@@ -409,42 +410,80 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
         if (v.computed_at && (!lastAt || v.computed_at > lastAt)) lastAt = v.computed_at;
       }
     }
-    return { score: n ? sum / n : null, covered: n, total: col.standardIds.length, attempts, lastAt };
+    return { score: n ? sum / n : null, covered: n, total: standardIds.length, attempts, lastAt };
   }
 
-  // Sort columns based on weakest/strongest using class-wide averages.
-  const sortedColumns = useMemo(() => {
-    if (sortBy === "code") return [...columns].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
-    const colAvg = (col: Column) => {
+  // Sort the parent groups by class-wide rolled-up averages when requested.
+  const sortedGroups = useMemo(() => {
+    if (sortBy === "code") return [...parentGroups].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+    const groupAvg = (g: ParentGroup) => {
+      const ids = g.children.map((c) => c.id);
       let sum = 0, n = 0;
       students.forEach((st) => {
-        const v = cellValue(st.id, col);
+        const v = avgFor(st.id, ids);
         if (v.score != null) { sum += v.score; n += 1; }
       });
       return n ? sum / n : null;
     };
-    return [...columns].sort((a, b) => {
-      const av = colAvg(a), bv = colAvg(b);
+    return [...parentGroups].sort((a, b) => {
+      const av = groupAvg(a), bv = groupAvg(b);
       if (av == null && bv == null) return 0;
       if (av == null) return 1;
       if (bv == null) return -1;
       return sortBy === "weak" ? av - bv : bv - av;
     });
-  }, [columns, sortBy, students, valueByPair]);
+  }, [parentGroups, sortBy, students, valueByPair]);
+
+  // Build the flat list of leaf columns reflecting current expansion state.
+  // Each parent contributes a single rollup column; expanded parents add a
+  // column per substandard before their rollup column.
+  type LeafCol =
+    | { kind: "parent"; key: string; group: ParentGroup; standardIds: string[] }
+    | { kind: "child"; key: string; group: ParentGroup; childId: string; childCode: string; childDescription: string };
+  const leafColumns = useMemo<LeafCol[]>(() => {
+    const out: LeafCol[] = [];
+    sortedGroups.forEach((g) => {
+      const isOpen = expanded.has(g.key) && g.children.length > 1;
+      if (isOpen) {
+        g.children.forEach((c) => out.push({
+          kind: "child", key: `${g.key}::${c.id}`, group: g, childId: c.id, childCode: c.code, childDescription: c.description,
+        }));
+      }
+      out.push({ kind: "parent", key: g.key, group: g, standardIds: g.children.map((c) => c.id) });
+    });
+    return out;
+  }, [sortedGroups, expanded]);
+
+  function leafValue(studentId: string, col: LeafCol) {
+    if (col.kind === "parent") return avgFor(studentId, col.standardIds);
+    return avgFor(studentId, [col.childId]);
+  }
+
+  function toggleParent(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
 
   const visibleStudents = students.filter((s) =>
     !studentFilter || s.name.toLowerCase().includes(studentFilter.toLowerCase()));
 
   // CSV export of exactly what's on screen.
   function exportCsv() {
-    const header = ["Student", ...sortedColumns.map((c) => c.label), "Avg"];
+    const header = ["Student", ...leafColumns.map((c) => c.kind === "parent" ? c.group.label : `${c.group.label} › ${c.childCode}`), "Avg"];
     const lines = [header.join(",")];
     visibleStudents.forEach((st) => {
-      const cells = sortedColumns.map((c) => {
-        const v = cellValue(st.id, c);
+      const cells = leafColumns.map((c) => {
+        const v = leafValue(st.id, c);
         return v.score != null ? (v.score * 100).toFixed(0) : "";
       });
-      const studentVals = sortedColumns.map((c) => cellValue(st.id, c).score).filter((s): s is number => s != null);
+      // Student average uses parent rollups only, so substandards don't double-count.
+      const studentVals = leafColumns
+        .filter((c) => c.kind === "parent")
+        .map((c) => leafValue(st.id, c).score)
+        .filter((s): s is number => s != null);
       const avg = studentVals.length ? (studentVals.reduce((a, b) => a + b, 0) / studentVals.length * 100).toFixed(0) : "";
       lines.push([JSON.stringify(st.name), ...cells, avg].join(","));
     });
@@ -457,6 +496,9 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
     URL.revokeObjectURL(url);
   }
 
+  const allExpandable = sortedGroups.filter((g) => g.children.length > 1);
+  const allOpen = allExpandable.length > 0 && allExpandable.every((g) => expanded.has(g.key));
+
   return (
     <Card>
       <CardHeader>
@@ -468,7 +510,7 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
             <CardTitle>{course.course_name}</CardTitle>
             <CardDescription>
               Mastery for every active student against the standards covered in this course.
-              Toggle below to view individual <strong>substandards</strong> or roll them up into <strong>standards</strong>.
+              Click a standard column header to expand its <strong>substandards</strong>.
             </CardDescription>
           </div>
           <div className="flex items-end gap-2 flex-wrap">
@@ -499,61 +541,92 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
                 <SelectItem value="strong">Strongest first</SelectItem>
               </SelectContent>
             </Select>
+            {allExpandable.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() =>
+                setExpanded(allOpen ? new Set() : new Set(allExpandable.map((g) => g.key)))
+              }>
+                {allOpen ? "Collapse all" : "Expand all"}
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={exportCsv}><Download className="h-3.5 w-3.5 mr-1" />CSV</Button>
           </div>
-        </div>
-        <div className="flex rounded-md border overflow-hidden h-9 w-fit mt-3">
-          {(["sub", "parent"] as const).map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setGrouping(g)}
-              className={`px-3 text-xs font-medium transition ${grouping === g ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
-            >
-              {g === "sub" ? "Substandards" : "Standards (rolled up)"}
-            </button>
-          ))}
         </div>
       </CardHeader>
       <CardContent>
         {data === null ? <Skeleton className="h-60 w-full" /> :
          visibleStudents.length === 0 ? <EmptyState message="No students match this filter." /> :
-         sortedColumns.length === 0 ? <EmptyState message="This course has no confirmed standards yet. Tag assessments on Tag Review first." /> : (
+         leafColumns.length === 0 ? <EmptyState message="This course has no confirmed standards yet. Tag assessments on Tag Review first." /> : (
           <div className="overflow-auto border rounded-lg max-h-[70vh]">
             <table className="w-full border-collapse text-xs">
               <thead className="sticky top-0 z-10 bg-card">
                 <tr>
                   <th className="sticky left-0 z-20 bg-card border-b border-r p-2 text-left font-medium min-w-[180px]">Student</th>
-                  {sortedColumns.map((c) => (
-                    <th key={c.key} className="border-b border-r p-2 font-mono font-normal text-[10px] whitespace-nowrap"
-                        title={c.description ? `${c.label} — ${c.description}` : c.label}>
-                      <div>{c.label}</div>
-                      {grouping === "parent" && <div className="text-[9px] text-muted-foreground font-sans">n={c.childCount}</div>}
-                    </th>
-                  ))}
+                  {leafColumns.map((c) => {
+                    if (c.kind === "child") {
+                      return (
+                        <th key={c.key} className="border-b border-r p-2 font-mono font-normal text-[10px] whitespace-nowrap bg-muted/30"
+                            title={c.childDescription ? `${c.childCode} — ${c.childDescription}` : c.childCode}>
+                          <div className="text-muted-foreground">{c.childCode}</div>
+                          <div className="text-[9px] font-sans text-muted-foreground/80">substandard</div>
+                        </th>
+                      );
+                    }
+                    const isOpen = expanded.has(c.group.key);
+                    const canExpand = c.group.children.length > 1;
+                    return (
+                      <th key={c.key} className="border-b border-r p-2 font-mono font-normal text-[10px] whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => canExpand && toggleParent(c.group.key)}
+                          disabled={!canExpand}
+                          className={`flex items-center gap-1 mx-auto ${canExpand ? "hover:text-primary cursor-pointer" : "cursor-default"}`}
+                          title={canExpand
+                            ? `${c.group.label} — ${isOpen ? "click to collapse" : `click to show ${c.group.children.length} substandards`}`
+                            : c.group.label}
+                        >
+                          {canExpand && (isOpen
+                            ? <ChevronDown className="h-3 w-3" />
+                            : <ChevronRight className="h-3 w-3" />)}
+                          <span>{c.group.label}</span>
+                        </button>
+                        <div className="text-[9px] text-muted-foreground font-sans">
+                          {c.group.children.length === 1 ? "1 standard" : `${c.group.children.length} substandards`}
+                        </div>
+                      </th>
+                    );
+                  })}
                   <th className="border-b p-2 font-medium text-right whitespace-nowrap">Avg</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleStudents.map((st) => {
+                  // Student average uses parent rollups only.
                   const studentScores: number[] = [];
-                  const cells = sortedColumns.map((c) => {
-                    const v = cellValue(st.id, c);
+                  leafColumns.forEach((c) => {
+                    if (c.kind !== "parent") return;
+                    const v = leafValue(st.id, c);
                     if (v.score != null) studentScores.push(v.score);
-                    return { col: c, v };
                   });
                   const studentAvg = studentScores.length ? studentScores.reduce((a, b) => a + b, 0) / studentScores.length : null;
                   return (
                     <tr key={st.id} className="hover:bg-muted/30">
                       <td className="sticky left-0 z-10 bg-card border-b border-r p-2 font-medium whitespace-nowrap">{st.name}</td>
-                      {cells.map(({ col, v }) => (
-                        <td key={col.key} className={`border-b border-r p-2 text-center tabular-nums ${masteryColor(v.score)}`}
-                            title={v.score == null
-                              ? `${col.label}: no evidence yet`
-                              : `${col.label}: ${(v.score * 100).toFixed(0)}% • ${v.attempts} attempt(s)${v.lastAt ? ` • last ${new Date(v.lastAt).toLocaleDateString()}` : ""}${grouping === "parent" ? ` • ${v.covered}/${v.total} substandards` : ""}`}>
-                          {v.score == null ? "—" : `${(v.score * 100).toFixed(0)}`}
-                        </td>
-                      ))}
+                      {leafColumns.map((c) => {
+                        const v = leafValue(st.id, c);
+                        const label = c.kind === "parent" ? c.group.label : `${c.group.label} › ${c.childCode}`;
+                        const detail = c.kind === "parent" && c.standardIds.length > 1
+                          ? ` • ${v.covered}/${v.total} substandards`
+                          : "";
+                        return (
+                          <td key={c.key}
+                              className={`border-b border-r p-2 text-center tabular-nums ${masteryColor(v.score)} ${c.kind === "child" ? "bg-opacity-60" : ""}`}
+                              title={v.score == null
+                                ? `${label}: no evidence yet`
+                                : `${label}: ${(v.score * 100).toFixed(0)}% • ${v.attempts} attempt(s)${v.lastAt ? ` • last ${new Date(v.lastAt).toLocaleDateString()}` : ""}${detail}`}>
+                            {v.score == null ? "—" : `${(v.score * 100).toFixed(0)}`}
+                          </td>
+                        );
+                      })}
                       <td className={`border-b p-2 text-right tabular-nums font-medium ${masteryColor(studentAvg)}`}>
                         {studentAvg == null ? "—" : `${(studentAvg * 100).toFixed(0)}`}
                       </td>
@@ -563,10 +636,10 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
                 {/* Class-average footer per column */}
                 <tr className="bg-muted/30 font-medium">
                   <td className="sticky left-0 z-10 bg-muted/40 border-r p-2">Class avg</td>
-                  {sortedColumns.map((c) => {
+                  {leafColumns.map((c) => {
                     let sum = 0, n = 0;
                     visibleStudents.forEach((st) => {
-                      const v = cellValue(st.id, c);
+                      const v = leafValue(st.id, c);
                       if (v.score != null) { sum += v.score; n += 1; }
                     });
                     const avg = n ? sum / n : null;
@@ -587,6 +660,7 @@ function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => v
           <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-amber-500/15 border border-amber-500/30" /> 60–79%</span>
           <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-red-500/15 border border-red-500/30" /> &lt; 60%</span>
           <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-muted/60" /> No evidence yet</span>
+          <span className="ml-auto">Click a standard code to reveal its substandards.</span>
         </div>
       </CardContent>
     </Card>
