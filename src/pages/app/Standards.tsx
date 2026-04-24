@@ -27,6 +27,7 @@ export default function Standards() {
   const [rows, setRows] = useState<Standard[]>([]);
   const [filter, setFilter] = useState("");
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
+  const [scopeFilter, setScopeFilter] = useState<"ALL" | "STATE" | "NATIONAL">("ALL");
   const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
   const [gradeFilter, setGradeFilter] = useState<string>("ALL");
   const [profile, setProfile] = useState<{ state: string | null; default_subject: string | null; default_grade: string | null } | null>(null);
@@ -47,9 +48,25 @@ export default function Standards() {
     return Array.from(s);
   }, [rows]);
 
+  // Per-subject breakdown so teachers can see "what coverage do I have for Science?
+  // → 24 NGSS (national) + 12 Idaho (state)" at a glance.
+  const subjectBreakdown = useMemo(() => {
+    const map = new Map<string, Map<string, number>>();
+    rows.forEach((r) => {
+      const fw = r.framework ?? "STATE";
+      if (!map.has(r.subject)) map.set(r.subject, new Map());
+      const inner = map.get(r.subject)!;
+      inner.set(fw, (inner.get(fw) ?? 0) + 1);
+    });
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [rows]);
+
   const visible = rows.filter((r) => {
     const fw = r.framework ?? "STATE";
+    const meta = getFramework(fw);
     if (frameworkFilter !== "ALL" && fw !== frameworkFilter) return false;
+    if (scopeFilter === "STATE" && meta.national) return false;
+    if (scopeFilter === "NATIONAL" && !meta.national) return false;
     if (subjectFilter !== "ALL" && r.subject !== subjectFilter) return false;
     if (gradeFilter !== "ALL" && r.grade !== gradeFilter) return false;
     if (filter) {
@@ -59,15 +76,76 @@ export default function Standards() {
     return true;
   });
 
+  // Color palette for framework badges so each library is instantly recognizable.
+  const fwBadgeClass = (fwId: string) => {
+    const meta = getFramework(fwId);
+    if (!meta.national) return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30";
+    switch (meta.id) {
+      case "NGSS": return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
+      case "CCSS_MATH": return "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30";
+      case "CCSS_ELA": return "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30";
+      case "C3_SS": return "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30";
+      case "AP": return "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30";
+      case "IB": return "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30";
+      default: return "bg-muted text-muted-foreground border-border";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-4xl font-semibold mb-2">Standards library</h1>
-          <p className="text-muted-foreground">Seeded standards (shared) + your custom ones.</p>
+          <p className="text-muted-foreground">
+            Mix state-specific standards (e.g. Idaho Science) and national frameworks (e.g. NGSS, Common Core) per subject.
+          </p>
         </div>
         <AddStandardDialog defaults={profile} onAdded={load} />
       </div>
+
+      {/* Per-subject coverage so teachers see at a glance which frameworks
+          cover each subject they teach (state vs national). */}
+      {subjectBreakdown.length > 0 && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-3">Coverage by subject</div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {subjectBreakdown.map(([subj, fwMap]) => {
+                const entries = Array.from(fwMap.entries());
+                const stateCount = entries.filter(([fw]) => !getFramework(fw).national).reduce((a, [, c]) => a + c, 0);
+                const nationalCount = entries.filter(([fw]) => getFramework(fw).national).reduce((a, [, c]) => a + c, 0);
+                return (
+                  <button
+                    key={subj}
+                    type="button"
+                    onClick={() => { setSubjectFilter(subj); setFrameworkFilter("ALL"); setScopeFilter("ALL"); }}
+                    className="text-left rounded-lg border bg-background hover:bg-muted/40 transition p-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-sm">{subj}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {stateCount > 0 && <span>State {stateCount}</span>}
+                        {stateCount > 0 && nationalCount > 0 && <span> · </span>}
+                        {nationalCount > 0 && <span>National {nationalCount}</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {entries.sort((a, b) => b[1] - a[1]).map(([fw, count]) => {
+                        const meta = getFramework(fw);
+                        return (
+                          <Badge key={fw} variant="outline" className={`text-[10px] ${fwBadgeClass(fw)}`} title={meta.description}>
+                            {meta.shortLabel} · {count}
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-wrap items-end gap-3">
         <Input
@@ -76,6 +154,23 @@ export default function Standards() {
           onChange={(e) => setFilter(e.target.value)}
           className="max-w-xs"
         />
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Scope</Label>
+          <div className="flex rounded-md border overflow-hidden h-9">
+            {(["ALL", "STATE", "NATIONAL"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setScopeFilter(s)}
+                className={`px-3 text-xs font-medium transition ${
+                  scopeFilter === s ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
+                }`}
+              >
+                {s === "ALL" ? "All" : s === "STATE" ? "State" : "National"}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Framework</Label>
           <Select value={frameworkFilter} onValueChange={setFrameworkFilter}>
@@ -119,13 +214,24 @@ export default function Standards() {
       ) : (
         <div className="rounded-lg border bg-card divide-y">
           {visible.map((s) => {
-            const fw = getFramework(s.framework);
+            const fwId = s.framework ?? "STATE";
+            const fw = getFramework(fwId);
             return (
-              <div key={s.id} className="p-4 flex items-start gap-4 hover:bg-muted/30">
-                <div className="font-mono text-xs text-muted-foreground w-40 shrink-0 pt-0.5 break-all">{s.code}</div>
+              <div key={s.id} className="p-4 flex items-start gap-3 hover:bg-muted/30">
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] shrink-0 mt-0.5 ${fwBadgeClass(fwId)}`}
+                  title={`${fw.label}${fw.national ? " (national)" : " (state)"} — ${fw.description}`}
+                >
+                  {fw.shortLabel}
+                </Badge>
+                <div className="font-mono text-xs text-muted-foreground w-36 shrink-0 pt-0.5 break-all">{s.code}</div>
                 <div className="flex-1 min-w-0 text-sm">{s.description}</div>
                 <div className="text-xs text-muted-foreground shrink-0 flex items-center gap-1.5">
-                  <Badge variant="outline" className="text-[10px]" title={fw.description}>{fw.shortLabel}</Badge>
+                  <span className={fw.national ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
+                    {fw.national ? "National" : "State"}
+                  </span>
+                  <span>·</span>
                   <span>{s.state || "—"} · {s.subject} · G{s.grade}</span>
                 </div>
                 {s.teacher_id !== null && (
