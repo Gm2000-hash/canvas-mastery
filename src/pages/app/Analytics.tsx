@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -349,23 +349,43 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
   const [sortBy, setSortBy] = useState<"code" | "weak" | "strong">("code");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  type RosterStudent = { id: string; name: string; sortable: string | null };
+  const [roster, setRoster] = useState<RosterStudent[] | null>(null);
 
   useEffect(() => {
-    if (collapsed) return; // defer fetch until the teacher opens the panel
-    if (data !== null) return;
-    supabase.rpc("analytics_class_matrix", { _course_id: course.course_id })
-      .then(({ data }) => setData((data as any) ?? []));
-  }, [course.course_id, collapsed, data]);
+    if (collapsed) return;
+    if (data === null) {
+      supabase.rpc("analytics_class_matrix", { _course_id: course.course_id })
+        .then(({ data }) => setData((data as any) ?? []));
+    }
+    if (roster === null) {
+      // Fetch the roster directly so students render even before any
+      // standards have been tagged for this course (the RPC's CROSS JOIN
+      // would otherwise produce zero rows and hide everyone).
+      supabase.from("students")
+        .select("id, name, sortable_name")
+        .eq("course_id", course.course_id)
+        .then(({ data }) => setRoster(((data as any) ?? []).map((r: any) => ({
+          id: r.id, name: r.name, sortable: r.sortable_name,
+        }))));
+    }
+  }, [course.course_id, collapsed, data, roster]);
 
   // Distinct students and standards out of the long-form rows.
+  // Students are seeded from the roster fetch so they appear even when the
+  // matrix RPC returns zero rows (no confirmed standards yet).
   const { students, standards, valueByPair, subjects, frameworks } = useMemo(() => {
     const studentMap = new Map<string, { id: string; name: string; sortable: string | null }>();
+    (roster ?? []).forEach((r) => studentMap.set(r.id, r));
     const stdMap = new Map<string, { id: string; code: string; parent_code: string; description: string; subject: string; framework: string }>();
     const valueMap = new Map<string, MatrixRow>();
     const subjs = new Set<string>();
     const fws = new Set<string>();
     (data ?? []).forEach((r) => {
-      studentMap.set(r.student_id, { id: r.student_id, name: r.student_name, sortable: r.student_sortable });
+      // Backfill in case a student is in the matrix but missing from the roster fetch.
+      if (!studentMap.has(r.student_id)) {
+        studentMap.set(r.student_id, { id: r.student_id, name: r.student_name, sortable: r.student_sortable });
+      }
       stdMap.set(r.standard_id, {
         id: r.standard_id, code: r.code, parent_code: r.parent_code,
         description: r.description, subject: r.subject, framework: r.framework,
@@ -382,7 +402,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
       subjects: Array.from(subjs).sort(),
       frameworks: Array.from(fws).sort(),
     };
-  }, [data]);
+  }, [data, roster]);
 
   // Apply subject/framework filters to the standard list.
   const filteredStandards = useMemo(() => {
@@ -580,9 +600,36 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
       </CardHeader>
       {!collapsed && (
       <CardContent>
-        {data === null ? <Skeleton className="h-60 w-full" /> :
-         visibleStudents.length === 0 ? <EmptyState message="No students match this filter." /> :
-         leafColumns.length === 0 ? <EmptyState message="This course has no confirmed standards yet. Tag assessments on Tag Review first." /> : (
+        {(data === null || roster === null) ? <Skeleton className="h-60 w-full" /> :
+         students.length === 0 ? <EmptyState message="No students enrolled in this course yet. Sync your roster from Courses." /> :
+         leafColumns.length === 0 ? (
+          <div className="space-y-3">
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+              <strong>No confirmed standards for this course yet.</strong> Tag assessments on{" "}
+              <Link to="/app/review" className="underline font-medium">Tag Review</Link>{" "}
+              and run mastery to populate the matrix below.
+            </div>
+            <div className="overflow-auto border rounded-lg max-h-[70vh]">
+              <table className="w-full border-collapse text-xs">
+                <thead className="sticky top-0 z-10 bg-card">
+                  <tr>
+                    <th className="sticky left-0 z-20 bg-card border-b border-r p-2 text-left font-medium min-w-[180px]">Student</th>
+                    <th className="border-b p-2 text-right font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleStudents.map((st) => (
+                    <tr key={st.id} className="hover:bg-muted/30">
+                      <td className="sticky left-0 z-10 bg-card border-b border-r p-2 font-medium whitespace-nowrap">{st.name}</td>
+                      <td className="border-b p-2 text-right text-muted-foreground italic">awaiting tagged standards</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+         ) :
+         visibleStudents.length === 0 ? <EmptyState message="No students match this filter." /> : (
           <div className="overflow-auto border rounded-lg max-h-[70vh]">
             <table className="w-full border-collapse text-xs">
               <thead className="sticky top-0 z-10 bg-card">
@@ -916,14 +963,13 @@ function QuestionsView({ courseId }: { courseId: string | null }) {
   );
 }
 
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="py-10 text-center text-muted-foreground">
-      <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-60" />
-      <p className="text-sm">{message}</p>
-      <p className="text-xs mt-2">
-        Need to set things up? Visit <Link to="/app/courses" className="underline">Courses</Link>, <Link to="/app/review" className="underline">Tag Review</Link>, or <Link to="/app/mastery" className="underline">Mastery</Link>.
-      </p>
-    </div>
-  );
-}
+const EmptyState = forwardRef<HTMLDivElement, { message: string }>(({ message }, ref) => (
+  <div ref={ref} className="py-10 text-center text-muted-foreground">
+    <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-60" />
+    <p className="text-sm">{message}</p>
+    <p className="text-xs mt-2">
+      Need to set things up? Visit <Link to="/app/courses" className="underline">Courses</Link>, <Link to="/app/review" className="underline">Tag Review</Link>, or <Link to="/app/mastery" className="underline">Mastery</Link>.
+    </p>
+  </div>
+));
+EmptyState.displayName = "EmptyState";
