@@ -14,6 +14,7 @@ import Assignments from "./pages/app/Assignments";
 import Standards from "./pages/app/Standards";
 import Mastery from "./pages/app/Mastery";
 import Review from "./pages/app/Review";
+import Analytics from "./pages/app/Analytics";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="review" element={<Review />} />
             <Route path="standards" element={<Standards />} />
             <Route path="mastery" element={<Mastery />} />
+            <Route path="analytics" element={<Analytics />} />
             <Route path="settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />

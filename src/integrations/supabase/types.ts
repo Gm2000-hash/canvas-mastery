@@ -597,6 +597,106 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      analytics_active_dimensions: {
+        Args: never
+        Returns: {
+          framework: string
+          standard_count: number
+          subject: string
+        }[]
+      }
+      analytics_assignment_breakdown: {
+        Args: { _course_id?: string }
+        Returns: {
+          assignment_id: string
+          avg_percentage: number
+          course_id: string
+          course_name: string
+          due_at: string
+          kind: string
+          name: string
+          points_possible: number
+          standards_tagged: number
+          submission_count: number
+        }[]
+      }
+      analytics_class_breakdown: {
+        Args: never
+        Returns: {
+          assessment_count: number
+          avg_mastery: number
+          course_id: string
+          course_name: string
+          framework: string
+          pct_mastered: number
+          student_count: number
+          subject: string
+        }[]
+      }
+      analytics_mastery_distribution: {
+        Args: { _course_id?: string; _subject?: string }
+        Returns: {
+          bucket: string
+          bucket_max: number
+          bucket_min: number
+          count: number
+        }[]
+      }
+      analytics_mastery_trends: {
+        Args: { _course_id?: string; _granularity?: string; _subject?: string }
+        Returns: {
+          avg_mastery: number
+          bucket_label: string
+          bucket_ts: string
+          framework: string
+          sample_size: number
+          subject: string
+        }[]
+      }
+      analytics_question_breakdown: {
+        Args: { _assignment_id?: string; _course_id?: string }
+        Returns: {
+          assignment_id: string
+          assignment_name: string
+          avg_points: number
+          correct_count: number
+          pct_correct: number
+          points_possible: number
+          question_id: string
+          question_position: number
+          question_text: string
+          responses: number
+          standards_tagged: number
+        }[]
+      }
+      analytics_standard_breakdown: {
+        Args: { _course_id?: string; _framework?: string; _subject?: string }
+        Returns: {
+          avg_mastery: number
+          code: string
+          description: string
+          framework: string
+          grade: string
+          pct_mastered: number
+          standard_id: string
+          students_assessed: number
+          students_mastered: number
+          subject: string
+        }[]
+      }
+      analytics_student_breakdown: {
+        Args: { _course_id?: string }
+        Returns: {
+          avg_mastery: number
+          course_id: string
+          course_name: string
+          last_activity: string
+          standards_assessed: number
+          standards_mastered: number
+          student_id: string
+          student_name: string
+        }[]
+      }
       get_canvas_connection_status: {
         Args: never
         Returns: {
