@@ -1,45 +1,33 @@
-# Analytics: Classes default + drill-in matrix
+## Why the tables look empty
 
-## What changes
+I checked the database: every class has students and submissions, but **no assessments have confirmed standard tags yet**, and **no mastery snapshots exist**. The matrix RPC pivots on tagged standards — without tags, it returns zero rows, which causes the table to collapse to "No students match this filter."
 
-1. **Default tab → Classes.** When a teacher opens `/app/analytics`, the Classes tab is selected by default (currently it lands on "Mastery by subject"). The standalone "Students" tab is removed because student data is now reached by clicking a class.
+So the data tables are technically rendering correctly given the inputs — there is just nothing to plot. But the UX is misleading and unhelpful.
 
-2. **Class drill-in.** Each row in the Classes table becomes clickable (and gets a "View students" affordance). Clicking opens a per-course matrix view in place:
-   - Rows = active students in the course (one per student)
-   - Columns = standards confirmed on that course's assignments
-   - Cells = mastery score (0–100%) color-coded (red < 60%, amber 60–79%, green ≥ 80%, gray for "no evidence yet")
-   - Sticky first column (student name) and sticky header row, horizontally scrollable
-   - Trailing column = student average across visible standards
-   - Footer row = class average per standard
-   - Hover a cell → tooltip with attempts, last computed timestamp, and the standard's full description
-   - Top-left "← Back to classes" returns to the rollup
+## Fix
 
-3. **Standards / Substandards toggle.** Above the matrix, a two-button toggle:
-   - **Substandards (default):** one column per individual standard code (e.g. `PS-MS-1-1`, `PS-MS-1-2`, `PS-MS-1-3`)
-   - **Standards (rolled up):** columns are parent codes (e.g. `PS-MS-1`) and each cell is the average of that student's mastery across all child substandards. A small "n=3" sub-label shows how many substandards rolled up.
-   - The parent code is derived from the standard code by stripping the trailing segment after the last `-` or `.` (e.g. `PS-MS-1-1 → PS-MS-1`, `7.NS.A.1 → 7.NS.A`). Codes with no separator stay as-is.
+Update the per-class matrix view (`ClassMatrixView` in `src/pages/app/Analytics.tsx`) so the data table is always useful:
 
-4. **Matrix filters & utilities.**
-   - Search-by-student textbox
-   - Subject + framework filter chips (because a course may have standards from multiple frameworks once seeded)
-   - "Sort columns by: code | weakest first | strongest first"
-   - "Export CSV" button that downloads exactly what's on screen
+1. **Fetch the roster directly** from the `students` table (not just from the matrix RPC). Students will appear as rows even before any standards are tagged or any mastery is computed.
+2. **Replace the misleading empty state.** When there are no confirmed standards yet, show the student list with a single "Status" column and a clear banner:
+   - "This course has 0 confirmed standard tags. Tag assessments on **Tag Review** to populate the mastery matrix."
+   - Inline link/button to the Tag Review page.
+3. **When standards exist but mastery is zero**, render the matrix as today with em-dashes in the empty cells — this already works.
+4. **Keep the existing student search / filter / sort controls** working against the roster, not just the RPC output.
+5. **Fix two unrelated console warnings** flagged in the logs while I'm in the file:
+   - Wrap `Skeleton` and `EmptyState` in `React.forwardRef` so Radix's Tabs/Card don't complain about missing refs.
 
-## Technical notes
+## Files
 
-- New SQL function `analytics_class_matrix(_course_id uuid)` returning one row per (student × standard) for that course, including: `student_id`, `student_name`, `student_sortable`, `standard_id`, `code`, `parent_code` (derived via `regexp_replace(code, '[-.][^-.]+$', '')`), `description`, `subject`, `grade`, `framework`, `mastery_score`, `mastered`, `attempts`, `computed_at`. SECURITY DEFINER, scoped to `auth.uid()`.
-- Frontend pivots into a 2D grid client-side. In "Standards" rollup mode, average the mastery scores of all substandards belonging to the same `parent_code` per student (ignoring nulls).
-- The Classes tab becomes a small state machine: `mode = 'list' | 'matrix'`, with `selectedCourseId` driving the matrix view.
-- Tabs reorder: Classes, Mastery by subject, Standards, Assessments, Mastery levels, Questions.
-- Remove the now-unused `StudentsView` component and `Users` icon import to keep the bundle clean.
+- `src/pages/app/Analytics.tsx` — roster fetch, empty-state rebuild, filter/sort against roster.
+- `src/components/ui/skeleton.tsx` — `forwardRef` wrap.
+- The local `EmptyState` component in `Analytics.tsx` — `forwardRef` wrap.
 
-## Files touched
+## What you'll see after the fix
 
-- `supabase/migrations/<new>.sql` — add `analytics_class_matrix` function
-- `src/pages/app/Analytics.tsx` — reorder tabs, default to Classes, replace `ClassesView` with combined list+matrix flow, delete `StudentsView`
+- Each class's table immediately shows every active student as a row.
+- If no standards are tagged yet → one "Status" column + "Tag assessments to populate" CTA.
+- If standards are tagged but mastery hasn't been computed yet → full column headers, em-dash cells.
+- Once mastery snapshots exist → full color-coded matrix as designed.
 
-## Out of scope
-
-- No schema changes to `standards` (parent/child relationship is purely derived from the code).
-- No edits to the existing trends, standards, assessments, levels, or questions tabs.
-- No persisted "last viewed course" preference — drill-in resets when leaving the tab.
+No database changes required.

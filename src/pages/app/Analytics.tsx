@@ -349,13 +349,27 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
   const [sortBy, setSortBy] = useState<"code" | "weak" | "strong">("code");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  type RosterStudent = { id: string; name: string; sortable: string | null };
+  const [roster, setRoster] = useState<RosterStudent[] | null>(null);
 
   useEffect(() => {
-    if (collapsed) return; // defer fetch until the teacher opens the panel
-    if (data !== null) return;
-    supabase.rpc("analytics_class_matrix", { _course_id: course.course_id })
-      .then(({ data }) => setData((data as any) ?? []));
-  }, [course.course_id, collapsed, data]);
+    if (collapsed) return;
+    if (data === null) {
+      supabase.rpc("analytics_class_matrix", { _course_id: course.course_id })
+        .then(({ data }) => setData((data as any) ?? []));
+    }
+    if (roster === null) {
+      // Fetch the roster directly so students render even before any
+      // standards have been tagged for this course (the RPC's CROSS JOIN
+      // would otherwise produce zero rows and hide everyone).
+      supabase.from("students")
+        .select("id, name, sortable_name")
+        .eq("course_id", course.course_id)
+        .then(({ data }) => setRoster(((data as any) ?? []).map((r: any) => ({
+          id: r.id, name: r.name, sortable: r.sortable_name,
+        }))));
+    }
+  }, [course.course_id, collapsed, data, roster]);
 
   // Distinct students and standards out of the long-form rows.
   const { students, standards, valueByPair, subjects, frameworks } = useMemo(() => {
