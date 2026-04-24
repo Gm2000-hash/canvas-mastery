@@ -282,6 +282,90 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* DISCIPLINES (multi) */}
+      <Card id="disciplines">
+        <CardHeader>
+          <CardTitle>Disciplines</CardTitle>
+          <CardDescription>
+            Add every state · subject · grade combination you teach. Each course on the Courses page can be tagged with one of these so the AI uses the right standards library when tagging assignments.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {disciplines.length === 0 ? (
+            <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+              No disciplines yet. Add your first below.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {disciplines.map((d) => (
+                <div key={d.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{d.subject}</span>
+                    <span className="text-muted-foreground">·</span>
+                    <span>Grade {d.grade}</span>
+                    <span className="text-muted-foreground">·</span>
+                    <span>{d.state}</span>
+                    {d.is_default && (
+                      <Badge variant="outline" className="text-[10px] gap-1">
+                        <Star className="h-2.5 w-2.5" /> default
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {!d.is_default && (
+                      <Button size="sm" variant="ghost" onClick={() => makeDefault(d.id)} title="Make default">
+                        <Star className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => seedDiscipline(d)}
+                      disabled={seedingDiscId === d.id}
+                      title="Seed standards for this discipline"
+                    >
+                      {seedingDiscId === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Seed standards"}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => removeDiscipline(d.id)} title="Remove">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid sm:grid-cols-4 gap-2 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">State</Label>
+              <Select value={newState} onValueChange={setNewState}>
+                <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Subject</Label>
+              <Select value={newSubject} onValueChange={setNewSubject}>
+                <SelectTrigger><SelectValue placeholder="Subject" /></SelectTrigger>
+                <SelectContent>{SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Grade</Label>
+              <Select value={newGrade} onValueChange={setNewGrade}>
+                <SelectTrigger><SelectValue placeholder="Grade" /></SelectTrigger>
+                <SelectContent>{GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <Button onClick={addDiscipline} disabled={addingDisc || !newState || !newSubject || !newGrade}>
+              <Plus className="h-4 w-4 mr-1" /> Add
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* STANDARDS SEED */}
       <Card id="standards">
         <CardHeader>
