@@ -36,6 +36,15 @@ type Tag = {
 };
 type StatusFilter = "untagged" | "ai" | "confirmed" | "all";
 type SortKey = "recent" | "due" | "alpha";
+type QuizQuestion = {
+  id: string; assignment_id: string; position: number | null;
+  question_text: string | null; points_possible: number | null;
+};
+type QTag = {
+  id: string; question_id: string; standard_id: string;
+  ai_suggested: boolean; confirmed: boolean; confidence: number | null; rationale: string | null;
+  standards: { code: string; description: string } | null;
+};
 
 export default function Review() {
   const [courses, setCourses] = useState<Course[]>([]);
