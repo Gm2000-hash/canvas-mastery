@@ -338,104 +338,171 @@ export default function Settings() {
       {/* DISCIPLINES (multi) */}
       <Card id="disciplines">
         <CardHeader>
-          <CardTitle>Disciplines</CardTitle>
+          <CardTitle>What I teach</CardTitle>
           <CardDescription>
-            Add every state · subject · grade combination you teach. Each course on the Courses page can be tagged with one of these so the AI uses the right standards library when tagging assignments.
+            Add every <strong>framework · subject · grade</strong> you teach. Each course on the Courses page can be tagged with one of these so the AI uses the right standards library.
+            You can mix state-specific standards (e.g. Idaho Science) and national frameworks (e.g. NGSS, Common Core) side-by-side.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           {disciplines.length === 0 ? (
             <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
               No disciplines yet. Add your first below.
             </div>
           ) : (
             <div className="space-y-2">
-              {disciplines.map((d) => (
-                <div key={d.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium">{d.subject}</span>
-                    <span className="text-muted-foreground">·</span>
-                    <span>Grade {d.grade}</span>
-                    <span className="text-muted-foreground">·</span>
-                    <span>{d.state}</span>
-                    {d.is_default && (
-                      <Badge variant="outline" className="text-[10px] gap-1">
-                        <Star className="h-2.5 w-2.5" /> default
+              {disciplines.map((d) => {
+                const fw = getFramework(d.framework);
+                return (
+                  <div key={d.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-medium"
+                        title={fw.description}
+                      >
+                        {fw.shortLabel}
                       </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {!d.is_default && (
-                      <Button size="sm" variant="ghost" onClick={() => makeDefault(d.id)} title="Make default">
-                        <Star className="h-3.5 w-3.5" />
+                      <span className="font-medium">{d.subject}</span>
+                      <span className="text-muted-foreground">·</span>
+                      <span>Grade {d.grade}</span>
+                      {d.state && (
+                        <>
+                          <span className="text-muted-foreground">·</span>
+                          <span>{d.state}</span>
+                        </>
+                      )}
+                      {d.is_default && (
+                        <Badge variant="outline" className="text-[10px] gap-1">
+                          <Star className="h-2.5 w-2.5" /> default
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!d.is_default && (
+                        <Button size="sm" variant="ghost" onClick={() => makeDefault(d.id)} title="Make default">
+                          <Star className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(d)} title="Edit">
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => seedDiscipline(d)}
-                      disabled={seedingDiscId === d.id}
-                      title="Seed standards for this discipline"
-                    >
-                      {seedingDiscId === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Seed standards"}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => removeDiscipline(d.id)} title="Remove">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                      {fw.seedable && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => seedDiscipline(d)}
+                          disabled={seedingDiscId === d.id}
+                          title="Seed standards for this discipline"
+                        >
+                          {seedingDiscId === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Seed"}
+                        </Button>
+                      )}
+                      {fw.seedable && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (confirm(`Replace the existing ${fw.shortLabel} ${d.subject} grade ${d.grade} standards library? This deletes the shared seeded standards and re-asks the AI.`)) {
+                              seedDiscipline(d, true);
+                            }
+                          }}
+                          disabled={seedingDiscId === d.id}
+                          title="Re-seed (replace existing)"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => removeDiscipline(d.id)} title="Remove">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
-          <div className="grid sm:grid-cols-4 gap-2 items-end">
-            <div className="space-y-1">
-              <Label className="text-xs">State</Label>
-              <Select value={newState} onValueChange={setNewState}>
-                <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          {/* MULTI-PICK ADD FORM */}
+          <div className="rounded-md border p-4 space-y-4 bg-muted/20">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Standards framework</Label>
+                <Select value={newFramework} onValueChange={(v) => setNewFramework(v as FrameworkId)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {FRAMEWORKS.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">{newFrameworkMeta.description}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">
+                  State {newFrameworkMeta.national && <span className="text-muted-foreground">(optional — {newFrameworkMeta.shortLabel} is national)</span>}
+                </Label>
+                <Select value={newState} onValueChange={setNewState}>
+                  <SelectTrigger><SelectValue placeholder={newFrameworkMeta.national ? "Optional" : "State"} /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
             <div className="space-y-1">
-              <Label className="text-xs">Subject</Label>
-              <Select value={newSubject} onValueChange={setNewSubject}>
-                <SelectTrigger><SelectValue placeholder="Subject" /></SelectTrigger>
-                <SelectContent>{SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
+              <Label className="text-xs">Subjects (pick one or more)</Label>
+              <ChipMultiSelect
+                options={SUBJECTS}
+                selected={newSubjects}
+                onChange={setNewSubjects}
+              />
             </div>
+
             <div className="space-y-1">
-              <Label className="text-xs">Grade</Label>
-              <Select value={newGrade} onValueChange={setNewGrade}>
-                <SelectTrigger><SelectValue placeholder="Grade" /></SelectTrigger>
-                <SelectContent>{GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
-              </Select>
+              <Label className="text-xs">Grades (pick one or more)</Label>
+              <ChipMultiSelect
+                options={GRADES}
+                selected={newGrades}
+                onChange={setNewGrades}
+                gridCols={7}
+              />
             </div>
-            <Button onClick={addDiscipline} disabled={addingDisc || !newState || !newSubject || !newGrade}>
-              <Plus className="h-4 w-4 mr-1" /> Add
-            </Button>
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                {newSubjects.length > 0 && newGrades.length > 0
+                  ? `Will add ${newSubjects.length * newGrades.length} discipline${newSubjects.length * newGrades.length === 1 ? "" : "s"} (existing combos are skipped).`
+                  : "Pick at least one subject and one grade."}
+              </p>
+              <Button
+                onClick={addDisciplines}
+                disabled={
+                  addingDisc ||
+                  newSubjects.length === 0 ||
+                  newGrades.length === 0 ||
+                  (!newFrameworkMeta.national && !newState)
+                }
+              >
+                {addingDisc && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                <Plus className="h-4 w-4 mr-1" /> Add disciplines
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* STANDARDS SEED */}
-      <Card id="standards">
-        <CardHeader>
-          <CardTitle>Seed your standards library</CardTitle>
-          <CardDescription>Loads the official content standards for your state/subject/grade. You can add or edit individual standards on the Standards page.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={seedStandards} disabled={seeding || !state || !subject || !grade}>
-            {seeding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {seeding ? "Seeding…" : `Seed ${state || "?"} ${subject || "?"} ${grade || "?"} standards`}
-          </Button>
-          <p className="text-xs text-muted-foreground mt-3">
-            Tip: if your district uses non-standard codes, you can also add custom standards on the
-            Standards page or upload a CSV later. <ExternalLink className="inline h-3 w-3" />
-          </p>
-        </CardContent>
-      </Card>
+      {/* EDIT DIALOG */}
+      {editing && (
+        <EditDisciplineDialog
+          discipline={editing}
+          onClose={() => setEditing(null)}
+          onSave={saveEditDiscipline}
+        />
+      )}
 
       {/* MASTERY RULES */}
       <Card id="mastery">
