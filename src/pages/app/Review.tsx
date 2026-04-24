@@ -231,7 +231,38 @@ export default function Review() {
     loadAll();
   }
 
-  async function bulkConfirmAll() {
+  async function aiSuggestByQuestion(assignmentId: string) {
+    setQuestionTagBusy((p) => new Set(p).add(assignmentId));
+    const { data, error } = await supabase.functions.invoke("tag-question-standards", { body: { assignment_id: assignmentId } });
+    setQuestionTagBusy((p) => { const n = new Set(p); n.delete(assignmentId); return n; });
+    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if ((data as any)?.error) { toast.error((data as any).error); return; }
+    const qn = (data as any).questions_tagged ?? 0;
+    const rn = (data as any).assignment_rollup_count ?? 0;
+    toast.success(`Tagged ${qn} question${qn === 1 ? "" : "s"} → ${rn} assignment-level standard${rn === 1 ? "" : "s"}`);
+    setExpandedQuestions((p) => new Set(p).add(assignmentId));
+    await loadQuestionsFor(assignmentId);
+    loadAll();
+  }
+
+  async function toggleExpand(assignmentId: string) {
+    setExpandedQuestions((p) => {
+      const n = new Set(p);
+      if (n.has(assignmentId)) n.delete(assignmentId);
+      else { n.add(assignmentId); loadQuestionsFor(assignmentId); }
+      return n;
+    });
+  }
+
+  async function confirmQTag(t: QTag) {
+    const { error } = await supabase.from("question_standards").update({ confirmed: true }).eq("id", t.id);
+    if (error) toast.error(error.message);
+    else loadQuestionsFor(t.question_id ? (questionsByAssignment[Object.keys(questionsByAssignment).find((aid) => questionsByAssignment[aid].some((q) => q.id === t.question_id)) ?? ""]?.[0]?.assignment_id ?? "") : "");
+  }
+  async function removeQTag(t: QTag, assignmentId: string) {
+    const { error } = await supabase.from("question_standards").delete().eq("id", t.id);
+    if (error) toast.error(error.message); else loadQuestionsFor(assignmentId);
+  }
     if (selected.size === 0) return;
     setBulkBusy(true);
     const ids = Array.from(selected).flatMap((aid) =>
