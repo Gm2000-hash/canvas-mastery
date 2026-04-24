@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { Check, ExternalLink, Loader2, Star, Trash2, Plus, Pencil, RefreshCw } from "lucide-react";
+import { Check, Loader2, Star, Trash2, Plus, Pencil, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
@@ -35,8 +35,7 @@ export default function Settings() {
   const [windowN, setWindowN] = useState(3);
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // Standards seeding
-  const [seeding, setSeeding] = useState(false);
+  // (legacy single seed kept for migration; new seeding lives per-discipline below)
 
   // Disciplines (multi)
   type Discipline = { id: string; state: string; subject: string; grade: string; is_default: boolean; framework: string | null };
@@ -119,18 +118,8 @@ export default function Settings() {
     setCanvasConnected(true);
   }
 
-  async function seedStandards() {
-    if (!state || !subject || !grade) { toast.error("Save your state/subject/grade first"); return; }
-    setSeeding(true);
-    const { data, error } = await supabase.functions.invoke("seed-standards", {
-      body: { framework: "STATE", state, subject, grade },
-    });
-    setSeeding(false);
-    if (error) { toast.error((error as any).message ?? "Failed"); return; }
-    if ((data as any)?.error) { toast.error((data as any).error); return; }
-    if ((data as any).skipped) toast.info(`Already seeded (${(data as any).existing} standards available)`);
-    else toast.success(`Seeded ${(data as any).inserted} standards`);
-  }
+  // Legacy single-shot seeder removed — see per-discipline "Seed" / "Re-seed" buttons above.
+
 
   async function saveSettings(e: React.FormEvent) {
     e.preventDefault();
