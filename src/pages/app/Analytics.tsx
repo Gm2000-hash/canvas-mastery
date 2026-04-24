@@ -219,15 +219,38 @@ function TrendsView({ courseId, subjects }: { courseId: string | null; subjects:
   );
 }
 
-// ───────────────────────── Classes ─────────────────────────
-function ClassesView() {
+// ───────────────────────── Classes (with drill-in matrix) ─────────────────────────
+function ClassesView({ courseFilter }: { courseFilter: string | null }) {
   const [rows, setRows] = useState<ClassRow[] | null>(null);
+  const [selected, setSelected] = useState<ClassRow | null>(null);
+
   useEffect(() => {
     supabase.rpc("analytics_class_breakdown").then(({ data }) => setRows((data as any) ?? []));
   }, []);
+
+  // Honor the global course filter: if the teacher narrowed at the top,
+  // pre-select that class (still gives them the back arrow to return).
+  useEffect(() => {
+    if (!courseFilter || !rows) return;
+    const match = rows.find((r) => r.course_id === courseFilter);
+    if (match) setSelected(match);
+  }, [courseFilter, rows]);
+
+  if (selected) {
+    return (
+      <ClassMatrixView
+        course={selected}
+        onBack={() => setSelected(null)}
+      />
+    );
+  }
+
   return (
     <Card>
-      <CardHeader><CardTitle>Class breakdown</CardTitle><CardDescription>Per-course rollup of cohort mastery.</CardDescription></CardHeader>
+      <CardHeader>
+        <CardTitle>Active classes</CardTitle>
+        <CardDescription>Click a class to see every student plotted against the standards covered in that course.</CardDescription>
+      </CardHeader>
       <CardContent>
         {rows === null ? <Skeleton className="h-40 w-full" /> :
          rows.length === 0 ? <EmptyState message="No courses imported yet." /> : (
@@ -236,12 +259,17 @@ function ClassesView() {
               <TableHead>Course</TableHead><TableHead>Subject</TableHead><TableHead>Framework</TableHead>
               <TableHead className="text-right">Students</TableHead><TableHead className="text-right">Assessments</TableHead>
               <TableHead className="text-right">Avg mastery</TableHead><TableHead className="text-right">% mastered</TableHead>
+              <TableHead></TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {rows.map((r) => {
                 const fw = getFramework(r.framework);
                 return (
-                  <TableRow key={r.course_id}>
+                  <TableRow
+                    key={r.course_id}
+                    onClick={() => setSelected(r)}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
                     <TableCell className="font-medium">{r.course_name}</TableCell>
                     <TableCell className="text-muted-foreground">{r.subject ?? "—"}</TableCell>
                     <TableCell><Badge variant="outline" style={{ borderColor: FRAMEWORK_COLOR[r.framework ?? "STATE"], color: FRAMEWORK_COLOR[r.framework ?? "STATE"] }}>{fw.shortLabel}</Badge></TableCell>
@@ -249,6 +277,11 @@ function ClassesView() {
                     <TableCell className="text-right tabular-nums">{r.assessment_count}</TableCell>
                     <TableCell className="text-right tabular-nums">{pct(r.avg_mastery)}</TableCell>
                     <TableCell className="text-right tabular-nums">{pct(r.pct_mastered)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="ghost" className="h-7" onClick={(e) => { e.stopPropagation(); setSelected(r); }}>
+                        View students <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -260,50 +293,300 @@ function ClassesView() {
   );
 }
 
-// ───────────────────────── Students ─────────────────────────
-function StudentsView({ courseId }: { courseId: string | null }) {
-  const [rows, setRows] = useState<StudentRow[] | null>(null);
-  const [filter, setFilter] = useState("");
-  useEffect(() => {
-    setRows(null);
-    supabase.rpc("analytics_student_breakdown", { _course_id: courseId }).then(({ data }) => setRows((data as any) ?? []));
-  }, [courseId]);
+// Per-course matrix: students × standards
+type MatrixRow = {
+  student_id: string;
+  student_name: string;
+  student_sortable: string | null;
+  standard_id: string;
+  code: string;
+  parent_code: string;
+  description: string;
+  subject: string;
+  grade: string;
+  framework: string;
+  mastery_score: number | null;
+  mastered: boolean | null;
+  attempts: number | null;
+  computed_at: string | null;
+};
 
-  const visible = (rows ?? []).filter((r) => !filter || r.student_name.toLowerCase().includes(filter.toLowerCase()));
+function masteryColor(score: number | null | undefined): string {
+  if (score == null) return "bg-muted/40 text-muted-foreground";
+  const p = score * 100;
+  if (p >= 80) return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+  if (p >= 60) return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
+  return "bg-red-500/15 text-red-700 dark:text-red-300";
+}
+
+function ClassMatrixView({ course, onBack }: { course: ClassRow; onBack: () => void }) {
+  const [data, setData] = useState<MatrixRow[] | null>(null);
+  const [grouping, setGrouping] = useState<"sub" | "parent">("sub");
+  const [studentFilter, setStudentFilter] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
+  const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
+  const [sortBy, setSortBy] = useState<"code" | "weak" | "strong">("code");
+
+  useEffect(() => {
+    setData(null);
+    supabase.rpc("analytics_class_matrix", { _course_id: course.course_id })
+      .then(({ data }) => setData((data as any) ?? []));
+  }, [course.course_id]);
+
+  // Distinct students and standards out of the long-form rows.
+  const { students, standards, valueByPair, subjects, frameworks } = useMemo(() => {
+    const studentMap = new Map<string, { id: string; name: string; sortable: string | null }>();
+    const stdMap = new Map<string, { id: string; code: string; parent_code: string; description: string; subject: string; framework: string }>();
+    const valueMap = new Map<string, MatrixRow>();
+    const subjs = new Set<string>();
+    const fws = new Set<string>();
+    (data ?? []).forEach((r) => {
+      studentMap.set(r.student_id, { id: r.student_id, name: r.student_name, sortable: r.student_sortable });
+      stdMap.set(r.standard_id, {
+        id: r.standard_id, code: r.code, parent_code: r.parent_code,
+        description: r.description, subject: r.subject, framework: r.framework,
+      });
+      valueMap.set(`${r.student_id}|${r.standard_id}`, r);
+      if (r.subject) subjs.add(r.subject);
+      if (r.framework) fws.add(r.framework);
+    });
+    return {
+      students: Array.from(studentMap.values()).sort((a, b) =>
+        (a.sortable ?? a.name).localeCompare(b.sortable ?? b.name)),
+      standards: Array.from(stdMap.values()),
+      valueByPair: valueMap,
+      subjects: Array.from(subjs).sort(),
+      frameworks: Array.from(fws).sort(),
+    };
+  }, [data]);
+
+  // Apply subject/framework filters to the standard list.
+  const filteredStandards = useMemo(() => {
+    return standards.filter((s) => {
+      if (subjectFilter !== "ALL" && s.subject !== subjectFilter) return false;
+      if (frameworkFilter !== "ALL" && s.framework !== frameworkFilter) return false;
+      return true;
+    });
+  }, [standards, subjectFilter, frameworkFilter]);
+
+  // Build the columns. In "parent" mode, group substandards by their parent
+  // code and store the underlying substandard ids for averaging in cells.
+  type Column = { key: string; label: string; childCount: number; standardIds: string[]; subject: string; framework: string; description?: string };
+  const columns = useMemo<Column[]>(() => {
+    if (grouping === "sub") {
+      return filteredStandards.map((s) => ({
+        key: s.id, label: s.code, childCount: 1, standardIds: [s.id],
+        subject: s.subject, framework: s.framework, description: s.description,
+      }));
+    }
+    const groups = new Map<string, Column>();
+    filteredStandards.forEach((s) => {
+      const existing = groups.get(s.parent_code);
+      if (existing) {
+        existing.childCount += 1;
+        existing.standardIds.push(s.id);
+      } else {
+        groups.set(s.parent_code, {
+          key: s.parent_code, label: s.parent_code, childCount: 1,
+          standardIds: [s.id], subject: s.subject, framework: s.framework,
+        });
+      }
+    });
+    return Array.from(groups.values());
+  }, [filteredStandards, grouping]);
+
+  // Compute the score a given student has on a given column (averaging
+  // substandard scores when grouping is enabled), ignoring nulls.
+  function cellValue(studentId: string, col: Column): { score: number | null; covered: number; total: number; attempts: number; lastAt: string | null } {
+    let sum = 0, n = 0, attempts = 0, lastAt: string | null = null;
+    for (const sid of col.standardIds) {
+      const v = valueByPair.get(`${studentId}|${sid}`);
+      if (v?.mastery_score != null) {
+        sum += Number(v.mastery_score);
+        n += 1;
+        attempts += v.attempts ?? 0;
+        if (v.computed_at && (!lastAt || v.computed_at > lastAt)) lastAt = v.computed_at;
+      }
+    }
+    return { score: n ? sum / n : null, covered: n, total: col.standardIds.length, attempts, lastAt };
+  }
+
+  // Sort columns based on weakest/strongest using class-wide averages.
+  const sortedColumns = useMemo(() => {
+    if (sortBy === "code") return [...columns].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+    const colAvg = (col: Column) => {
+      let sum = 0, n = 0;
+      students.forEach((st) => {
+        const v = cellValue(st.id, col);
+        if (v.score != null) { sum += v.score; n += 1; }
+      });
+      return n ? sum / n : null;
+    };
+    return [...columns].sort((a, b) => {
+      const av = colAvg(a), bv = colAvg(b);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return sortBy === "weak" ? av - bv : bv - av;
+    });
+  }, [columns, sortBy, students, valueByPair]);
+
+  const visibleStudents = students.filter((s) =>
+    !studentFilter || s.name.toLowerCase().includes(studentFilter.toLowerCase()));
+
+  // CSV export of exactly what's on screen.
+  function exportCsv() {
+    const header = ["Student", ...sortedColumns.map((c) => c.label), "Avg"];
+    const lines = [header.join(",")];
+    visibleStudents.forEach((st) => {
+      const cells = sortedColumns.map((c) => {
+        const v = cellValue(st.id, c);
+        return v.score != null ? (v.score * 100).toFixed(0) : "";
+      });
+      const studentVals = sortedColumns.map((c) => cellValue(st.id, c).score).filter((s): s is number => s != null);
+      const avg = studentVals.length ? (studentVals.reduce((a, b) => a + b, 0) / studentVals.length * 100).toFixed(0) : "";
+      lines.push([JSON.stringify(st.name), ...cells, avg].join(","));
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${course.course_name.replace(/\W+/g, "_")}_mastery_matrix.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-end justify-between gap-3 flex-wrap">
-          <div><CardTitle>Student breakdown</CardTitle><CardDescription>How each student is progressing across all standards.</CardDescription></div>
-          <Input placeholder="Search students…" value={filter} onChange={(e) => setFilter(e.target.value)} className="max-w-xs" />
+          <div>
+            <Button variant="ghost" size="sm" onClick={onBack} className="mb-2 -ml-2 h-7">
+              <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to classes
+            </Button>
+            <CardTitle>{course.course_name}</CardTitle>
+            <CardDescription>
+              Mastery for every active student against the standards covered in this course.
+              Toggle below to view individual <strong>substandards</strong> or roll them up into <strong>standards</strong>.
+            </CardDescription>
+          </div>
+          <div className="flex items-end gap-2 flex-wrap">
+            <Input placeholder="Search students…" value={studentFilter} onChange={(e) => setStudentFilter(e.target.value)} className="max-w-[180px]" />
+            {subjects.length > 1 && (
+              <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                <SelectTrigger className="w-[130px] h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All subjects</SelectItem>
+                  {subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {frameworks.length > 1 && (
+              <Select value={frameworkFilter} onValueChange={setFrameworkFilter}>
+                <SelectTrigger className="w-[140px] h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All frameworks</SelectItem>
+                  {frameworks.map((f) => <SelectItem key={f} value={f}>{getFramework(f).shortLabel}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+              <SelectTrigger className="w-[150px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="code">Sort by code</SelectItem>
+                <SelectItem value="weak">Weakest first</SelectItem>
+                <SelectItem value="strong">Strongest first</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" onClick={exportCsv}><Download className="h-3.5 w-3.5 mr-1" />CSV</Button>
+          </div>
+        </div>
+        <div className="flex rounded-md border overflow-hidden h-9 w-fit mt-3">
+          {(["sub", "parent"] as const).map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setGrouping(g)}
+              className={`px-3 text-xs font-medium transition ${grouping === g ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+            >
+              {g === "sub" ? "Substandards" : "Standards (rolled up)"}
+            </button>
+          ))}
         </div>
       </CardHeader>
       <CardContent>
-        {rows === null ? <Skeleton className="h-40 w-full" /> :
-         visible.length === 0 ? <EmptyState message="No students match." /> : (
-          <Table>
-            <TableHeader><TableRow>
-              <TableHead>Student</TableHead><TableHead>Course</TableHead>
-              <TableHead className="text-right">Assessed</TableHead><TableHead className="text-right">Mastered</TableHead>
-              <TableHead className="text-right">Avg mastery</TableHead><TableHead className="text-right">Last activity</TableHead>
-            </TableRow></TableHeader>
-            <TableBody>
-              {visible.map((r) => (
-                <TableRow key={r.student_id}>
-                  <TableCell className="font-medium">{r.student_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.course_name}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.standards_assessed}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.standards_mastered}</TableCell>
-                  <TableCell className="text-right tabular-nums">{pct(r.avg_mastery)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
-                    {r.last_activity ? new Date(r.last_activity).toLocaleDateString() : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        {data === null ? <Skeleton className="h-60 w-full" /> :
+         visibleStudents.length === 0 ? <EmptyState message="No students match this filter." /> :
+         sortedColumns.length === 0 ? <EmptyState message="This course has no confirmed standards yet. Tag assessments on Tag Review first." /> : (
+          <div className="overflow-auto border rounded-lg max-h-[70vh]">
+            <table className="w-full border-collapse text-xs">
+              <thead className="sticky top-0 z-10 bg-card">
+                <tr>
+                  <th className="sticky left-0 z-20 bg-card border-b border-r p-2 text-left font-medium min-w-[180px]">Student</th>
+                  {sortedColumns.map((c) => (
+                    <th key={c.key} className="border-b border-r p-2 font-mono font-normal text-[10px] whitespace-nowrap"
+                        title={c.description ? `${c.label} — ${c.description}` : c.label}>
+                      <div>{c.label}</div>
+                      {grouping === "parent" && <div className="text-[9px] text-muted-foreground font-sans">n={c.childCount}</div>}
+                    </th>
+                  ))}
+                  <th className="border-b p-2 font-medium text-right whitespace-nowrap">Avg</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleStudents.map((st) => {
+                  const studentScores: number[] = [];
+                  const cells = sortedColumns.map((c) => {
+                    const v = cellValue(st.id, c);
+                    if (v.score != null) studentScores.push(v.score);
+                    return { col: c, v };
+                  });
+                  const studentAvg = studentScores.length ? studentScores.reduce((a, b) => a + b, 0) / studentScores.length : null;
+                  return (
+                    <tr key={st.id} className="hover:bg-muted/30">
+                      <td className="sticky left-0 z-10 bg-card border-b border-r p-2 font-medium whitespace-nowrap">{st.name}</td>
+                      {cells.map(({ col, v }) => (
+                        <td key={col.key} className={`border-b border-r p-2 text-center tabular-nums ${masteryColor(v.score)}`}
+                            title={v.score == null
+                              ? `${col.label}: no evidence yet`
+                              : `${col.label}: ${(v.score * 100).toFixed(0)}% • ${v.attempts} attempt(s)${v.lastAt ? ` • last ${new Date(v.lastAt).toLocaleDateString()}` : ""}${grouping === "parent" ? ` • ${v.covered}/${v.total} substandards` : ""}`}>
+                          {v.score == null ? "—" : `${(v.score * 100).toFixed(0)}`}
+                        </td>
+                      ))}
+                      <td className={`border-b p-2 text-right tabular-nums font-medium ${masteryColor(studentAvg)}`}>
+                        {studentAvg == null ? "—" : `${(studentAvg * 100).toFixed(0)}`}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {/* Class-average footer per column */}
+                <tr className="bg-muted/30 font-medium">
+                  <td className="sticky left-0 z-10 bg-muted/40 border-r p-2">Class avg</td>
+                  {sortedColumns.map((c) => {
+                    let sum = 0, n = 0;
+                    visibleStudents.forEach((st) => {
+                      const v = cellValue(st.id, c);
+                      if (v.score != null) { sum += v.score; n += 1; }
+                    });
+                    const avg = n ? sum / n : null;
+                    return (
+                      <td key={c.key} className={`border-r p-2 text-center tabular-nums ${masteryColor(avg)}`}>
+                        {avg == null ? "—" : `${(avg * 100).toFixed(0)}`}
+                      </td>
+                    );
+                  })}
+                  <td className="p-2 text-right">—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         )}
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-500/15 border border-emerald-500/30" /> ≥ 80%</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-amber-500/15 border border-amber-500/30" /> 60–79%</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-red-500/15 border border-red-500/30" /> &lt; 60%</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-muted/60" /> No evidence yet</span>
+        </div>
       </CardContent>
     </Card>
   );
