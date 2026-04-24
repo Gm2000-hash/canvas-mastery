@@ -372,14 +372,20 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
   }, [course.course_id, collapsed, data, roster]);
 
   // Distinct students and standards out of the long-form rows.
+  // Students are seeded from the roster fetch so they appear even when the
+  // matrix RPC returns zero rows (no confirmed standards yet).
   const { students, standards, valueByPair, subjects, frameworks } = useMemo(() => {
     const studentMap = new Map<string, { id: string; name: string; sortable: string | null }>();
+    (roster ?? []).forEach((r) => studentMap.set(r.id, r));
     const stdMap = new Map<string, { id: string; code: string; parent_code: string; description: string; subject: string; framework: string }>();
     const valueMap = new Map<string, MatrixRow>();
     const subjs = new Set<string>();
     const fws = new Set<string>();
     (data ?? []).forEach((r) => {
-      studentMap.set(r.student_id, { id: r.student_id, name: r.student_name, sortable: r.student_sortable });
+      // Backfill in case a student is in the matrix but missing from the roster fetch.
+      if (!studentMap.has(r.student_id)) {
+        studentMap.set(r.student_id, { id: r.student_id, name: r.student_name, sortable: r.student_sortable });
+      }
       stdMap.set(r.standard_id, {
         id: r.standard_id, code: r.code, parent_code: r.parent_code,
         description: r.description, subject: r.subject, framework: r.framework,
@@ -396,7 +402,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
       subjects: Array.from(subjs).sort(),
       frameworks: Array.from(fws).sort(),
     };
-  }, [data]);
+  }, [data, roster]);
 
   // Apply subject/framework filters to the standard list.
   const filteredStandards = useMemo(() => {
