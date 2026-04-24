@@ -38,9 +38,9 @@ export default function Settings() {
   const [seeding, setSeeding] = useState(false);
 
   async function load() {
-    const [{ data: profile }, { data: cc }, { data: settings }] = await Promise.all([
+    const [{ data: profile }, { data: ccRows }, { data: settings }] = await Promise.all([
       supabase.from("profiles").select("*").maybeSingle(),
-      supabase.from("canvas_connection_status").select("*").maybeSingle(),
+      supabase.rpc("get_canvas_connection_status"),
       supabase.from("teacher_settings").select("*").maybeSingle(),
     ]);
     if (profile) {
@@ -49,6 +49,7 @@ export default function Settings() {
       setSubject(profile.default_subject ?? "");
       setGrade(profile.default_grade ?? "");
     }
+    const cc = Array.isArray(ccRows) ? ccRows[0] : null;
     if (cc) {
       setBaseUrl(cc.base_url ?? "");
       setCanvasConnected(!!cc.connected);
