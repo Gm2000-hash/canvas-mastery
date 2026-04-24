@@ -83,21 +83,47 @@ export default function Review() {
 
     if ((a ?? []).length) {
       const ids = (a ?? []).map((x) => x.id);
-      const { data: tags } = await supabase
-        .from("assignment_standards")
-        .select("id, assignment_id, standard_id, ai_suggested, confirmed, confidence, rationale, standards ( code, description )")
-        .in("assignment_id", ids);
+      const [{ data: tags }, { data: qs }] = await Promise.all([
+        supabase
+          .from("assignment_standards")
+          .select("id, assignment_id, standard_id, ai_suggested, confirmed, confidence, rationale, standards ( code, description )")
+          .in("assignment_id", ids),
+        supabase
+          .from("quiz_questions")
+          .select("id, assignment_id")
+          .in("assignment_id", ids),
+      ]);
       const map: Record<string, Tag[]> = {};
       for (const t of (tags as any[]) ?? []) {
         (map[t.assignment_id] ??= []).push(t as Tag);
       }
       setTagsByAssignment(map);
+      const counts: Record<string, number> = {};
+      for (const q of (qs as any[]) ?? []) counts[q.assignment_id] = (counts[q.assignment_id] ?? 0) + 1;
+      setQuestionCountByAssignment(counts);
     } else {
       setTagsByAssignment({});
+      setQuestionCountByAssignment({});
     }
     setLoading(false);
   }
   useEffect(() => { loadAll(); }, []);
+
+  // Lazy-load question detail + per-question tags for one assignment
+  async function loadQuestionsFor(assignmentId: string) {
+    const [{ data: qs }, { data: qts }] = await Promise.all([
+      supabase.from("quiz_questions")
+        .select("id, assignment_id, position, question_text, points_possible")
+        .eq("assignment_id", assignmentId).order("position"),
+      supabase.from("question_standards")
+        .select("id, question_id, standard_id, ai_suggested, confirmed, confidence, rationale, standards ( code, description ), quiz_questions!inner ( assignment_id )")
+        .eq("quiz_questions.assignment_id", assignmentId),
+    ]);
+    setQuestionsByAssignment((m) => ({ ...m, [assignmentId]: (qs ?? []) as QuizQuestion[] }));
+    const tagMap: Record<string, QTag[]> = {};
+    for (const t of (qts as any[]) ?? []) (tagMap[t.question_id] ??= []).push(t as QTag);
+    setQTagsByQuestion((m) => ({ ...m, ...tagMap }));
+  }
 
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
   const disciplineById = useMemo(() => new Map(disciplines.map((d) => [d.id, d])), [disciplines]);
