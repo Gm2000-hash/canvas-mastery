@@ -142,6 +142,59 @@ export default function Settings() {
     if (error) toast.error(error.message); else toast.success("Settings saved");
   }
 
+  // ----- Disciplines (multi) -----
+  async function addDiscipline() {
+    if (!newState || !newSubject || !newGrade) { toast.error("Pick state, subject, and grade"); return; }
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    setAddingDisc(true);
+    const isFirst = disciplines.length === 0;
+    const { error } = await supabase.from("teacher_disciplines").insert({
+      teacher_id: u.user.id,
+      state: newState,
+      subject: newSubject,
+      grade: newGrade,
+      is_default: isFirst,
+    });
+    setAddingDisc(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Discipline added");
+    setNewState(""); setNewSubject(""); setNewGrade("");
+    load();
+  }
+
+  async function removeDiscipline(id: string) {
+    const { error } = await supabase.from("teacher_disciplines").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Discipline removed");
+    load();
+  }
+
+  async function makeDefault(id: string) {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { error: e1 } = await supabase
+      .from("teacher_disciplines").update({ is_default: false }).eq("teacher_id", u.user.id).eq("is_default", true);
+    if (e1) { toast.error(e1.message); return; }
+    const { error: e2 } = await supabase
+      .from("teacher_disciplines").update({ is_default: true }).eq("id", id);
+    if (e2) { toast.error(e2.message); return; }
+    toast.success("Default discipline updated");
+    load();
+  }
+
+  async function seedDiscipline(d: Discipline) {
+    setSeedingDiscId(d.id);
+    const { data, error } = await supabase.functions.invoke("seed-standards", {
+      body: { state: d.state, subject: d.subject, grade: d.grade },
+    });
+    setSeedingDiscId(null);
+    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if ((data as any)?.error) { toast.error((data as any).error); return; }
+    if ((data as any).skipped) toast.info(`Already seeded (${(data as any).existing} standards)`);
+    else toast.success(`Seeded ${(data as any).inserted} standards`);
+  }
+
   return (
     <div className="space-y-8 max-w-3xl">
       <div>
