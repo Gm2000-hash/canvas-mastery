@@ -20,7 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
-  Check, Sparkles, Trash2, X, Loader2, Filter, ChevronUp, ChevronDown, Replace,
+  Check, Sparkles, Trash2, X, Loader2, Filter, ChevronUp, ChevronDown, Replace, ListChecks, ChevronRight,
 } from "lucide-react";
 
 type Course = { id: string; name: string; discipline_id: string | null };
