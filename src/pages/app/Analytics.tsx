@@ -578,6 +578,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
           </div>
         </div>
       </CardHeader>
+      {!collapsed && (
       <CardContent>
         {data === null ? <Skeleton className="h-60 w-full" /> :
          visibleStudents.length === 0 ? <EmptyState message="No students match this filter." /> :
