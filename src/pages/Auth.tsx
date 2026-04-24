@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +47,45 @@ export default function Auth() {
     navigate("/app", { replace: true });
   }
 
+  async function handleGoogle() {
+    setLoading(true);
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: `${window.location.origin}/app`,
+    });
+    if (result.error) {
+      setLoading(false);
+      toast.error(result.error.message ?? "Google sign-in failed");
+      return;
+    }
+    if (result.redirected) return;
+    navigate("/app", { replace: true });
+  }
+
+  const googleButton = (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full"
+        onClick={handleGoogle}
+        disabled={loading}
+      >
+        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1-3.3 0-6-2.7-6-6.1S8.7 6 12 6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.5 14.6 2.5 12 2.5 6.8 2.5 2.6 6.7 2.6 12S6.8 21.5 12 21.5c6.9 0 9.4-4.8 9.4-7.3 0-.5 0-.9-.1-1.3H12z"/>
+        </svg>
+        Continue with Google
+      </Button>
+      <div className="relative my-4">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-card px-2 text-muted-foreground">or continue with email</span>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-paper grid lg:grid-cols-2">
       <div className="hidden lg:flex flex-col justify-between p-12 bg-hero text-primary-foreground">
@@ -75,6 +115,7 @@ export default function Auth() {
                 <TabsTrigger value="signup">Create account</TabsTrigger>
               </TabsList>
               <TabsContent value="signin">
+                {googleButton}
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="si-email">Email</Label>
@@ -90,6 +131,7 @@ export default function Auth() {
                 </form>
               </TabsContent>
               <TabsContent value="signup">
+                {googleButton}
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="su-email">Email</Label>
