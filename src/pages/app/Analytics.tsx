@@ -639,37 +639,22 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
       </CardHeader>
       {!collapsed && (
       <CardContent>
-        {(data === null || roster === null) ? <Skeleton className="h-60 w-full" /> :
+        {(data === null || roster === null || placeholderStandards === null) ? <Skeleton className="h-60 w-full" /> :
          students.length === 0 ? <EmptyState message="No students enrolled in this course yet. Sync your roster from Courses." /> :
          leafColumns.length === 0 ? (
-          <div className="space-y-3">
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
-              <strong>No confirmed standards for this course yet.</strong> Tag assessments on{" "}
-              <Link to="/app/review" className="underline font-medium">Tag Review</Link>{" "}
-              and run mastery to populate the matrix below.
-            </div>
-            <div className="overflow-auto border rounded-lg max-h-[70vh]">
-              <table className="w-full border-collapse text-xs">
-                <thead className="sticky top-0 z-10 bg-card">
-                  <tr>
-                    <th className="sticky left-0 z-20 bg-card border-b border-r p-2 text-left font-medium min-w-[180px]">Student</th>
-                    <th className="border-b p-2 text-right font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleStudents.map((st) => (
-                    <tr key={st.id} className="hover:bg-muted/30">
-                      <td className="sticky left-0 z-10 bg-card border-b border-r p-2 font-medium whitespace-nowrap">{st.name}</td>
-                      <td className="border-b p-2 text-right text-muted-foreground italic">awaiting tagged standards</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <EmptyState message="No standards available for this course's discipline. Seed standards from Standards, then tag assessments on Tag Review." />
          ) :
          visibleStudents.length === 0 ? <EmptyState message="No students match this filter." /> : (
-          <div className="overflow-auto border rounded-lg max-h-[70vh]">
+          <div className="space-y-3">
+            {(data ?? []).length === 0 && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+                <strong>Showing placeholder columns from your discipline standards.</strong>{" "}
+                Mastery cells stay empty until you tag assessments on{" "}
+                <Link to="/app/review" className="underline font-medium">Tag Review</Link>{" "}
+                and recompute mastery.
+              </div>
+            )}
+            <div className="overflow-auto border rounded-lg max-h-[70vh]">
             <table className="w-full border-collapse text-xs">
               <thead className="sticky top-0 z-10 bg-card">
                 <tr>
