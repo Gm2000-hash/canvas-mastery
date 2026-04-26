@@ -366,6 +366,17 @@ export default function QuestionBank() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Status</label>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+              <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All tags</SelectItem>
+                <SelectItem value="SUGGESTED">AI-suggested only</SelectItem>
+                <SelectItem value="CONFIRMED">Confirmed only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1 flex-1 min-w-[220px]">
             <label className="text-xs text-muted-foreground">Search standards</label>
             <div className="relative">
