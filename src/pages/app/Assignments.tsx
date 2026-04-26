@@ -31,13 +31,28 @@ export default function Assignments() {
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const [tagsByAssignment, setTagsByAssignment] = useState<Record<string, StandardTag[]>>({});
   const [recomputing, setRecomputing] = useState(false);
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+
+  const currentCourse = useMemo(() => (courses ?? []).find((c) => c.id === courseId) ?? null, [courses, courseId]);
+  const effectiveDiscipline = useMemo(() => {
+    if (!currentCourse) return null;
+    if (currentCourse.discipline_id) return disciplines.find((d) => d.id === currentCourse.discipline_id) ?? null;
+    return disciplines.find((d) => d.is_default) ?? null;
+  }, [currentCourse, disciplines]);
 
   async function loadCourses() {
-    const { data } = await supabase.from("courses").select("id, name").order("name");
-    setCourses(data ?? []);
+    const { data } = await supabase.from("courses").select("id, name, discipline_id").order("name");
+    setCourses((data as Course[]) ?? []);
     if (!courseId && data?.length) setCourseId(data[0].id);
   }
-  useEffect(() => { loadCourses(); /* eslint-disable-next-line */ }, []);
+  async function loadDisciplines() {
+    const { data } = await supabase
+      .from("teacher_disciplines")
+      .select("id, state, subject, grade, framework, is_default")
+      .order("grade");
+    setDisciplines((data as Discipline[]) ?? []);
+  }
+  useEffect(() => { loadCourses(); loadDisciplines(); /* eslint-disable-next-line */ }, []);
 
   async function loadAssignments(cid: string) {
     setAssignments(null);
