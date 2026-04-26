@@ -96,12 +96,29 @@ export default function Assignments() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <span className="text-sm text-muted-foreground">Course:</span>
         <Select value={courseId} onValueChange={setCourseId}>
           <SelectTrigger className="w-72"><SelectValue placeholder="Select course" /></SelectTrigger>
           <SelectContent>{(courses ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
         </Select>
+
+        {currentCourse && (
+          <DisciplinePicker
+            course={currentCourse}
+            disciplines={disciplines}
+            effective={effectiveDiscipline}
+            onChange={async (newId) => {
+              const { error } = await supabase
+                .from("courses")
+                .update({ discipline_id: newId })
+                .eq("id", currentCourse.id);
+              if (error) { toast.error(error.message); return; }
+              toast.success("Discipline updated for this course");
+              await loadCourses();
+            }}
+          />
+        )}
       </div>
 
       {assignments === null ? (
