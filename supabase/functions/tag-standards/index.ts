@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     }
 
     // Profile fallback (legacy, before disciplines were introduced)
-    if (!state || !subject || !grade) {
+    if (!subject || !grade) {
       const { data: profile } = await admin
         .from("profiles").select("state, default_subject, default_grade").eq("id", teacherId).maybeSingle();
       state ??= profile?.state ?? null;
@@ -84,7 +84,11 @@ Deno.serve(async (req) => {
       grade ??= profile?.default_grade ?? null;
     }
 
-    if (!state || !subject || !grade) {
+    // State is optional (national frameworks like NGSS/CCSS don't need one).
+    // Normalize empty string → null so downstream queries behave consistently.
+    if (state === "") state = null;
+
+    if (!subject || !grade) {
       return new Response(JSON.stringify({
         error: "No discipline set. Add a discipline in Settings (or assign one to this course).",
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
