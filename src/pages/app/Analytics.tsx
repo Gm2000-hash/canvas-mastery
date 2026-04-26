@@ -751,6 +751,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
