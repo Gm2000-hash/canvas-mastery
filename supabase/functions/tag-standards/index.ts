@@ -300,7 +300,14 @@ Deno.serve(async (req) => {
       if (insErr) console.error("insert suggestions", insErr);
     }
 
-    return new Response(JSON.stringify({ success: true, suggestions: matches, discipline: { state, subject, grade } }), {
+    return new Response(JSON.stringify({
+      success: true,
+      suggestions: matches,
+      stored: rows.length,
+      candidate_count: standards.length,
+      questions_used: questionsUsed,
+      discipline: { state, subject, grade, framework, source: disciplineSource },
+    }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
