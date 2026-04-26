@@ -231,7 +231,17 @@ Deno.serve(async (req) => {
 
     await admin.from("canvas_credentials").update({ last_sync_at: new Date().toISOString() }).eq("teacher_id", teacherId);
 
-    return new Response(JSON.stringify({ success: true, stats }), {
+    // 5) Per-question scores (best-effort; never fails the sync)
+    let questionScores: { quizzes: number; responses: number } | null = null;
+    try {
+      const { syncQuestionScoresForTeacher } = await import("../canvas-sync-question-scores/index.ts");
+      const out = await syncQuestionScoresForTeacher({ teacherId, courseId: null, assignmentIds: null });
+      questionScores = out.stats;
+    } catch (e) {
+      console.warn("question-score sync skipped:", (e as Error).message);
+    }
+
+    return new Response(JSON.stringify({ success: true, stats, question_scores: questionScores }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

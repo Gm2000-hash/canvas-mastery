@@ -1,7 +1,11 @@
-// Recomputes mastery_snapshots for the teacher based on confirmed assignment_standards
-// and current submissions. Per student per standard:
-//   mastery = average of (last N submissions on assignments tagged with that standard)
-//   mastered = mastery >= threshold && attempts >= 1
+// Recomputes mastery_snapshots for the teacher.
+//
+// Per (student, standard):
+//   - If there are question_responses on questions CONFIRMED-tagged to that standard,
+//     mastery = average (points/points_possible) over the most recent N responses.
+//   - Otherwise (assignment-grain fallback): mastery = average percentage over the
+//     most recent N submissions on assignments CONFIRMED-tagged to that standard.
+//   - mastered = mastery >= threshold && attempts >= 1
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -36,50 +40,106 @@ Deno.serve(async (req) => {
     const threshold = Number(settings?.mastery_threshold ?? 0.8);
     const window = Number(settings?.attempt_window ?? 3);
 
-    // Pull confirmed standard tags for this teacher's assignments
+    type Row = { pct: number; ts: number };
+    const grouped = new Map<string, Row[]>();
+    const standardHasQuestionSignal = new Set<string>(); // standard_ids with any question-grain data
+
+    // ---- 1) Question-grain signal (preferred) ----
+    // Pull confirmed question-level tags + responses
+    const { data: qTags, error: qtErr } = await admin
+      .from("question_standards")
+      .select("question_id, standard_id, quiz_questions!inner(id, assignment_id)")
+      .eq("teacher_id", teacherId)
+      .eq("confirmed", true);
+    if (qtErr) throw qtErr;
+
+    const questionToStandards = new Map<string, string[]>();
+    for (const t of qTags ?? []) {
+      const arr = questionToStandards.get(t.question_id as string) ?? [];
+      arr.push(t.standard_id as string);
+      questionToStandards.set(t.question_id as string, arr);
+    }
+    const questionIds = Array.from(questionToStandards.keys());
+
+    if (questionIds.length) {
+      // Pull responses for those questions (chunk if large)
+      const responses: any[] = [];
+      for (let i = 0; i < questionIds.length; i += 200) {
+        const chunk = questionIds.slice(i, i + 200);
+        const { data: rs, error: rErr } = await admin
+          .from("question_responses")
+          .select("student_id, question_id, points, points_possible, created_at")
+          .eq("teacher_id", teacherId)
+          .in("question_id", chunk)
+          .not("points", "is", null)
+          .not("points_possible", "is", null);
+        if (rErr) throw rErr;
+        responses.push(...(rs ?? []));
+      }
+      for (const r of responses) {
+        const pp = Number(r.points_possible);
+        if (!pp || pp <= 0) continue;
+        const pct = Math.max(0, Math.min(1, Number(r.points) / pp));
+        const ts = new Date((r.created_at ?? 0) as string).getTime() || 0;
+        const stds = questionToStandards.get(r.question_id as string) ?? [];
+        for (const stdId of stds) {
+          const key = `${r.student_id}::${stdId}`;
+          const arr = grouped.get(key) ?? [];
+          arr.push({ pct, ts });
+          grouped.set(key, arr);
+          standardHasQuestionSignal.add(stdId);
+        }
+      }
+    }
+
+    // ---- 2) Assignment-grain fallback (only for standards w/o any question signal) ----
     const { data: tagged, error: tErr } = await admin
       .from("assignment_standards")
-      .select("assignment_id, standard_id, confirmed")
+      .select("assignment_id, standard_id")
       .eq("teacher_id", teacherId)
       .eq("confirmed", true);
     if (tErr) throw tErr;
-    if (!tagged || !tagged.length) {
-      return new Response(JSON.stringify({ success: true, snapshots: 0, note: "No confirmed standard tags yet." }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
-    // Map assignment -> standards
     const assignmentToStandards = new Map<string, string[]>();
-    for (const t of tagged) {
-      const arr = assignmentToStandards.get(t.assignment_id) ?? [];
-      arr.push(t.standard_id);
-      assignmentToStandards.set(t.assignment_id, arr);
+    for (const t of tagged ?? []) {
+      // Skip standards that already have question-grain data — we don't want to mix grains.
+      if (standardHasQuestionSignal.has(t.standard_id as string)) continue;
+      const arr = assignmentToStandards.get(t.assignment_id as string) ?? [];
+      arr.push(t.standard_id as string);
+      assignmentToStandards.set(t.assignment_id as string, arr);
     }
     const assignmentIds = Array.from(assignmentToStandards.keys());
 
-    // Pull submissions for those assignments
-    const { data: subs, error: sErr } = await admin
-      .from("submissions")
-      .select("student_id, assignment_id, percentage, submitted_at, graded_at")
-      .eq("teacher_id", teacherId)
-      .in("assignment_id", assignmentIds)
-      .not("percentage", "is", null);
-    if (sErr) throw sErr;
-
-    // Group: student + standard -> list of {pct, ts}
-    type Row = { pct: number; ts: number };
-    const grouped = new Map<string, Row[]>();
-    for (const s of subs ?? []) {
-      const stds = assignmentToStandards.get(s.assignment_id as string) ?? [];
-      const ts = new Date((s.graded_at ?? s.submitted_at ?? 0) as string).getTime() || 0;
-      const pct = Number(s.percentage);
-      for (const stdId of stds) {
-        const key = `${s.student_id}::${stdId}`;
-        const arr = grouped.get(key) ?? [];
-        arr.push({ pct, ts });
-        grouped.set(key, arr);
+    if (assignmentIds.length) {
+      const subs: any[] = [];
+      for (let i = 0; i < assignmentIds.length; i += 200) {
+        const chunk = assignmentIds.slice(i, i + 200);
+        const { data: ss, error: sErr } = await admin
+          .from("submissions")
+          .select("student_id, assignment_id, percentage, submitted_at, graded_at")
+          .eq("teacher_id", teacherId)
+          .in("assignment_id", chunk)
+          .not("percentage", "is", null);
+        if (sErr) throw sErr;
+        subs.push(...(ss ?? []));
       }
+      for (const s of subs) {
+        const stds = assignmentToStandards.get(s.assignment_id as string) ?? [];
+        const ts = new Date((s.graded_at ?? s.submitted_at ?? 0) as string).getTime() || 0;
+        const pct = Number(s.percentage);
+        for (const stdId of stds) {
+          const key = `${s.student_id}::${stdId}`;
+          const arr = grouped.get(key) ?? [];
+          arr.push({ pct, ts });
+          grouped.set(key, arr);
+        }
+      }
+    }
+
+    if (grouped.size === 0) {
+      return new Response(JSON.stringify({ success: true, snapshots: 0, note: "No confirmed standard tags or responses yet." }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const now = new Date().toISOString();
@@ -100,9 +160,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Replace previous snapshots with the latest run for this teacher
-    // (Keeping history would explode storage; instead keep the latest plus a periodic snapshot.)
-    // For Phase 1 simplicity: always insert new rows so growth-over-time works in Phase 2.
     if (snapshots.length) {
       for (let i = 0; i < snapshots.length; i += 500) {
         const chunk = snapshots.slice(i, i + 500);
@@ -111,7 +168,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, snapshots: snapshots.length }), {
+    return new Response(JSON.stringify({
+      success: true,
+      snapshots: snapshots.length,
+      question_grain_standards: standardHasQuestionSignal.size,
+    }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
