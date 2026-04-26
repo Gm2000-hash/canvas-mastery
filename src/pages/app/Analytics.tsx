@@ -402,11 +402,29 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
     const valueMap = new Map<string, MatrixRow>();
     const subjs = new Set<string>();
     const fws = new Set<string>();
+
+    function deriveParent(code: string) {
+      const m = code.match(/^(.+)[-.][^-.]+$/);
+      return m ? m[1] : code;
+    }
+
+    // Seed columns from the discipline-wide standards so the matrix has
+    // placeholder columns even when nothing has been tagged yet.
+    (placeholderStandards ?? []).forEach((s) => {
+      stdMap.set(s.id, {
+        id: s.id, code: s.code, parent_code: deriveParent(s.code),
+        description: s.description, subject: s.subject, framework: s.framework,
+      });
+      if (s.subject) subjs.add(s.subject);
+      if (s.framework) fws.add(s.framework);
+    });
+
     (data ?? []).forEach((r) => {
       // Backfill in case a student is in the matrix but missing from the roster fetch.
       if (!studentMap.has(r.student_id)) {
         studentMap.set(r.student_id, { id: r.student_id, name: r.student_name, sortable: r.student_sortable });
       }
+      // Tagged standards override placeholders (same id, fresher metadata + parent_code from RPC).
       stdMap.set(r.standard_id, {
         id: r.standard_id, code: r.code, parent_code: r.parent_code,
         description: r.description, subject: r.subject, framework: r.framework,
