@@ -11,6 +11,26 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Infer a grade label (e.g. "6", "7", "8", "K") from a course name/code.
+function inferGradeFromText(text: string): string | null {
+  const t = text.toLowerCase();
+  const m1 = t.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/);
+  if (m1) return m1[1];
+  const m2 = t.match(/\bgrade\s*(\d{1,2})\b/);
+  if (m2) return m2[1];
+  const m3 = t.match(/\b(\d{1,2})\s*grade\b/);
+  if (m3) return m3[1];
+  if (/\b(kindergarten|kinder)\b/.test(t)) return "K";
+  return null;
+}
+
+// Strip HTML tags and collapse whitespace — Canvas question text is usually HTML.
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ").trim();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
