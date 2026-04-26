@@ -1,8 +1,9 @@
-// Per-question AI standards tagging.
+// Per-question AI standards tagging — batched approach.
 // Input: { assignment_id }  (must be a quiz assignment with synced questions)
-// For EACH question, asks Lovable AI to pick 1-3 standards from the candidate list,
-// requiring ≥ 8 distinct keyword/phrase pieces of evidence per standard match.
-// Then rolls the union of question-level matches up to assignment_standards.
+//
+// Calls Lovable AI with batches of ~10 questions at a time, each enriched with
+// answer choices ("STEM: ... / CHOICES: A) ... B) ..."). Stores results as
+// ai_suggested rows in question_standards and rolls a union up to assignment_standards.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -23,7 +24,51 @@ function inferGradeFromText(text: string): string | null {
   return null;
 }
 
-type Match = { standard_code: string; confidence: number; rationale: string; keywords?: string[] };
+// Decode common HTML entities & strip tags. Drops <img>/<iframe>/<style>/<script> contents.
+function stripHtmlForTagger(input: string): string {
+  if (!input) return "";
+  let s = String(input);
+  s = s.replace(/<(script|style|iframe)[\s\S]*?<\/\1>/gi, " ");
+  s = s.replace(/<img[^>]*>/gi, " ");
+  s = s.replace(/<br\s*\/?>/gi, " ");
+  s = s.replace(/<\/(p|div|li|h[1-6]|tr|td)>/gi, " ");
+  s = s.replace(/<[^>]+>/g, " ");
+  s = s
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&[a-z]+;/gi, " ");
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
+// Build a sanitized payload string for the standards tagger.
+// Strips HTML, decodes entities, appends answer choices when present.
+function buildTaggerText(q: { question_text: string | null; answers: any }): string {
+  const stem = stripHtmlForTagger(q.question_text || "");
+  let out = `STEM: ${stem}`;
+  const answers = Array.isArray(q.answers) ? q.answers : null;
+  if (answers && answers.length > 0) {
+    const letters = ["A", "B", "C", "D", "E", "F", "G", "H"];
+    const choices = answers
+      .slice(0, 8)
+      .map((a: any, i: number) => {
+        const txt = stripHtmlForTagger(a?.text || a?.html || "");
+        return txt ? `${letters[i]}) ${txt}` : null;
+      })
+      .filter(Boolean)
+      .join(" ");
+    if (choices) out += `\nCHOICES: ${choices}`;
+  }
+  if (out.length > 1500) out = out.slice(0, 1497) + "...";
+  return out;
+}
+
+type Tag = { code: string; description: string; matched_terms?: string[] };
+type BatchResult = { question_id: number; standards: Tag[] };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -110,9 +155,9 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Load questions
+    // Load questions (now including answers jsonb)
     const { data: questions, error: qErr } = await admin
-      .from("quiz_questions").select("id, position, question_text, points_possible")
+      .from("quiz_questions").select("id, position, question_text, points_possible, answers")
       .eq("assignment_id", assignment_id).order("position");
     if (qErr) throw qErr;
     if (!questions || questions.length === 0) {
@@ -122,12 +167,10 @@ Deno.serve(async (req) => {
     }
 
     // Load candidate standards once — prefer the discipline's framework, but
-    // fall back to any framework for the same (subject, grade) so legacy
-    // libraries (with NULL framework) still work.
+    // fall back to (state, subject, grade) so legacy NULL-framework libraries match.
     let stdQuery = admin.from("standards").select("id, code, description, framework")
       .eq("subject", subject).eq("grade", grade).limit(500);
     if (framework && framework !== "STATE") {
-      // National framework: don't require state match
       stdQuery = stdQuery.eq("framework", framework);
     } else {
       stdQuery = stdQuery.eq("state", state);
@@ -135,77 +178,99 @@ Deno.serve(async (req) => {
     let { data: standards, error: sErr } = await stdQuery;
     if (sErr) throw sErr;
     if (!standards || standards.length === 0) {
-      // Fallback: any standards for (state, subject, grade) regardless of framework
       const fb = await admin.from("standards").select("id, code, description, framework")
         .eq("state", state).eq("subject", subject).eq("grade", grade).limit(500);
       standards = fb.data ?? [];
     }
     if (!standards || standards.length === 0) {
       return new Response(JSON.stringify({
-        error: `No standards found for ${state} ${subject} grade ${grade}. Seed them in Settings.`,
+        error: `No standards found for ${framework ?? "STATE"} ${state ?? ""} ${subject} grade ${grade}. Seed them in Settings.`,
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const codeToId = new Map(standards.map((s) => [s.code, s.id]));
-    const candidateList = standards.map((s) => `${s.code} — ${s.description}`).join("\n");
     const codes = standards.map((s) => s.code);
+    const standardsListText = standards.map((s) => `- ${s.code}: ${s.description}`).join("\n");
 
-    const sysPrompt =
-      `You are an expert curriculum specialist. Given a single assessment QUESTION, choose the 1–3 state standards from the candidate list that BEST match what the question is assessing. ` +
-      `Only use codes that appear EXACTLY in the candidate list. Be conservative — if nothing fits well, return fewer or none.\n\n` +
-      `EVIDENCE REQUIREMENT (STRICT): For every standard you propose, you MUST extract at least 8 distinct key words or short key phrases (1–4 words each) drawn from BOTH the question text AND the standard's description that justify the match. ` +
-      `Do not repeat the same word; do not use generic filler ("the", "students", "learn"). If you cannot find at least 8 substantive overlapping keywords for a standard, DO NOT include that standard.`;
+    const sysPrompt = `You are an expert curriculum specialist for ${framework ?? "STATE"} ${subject} (Grade ${grade}). Given a batch of quiz questions, identify the most relevant standard(s) for each question.
 
-    // Process each question, with light concurrency to keep the function fast
-    const CONCURRENCY = 4;
-    const perQuestion: { question_id: string; matches: Match[] }[] = [];
+You may ONLY use standards from this exact list:
 
-    async function tagOne(q: typeof questions[number]) {
-      const userPrompt =
-        `STATE: ${state}\nSUBJECT: ${subject}\nGRADE: ${grade}\n\n` +
-        `ASSIGNMENT: ${assignment.name}\n` +
-        `QUESTION #${q.position ?? "?"} (${q.points_possible ?? "?"} pts):\n${q.question_text ?? "(no text)"}\n\n` +
-        `CANDIDATE STANDARDS:\n${candidateList}\n\n` +
-        `Remember: each match needs ≥ 8 substantive keywords/phrases drawn from both the question and the standard description. Drop any standard that doesn't meet this bar.`;
+${standardsListText}
+
+RULES:
+- ONLY use codes from the list above. Do NOT invent codes.
+- The input may include answer choices after a \`CHOICES:\` marker — use them as PRIMARY evidence for the topic, since they often contain the key vocabulary (e.g. "mitochondria", "tectonic plates", "photosynthesis") that anchors the standard.
+- If the stem is generic ("Which of the following…"), rely heavily on the CHOICES.
+- KEYWORD MATCHING from the STANDARD'S LANGUAGE: Pay close attention to the specific verbs and nouns used in each standard's description. Look for those same words or close synonyms in the content.
+- Try HARD to match every question. Use inference: content about "dinosaurs" relates to fossils; "weather" relates to atmosphere/climate standards; "cells" relates to cell-biology standards.
+- Strip HTML tags mentally — focus on the actual content words.
+- If content partially overlaps with a standard, tag it. Only return an empty array if the question is truly unrelated to ANY standard in the list.
+- Prefer the most specific standard that matches the content (1–3 standards per question).
+- For each match, return the standard code, brief description, and 2–5 matched_terms — terms from the question that led you to choose this standard.
+
+Use the tool provided to return your analysis.`;
+
+    // Batch the questions in groups of ~10.
+    const BATCH_SIZE = 10;
+    const allResults: { question_id: string; tags: Tag[] }[] = [];
+    let batchesRun = 0;
+
+    for (let i = 0; i < questions.length; i += BATCH_SIZE) {
+      const slice = questions.slice(i, i + BATCH_SIZE);
+      // Use small numeric ids 0..N-1 in-prompt; we'll map back via index
+      const questionListText = slice.map((q, idx) => {
+        const text = buildTaggerText(q);
+        return `Question ${idx}: "${text}"`;
+      }).join("\n\n");
 
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "google/gemini-2.5-flash",
           messages: [
             { role: "system", content: sysPrompt },
-            { role: "user", content: userPrompt },
+            { role: "user", content: `Tag these quiz questions with standards:\n\n${questionListText}` },
           ],
           tools: [{
             type: "function",
             function: {
               name: "tag_standards",
-              description: "Return the matching standards from the candidate list for this single question.",
+              description: "Tag quiz questions with matching standards from the candidate list.",
               parameters: {
                 type: "object",
                 properties: {
-                  matches: {
+                  tags: {
                     type: "array",
                     items: {
                       type: "object",
                       properties: {
-                        standard_code: { type: "string", enum: codes },
-                        confidence: { type: "number", minimum: 0, maximum: 1 },
-                        rationale: { type: "string" },
-                        keywords: {
+                        question_id: { type: "number", description: "The question's index in this batch (0..N-1)." },
+                        standards: {
                           type: "array",
-                          description: "≥ 8 distinct keywords/short phrases (1-4 words) from BOTH the question and the standard description.",
-                          items: { type: "string", minLength: 2 },
-                          minItems: 8,
+                          items: {
+                            type: "object",
+                            properties: {
+                              code: { type: "string", enum: codes },
+                              description: { type: "string" },
+                              matched_terms: {
+                                type: "array",
+                                items: { type: "string", minLength: 2 },
+                                description: "2-5 key terms from the question that justify this standard.",
+                              },
+                            },
+                            required: ["code", "description", "matched_terms"],
+                            additionalProperties: false,
+                          },
+                          maxItems: 3,
                         },
                       },
-                      required: ["standard_code", "confidence", "rationale", "keywords"],
+                      required: ["question_id", "standards"],
                       additionalProperties: false,
                     },
-                    maxItems: 3,
                   },
                 },
-                required: ["matches"],
+                required: ["tags"],
                 additionalProperties: false,
               },
             },
@@ -215,65 +280,57 @@ Deno.serve(async (req) => {
       });
 
       if (!aiRes.ok) {
-        if (aiRes.status === 429 || aiRes.status === 402) {
-          throw { httpStatus: aiRes.status };
-        }
-        const t = await aiRes.text();
-        console.error(`AI gateway ${aiRes.status} for q ${q.id}: ${t.slice(0, 200)}`);
-        return { question_id: q.id, matches: [] as Match[] };
-      }
-
-      const aiJson = await aiRes.json();
-      const toolCall = aiJson.choices?.[0]?.message?.tool_calls?.[0];
-      let matches: Match[] = [];
-      if (toolCall?.function?.arguments) {
-        try { matches = JSON.parse(toolCall.function.arguments).matches ?? []; } catch (e) { console.error("parse args", e); }
-      }
-      // Server-side enforce ≥ 8 distinct substantive keywords
-      matches = matches.filter((m) => {
-        const kws = Array.isArray(m.keywords) ? m.keywords : [];
-        const distinct = Array.from(new Set(kws.map((k) => String(k).trim().toLowerCase()).filter((k) => k.length >= 2)));
-        return distinct.length >= 8;
-      });
-      return { question_id: q.id, matches };
-    }
-
-    // Run with bounded concurrency
-    for (let i = 0; i < questions.length; i += CONCURRENCY) {
-      const slice = questions.slice(i, i + CONCURRENCY);
-      try {
-        const results = await Promise.all(slice.map(tagOne));
-        perQuestion.push(...results);
-      } catch (e: any) {
-        if (e?.httpStatus === 429) {
+        if (aiRes.status === 429) {
           return new Response(JSON.stringify({ error: "AI rate limit reached. Try again in a moment." }), {
             status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        if (e?.httpStatus === 402) {
+        if (aiRes.status === 402) {
           return new Response(JSON.stringify({ error: "AI credits exhausted. Add credits in Workspace Settings." }), {
             status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        throw e;
+        const t = await aiRes.text();
+        console.error(`AI gateway ${aiRes.status} on batch ${batchesRun}: ${t.slice(0, 200)}`);
+        // skip this batch and continue
+        batchesRun++;
+        continue;
+      }
+
+      batchesRun++;
+      const aiJson = await aiRes.json();
+      const toolCall = aiJson.choices?.[0]?.message?.tool_calls?.[0];
+      let batchTags: BatchResult[] = [];
+      if (toolCall?.function?.arguments) {
+        try { batchTags = JSON.parse(toolCall.function.arguments).tags ?? []; }
+        catch (e) { console.error("parse args", e); }
+      }
+      // Map idx -> actual question id
+      const tagsByIdx = new Map<number, Tag[]>();
+      for (const t of batchTags) tagsByIdx.set(t.question_id, t.standards ?? []);
+      for (let k = 0; k < slice.length; k++) {
+        const tags = tagsByIdx.get(k) ?? [];
+        if (tags.length > 0) {
+          allResults.push({ question_id: slice[k].id, tags });
+        }
       }
     }
 
-    // Persist question_standards
+    // Persist question_standards rows
     const qRows: any[] = [];
-    for (const r of perQuestion) {
-      for (const m of r.matches) {
-        const sid = codeToId.get(m.standard_code);
+    for (const r of allResults) {
+      for (const t of r.tags) {
+        const sid = codeToId.get(t.code);
         if (!sid) continue;
-        const distinct = Array.from(new Set((m.keywords ?? []).map((k) => String(k).trim().toLowerCase()).filter((k) => k.length >= 2)));
+        const terms = Array.isArray(t.matched_terms) ? t.matched_terms.slice(0, 8) : [];
         qRows.push({
           teacher_id: teacherId,
           question_id: r.question_id,
           standard_id: sid,
           ai_suggested: true,
           confirmed: false,
-          confidence: m.confidence,
-          rationale: `${m.rationale}\n\nKey evidence: ${distinct.slice(0, 16).join(", ")}`,
+          confidence: 0.75,
+          rationale: terms.length ? `AI match · key terms: ${terms.join(", ")}` : "AI match",
         });
       }
     }
@@ -283,21 +340,18 @@ Deno.serve(async (req) => {
       if (insErr) console.error("question_standards upsert", insErr);
     }
 
-    // Roll up: union of all question-level standards → assignment_standards (ai_suggested)
-    // Aggregate confidence as the MAX confidence across questions for that standard,
-    // and rationale = "Tagged on N of M questions"
+    // Roll up question-level matches → assignment_standards
     const totalQuestions = questions.length;
-    const standardCounts = new Map<string, { count: number; maxConf: number; codes: Set<string> }>();
-    for (const r of perQuestion) {
-      const seenInThisQ = new Set<string>();
-      for (const m of r.matches) {
-        const sid = codeToId.get(m.standard_code);
-        if (!sid || seenInThisQ.has(sid)) continue;
-        seenInThisQ.add(sid);
-        const cur = standardCounts.get(sid) ?? { count: 0, maxConf: 0, codes: new Set<string>() };
+    const standardCounts = new Map<string, { count: number; codes: Set<string> }>();
+    for (const r of allResults) {
+      const seen = new Set<string>();
+      for (const t of r.tags) {
+        const sid = codeToId.get(t.code);
+        if (!sid || seen.has(sid)) continue;
+        seen.add(sid);
+        const cur = standardCounts.get(sid) ?? { count: 0, codes: new Set<string>() };
         cur.count += 1;
-        cur.maxConf = Math.max(cur.maxConf, m.confidence ?? 0);
-        cur.codes.add(m.standard_code);
+        cur.codes.add(t.code);
         standardCounts.set(sid, cur);
       }
     }
@@ -307,7 +361,7 @@ Deno.serve(async (req) => {
       standard_id: sid,
       ai_suggested: true,
       confirmed: false,
-      confidence: info.maxConf,
+      confidence: Math.min(0.95, 0.5 + (info.count / Math.max(totalQuestions, 1)) * 0.5),
       rationale: `Question-level rollup: matched on ${info.count} of ${totalQuestions} question${totalQuestions === 1 ? "" : "s"}.`,
     }));
     if (aRows.length) {
@@ -318,10 +372,12 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      questions_tagged: perQuestion.length,
+      questions_total: totalQuestions,
+      questions_tagged: allResults.length,
       total_question_matches: qRows.length,
       assignment_rollup_count: aRows.length,
-      discipline: { state, subject, grade },
+      batches: batchesRun,
+      discipline: { state, subject, grade, framework },
     }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
