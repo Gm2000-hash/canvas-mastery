@@ -70,6 +70,9 @@ export default function QuestionBank() {
   const [loadingQs, setLoadingQs] = useState(false);
   const [openQuestion, setOpenQuestion] = useState<QuestionRow | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState<
+    { name: string; status: "ok" | "skipped" | "error"; responses: number; reason?: string }[] | null
+  >(null);
 
   // --- Load courses ---
   useEffect(() => {
@@ -298,19 +301,23 @@ export default function QuestionBank() {
   // --- Import scores ---
   async function importAllScores() {
     setImporting(true);
+    setImportResults(null);
     const body: any = {};
     if (courseId !== "ALL") body.course_id = courseId;
-    else {
-      // No course selected — pick first course as a safety default; ask user instead
-      toast.message("Pick a course first to import quiz scores from Canvas.");
-      setImporting(false); return;
-    }
+    // No filter = sync every quiz the teacher owns.
     const { data, error } = await supabase.functions.invoke("canvas-sync-question-scores", { body });
     setImporting(false);
     if (error) { toast.error((error as any).message ?? "Failed"); return; }
     if ((data as any)?.error) { toast.error((data as any).error); return; }
     const stats = (data as any).stats ?? {};
-    toast.success(`Imported ${stats.responses ?? 0} response${stats.responses === 1 ? "" : "s"} from ${stats.quizzes ?? 0} quiz${stats.quizzes === 1 ? "" : "zes"}.`);
+    const recompute = (data as any).recompute;
+    const recomputeNote = recompute && recompute.snapshots > 0
+      ? ` Mastery updated for ${recompute.snapshots} entries.`
+      : "";
+    toast.success(
+      `Imported ${stats.responses ?? 0} response${stats.responses === 1 ? "" : "s"} from ${stats.quizzes ?? 0} quiz${stats.quizzes === 1 ? "" : "zes"}.${recomputeNote}`,
+    );
+    setImportResults(((data as any).results ?? []) as any);
     loadBank();
     if (selectedStandardId) loadQuestionsForStandard(selectedStandardId);
   }
@@ -390,6 +397,47 @@ export default function QuestionBank() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Per-quiz import results */}
+      {importResults && importResults.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center justify-between">
+              <span>Import results</span>
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setImportResults(null)}
+              >
+                Dismiss
+              </button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 max-h-64 overflow-y-auto">
+            <ul className="text-xs divide-y">
+              {importResults.map((r, i) => (
+                <li key={i} className="py-1.5 flex items-center justify-between gap-2">
+                  <span className="truncate">{r.name}</span>
+                  <span className="shrink-0 flex items-center gap-2">
+                    {r.status === "ok" ? (
+                      <Badge variant="outline" className="text-[10px] bg-mastery-high/10 border-mastery-high/30 text-mastery-high">
+                        {r.responses} response{r.responses === 1 ? "" : "s"}
+                      </Badge>
+                    ) : r.status === "skipped" ? (
+                      <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                        skipped{r.reason ? ` — ${r.reason}` : ""}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] bg-mastery-low/10 border-mastery-low/30 text-mastery-low">
+                        error{r.reason ? ` — ${r.reason}` : ""}
+                      </Badge>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Body: tree + question list */}
       {bank === null ? (

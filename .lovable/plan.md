@@ -1,79 +1,68 @@
-## The disconnect
+## Goal
 
-The Question Bank shows nothing because **0 of your 3,531 synced quiz questions are tagged**. Two compounding problems:
+Enable teachers to import per-student, per-question scores for their quizzes and have those scores attribute correctly to the standard / substandard each question is tagged with — so the Question Bank, Mastery, and Analytics views all reflect real student performance at the standard level.
 
-1. **Tagger is too strict**: the current `tag-question-standards` calls the AI **once per question** and then *throws away* every match that doesn't include ≥ 8 distinct keywords. With Gemini Flash that filter rejects almost every match — net result, no rows ever get inserted.
-2. **UI hides AI suggestions**: `QuestionBank.tsx` only loads rows where `confirmed = true`. Even when the AI does tag a question, you'd never see it on this page until you went to Review and clicked confirm on every one.
+The Canvas → `question_responses` pipeline already exists. The missing pieces are: (a) easier ways to trigger the import (whole course, selected quizzes, single quiz), (b) honoring AI-suggested tags during mastery rollup so teachers see signal immediately, (c) auto-recompute after import, and (d) clearer per-quiz progress feedback.
 
-## Approach — port the Canvas Quiz Export tagger
+## What you'll be able to do after this
 
-Your Canvas Quiz Export project solves the same problem with a much simpler, more reliable shape. We'll mirror it here:
+1. **From Question Bank** — "Import quiz scores" works for *all* courses (not just one), shows a per-quiz progress summary, and auto-recomputes mastery when finished.
+2. **From Assignments** — every quiz row gets an "Import scores" button so you can pull a single quiz's scores without bulk-importing.
+3. **Mastery & Question Bank percentages** populate using both *confirmed* and *AI-suggested* question→standard tags, with confirmed weighted higher. Once you confirm tags later, the numbers strengthen but never disappear.
+4. **Per-question class %** in the Question Bank reflects the freshly imported scores immediately, broken out by standard and substandard via the existing tree.
 
-- **Batch ~10 questions per AI call** (instead of 1) — same prompt sees more context, ~10× fewer API calls, dramatically faster.
-- **Enrich each question with answer choices** as `STEM: … / CHOICES: A) … B) …` — the choices often carry the topic vocabulary that anchors a standard ("mitochondria", "tectonic plates", etc.).
-- **Drop the 8-keyword gate.** Replace it with the lighter "matched_terms" hint (2–5 terms) used in Canvas Quiz Export, which the model reliably produces.
-- **Show AI suggestions in the Question Bank**, not just confirmed ones (with a visual "AI" badge so you can tell at a glance).
+## Approach
 
-## Changes
+### 1. Mastery rollup honors AI-suggested tags (edge function: `recompute-mastery`)
 
-### 1. Rewrite `supabase/functions/tag-question-standards/index.ts`
-- Resolve discipline exactly as today (course → infer-from-name → teacher default → profile).
-- Load synced `quiz_questions` for the assignment.
-- Build sanitized text per question via a `buildTaggerText` helper (HTML strip + decode entities + append `CHOICES:` when answers exist). Note: our `quiz_questions` table currently doesn't store answer choices, so as a follow-up we'll start capturing them in `canvas-sync` (see #4); until then this still works on the stem alone.
-- Send the AI **batches of 10 questions** with the candidate standards list inlined in the system prompt (same shape as the Canvas Quiz Export `standards-tagger`).
-- Tool schema returns `tags: [{ question_id, standards: [{ code, description, matched_terms[] }] }]`.
-- Insert rows into `question_standards` as `ai_suggested = true, confirmed = false`, with rationale `"AI match · key terms: …"`.
-- Roll the union of question-level matches up to `assignment_standards` (unchanged).
-- Return `{ questions_tagged, total_question_matches, batches, discipline }`.
+Currently `recompute-mastery` filters question→standard tags with `confirmed = true`, so until a teacher confirms each tag, imported scores never appear in mastery. Change it to:
 
-### 2. Rewrite `supabase/functions/tag-standards/index.ts` to share the same prompt style
-- Keep the assignment-level entrypoint, but use the same batched, choice-enriched approach when the assignment is a quiz: tag each question, then roll up to assignment-level. For non-quiz assignments fall back to the current single-shot description tagging (without the 8-keyword gate).
+- Include any tag where `confirmed = true OR ai_suggested = true`.
+- Weight each response by the tag's confidence: `weight = confirmed ? 1.0 : (confidence ?? 0.5)`.
+- Compute per-(student, standard) mastery as a confidence-weighted average of the most recent `attempt_window` responses.
+- Same fallback to assignment-grain submissions when a standard has no question signal.
 
-### 3. Update `src/pages/app/QuestionBank.tsx`
-- Stop filtering `question_standards` by `confirmed = true` — load both confirmed and AI-suggested rows.
-- Add a small `AI` badge on suggested-only questions so you can tell which are confirmed vs. proposed.
-- Add a "Suggested only / Confirmed only / All" toggle in the filter bar.
-- Add a "Tag this standard's questions" button on the empty-state pane that runs the new tagger across the selected course's untagged questions.
+This means imported scores show up immediately, and confirming tags later just sharpens the numbers.
 
-### 4. Capture answer choices in `canvas-sync` (small, additive)
-- Add an `answers jsonb` column to `quiz_questions` (nullable, defaults to `null`) via migration.
-- In `canvas-sync`, when fetching `/api/v1/courses/{id}/quizzes/{qid}/questions`, persist `q.answers` (array of `{text, html}`) into the new column.
-- The tagger will use this column when present to build the `CHOICES:` block, exactly like `buildTaggerText` does in Canvas Quiz Export.
+### 2. Bulk import across all courses (edge function: `canvas-sync-question-scores`)
+
+Today the function requires `course_id` or `assignment_ids`. Add an "all my courses" path:
+
+- If neither filter is provided, sync every quiz assignment owned by the teacher that has `canvas_quiz_id` set.
+- Keep the existing per-quiz result array so the UI can show which quizzes succeeded / were skipped / failed.
+- After successful upserts to `question_responses`, invoke `recompute-mastery` internally (server-to-server) so the teacher doesn't have to click a second button.
+
+### 3. Question Bank UI updates (`src/pages/app/QuestionBank.tsx`)
+
+- "Import quiz scores" button works whether course filter is "All my courses" or a specific course (drop the current "Pick a course first" guard).
+- After import, show a compact summary toast plus an inline collapsible card listing each quiz with its status (✓ N responses / skipped: reason / error).
+- Show a small "Last imported: <timestamp>" hint based on `canvas_credentials.last_sync_at` (read via the existing RPC) — purely informational.
+
+### 4. Per-quiz import on Assignments page (`src/pages/app/Assignments.tsx`)
+
+- For rows where `kind === "quiz"`, add an "Import scores" button next to "AI suggest" / "+ Add".
+- Calls `canvas-sync-question-scores` with `{ assignment_ids: [a.id] }`, then triggers `recompute-mastery` and toasts the response count.
+- Disabled when the quiz has no `canvas_quiz_id` (assignment-only).
+
+### 5. Small data-quality fix
+
+In `canvas-sync-question-scores`, when an answer has `points = null` but the submission is graded and the question is single-correct (`question_type` like `multiple_choice_question`/`true_false_question`), keep `correct = null` rather than guessing — current behavior is fine, just verify by checking a couple of recent rows after a real import.
 
 ## Technical details
 
-```text
-Old flow                                New flow
-────────────────                        ─────────────────────────────────
-For each Q (3,531×):                    For each batch of 10 Qs (~350×):
-  1 AI call                               1 AI call with all 10 stems+choices
-  require 8 keywords/match → drop         model returns matched_terms (2-5)
-  upsert (almost always 0 rows)          upsert ai_suggested rows
-                                         roll up to assignment_standards
-```
+**Files changed**
 
-Tool schema (matches Canvas Quiz Export):
-```ts
-{
-  name: "tag_standards",
-  parameters: { tags: [{
-    question_id: number,
-    standards: [{ code, description, matched_terms: string[] }]
-  }] }
-}
-```
+- `supabase/functions/recompute-mastery/index.ts` — include `ai_suggested` tags, add confidence weighting, keep assignment-grain fallback unchanged.
+- `supabase/functions/canvas-sync-question-scores/index.ts` — allow "no filter = all teacher quizzes"; after successful imports, fetch-invoke `recompute-mastery` with the teacher's auth header; return both stats and the recompute summary.
+- `src/pages/app/QuestionBank.tsx` — remove course-required guard on import; render per-quiz results panel; refresh bank + selected standard after import.
+- `src/pages/app/Assignments.tsx` — add per-quiz "Import scores" action; call `canvas-sync-question-scores` and then `recompute-mastery`.
 
-## Why this fixes it
+**No DB migration required** — `question_responses`, `question_standards`, and `mastery_snapshots` already have the columns we need.
 
-- The 8-keyword gate was effectively a "return nothing" filter — removing it lets actual matches land.
-- Batching cuts AI cost/latency ~10× so we can re-tag your whole 3,531-question bank in one pass.
-- Showing AI suggestions in the bank means the page populates the moment tagging finishes, instead of waiting on manual confirmation in Review.
-- Capturing answer choices gives the model the topic vocabulary it needs for vague stems ("Which of the following…").
+**Edge function auth** — `canvas-sync-question-scores` and `recompute-mastery` already require JWT. Server-to-server invoke from `canvas-sync-question-scores` will forward the teacher's `Authorization` header.
 
-## Files
+## Out of scope (not changing now)
 
-- **Edit**: `supabase/functions/tag-question-standards/index.ts`
-- **Edit**: `supabase/functions/tag-standards/index.ts`
-- **Edit**: `supabase/functions/canvas-sync/index.ts` (persist `answers` jsonb)
-- **Edit**: `src/pages/app/QuestionBank.tsx` (show AI suggestions + bulk re-tag)
-- **New**: migration to add `quiz_questions.answers jsonb`
+- New Question Bank columns (e.g. per-student breakdown per question) — the drawer already shows class average and response count; we can add a student list later if you want.
+- Quiz score sync for non-Classic Quizzes (New Quizzes / LTI). The current Canvas API path is Classic Quizzes only; New Quizzes would need a separate integration.
+- Changing the `analytics_question_bank` RPC — the bank UI already aggregates client-side and includes AI-suggested rows.

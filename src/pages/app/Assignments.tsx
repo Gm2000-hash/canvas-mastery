@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen } from "lucide-react";
+import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -16,7 +16,7 @@ type Discipline = { id: string; state: string | null; subject: string; grade: st
 
 type Assignment = {
   id: string; name: string; kind: "assignment" | "quiz"; description: string | null;
-  course_id: string; due_at: string | null;
+  course_id: string; due_at: string | null; canvas_quiz_id: number | null;
 };
 type Course = { id: string; name: string; discipline_id: string | null };
 type StandardTag = {
@@ -57,7 +57,7 @@ export default function Assignments() {
   async function loadAssignments(cid: string) {
     setAssignments(null);
     const { data: a } = await supabase
-      .from("assignments").select("id, name, kind, description, course_id, due_at")
+      .from("assignments").select("id, name, kind, description, course_id, due_at, canvas_quiz_id")
       .eq("course_id", cid).order("due_at", { ascending: false, nullsFirst: false }).order("name");
     setAssignments(a ?? []);
     if (a?.length) {
@@ -143,6 +143,7 @@ export default function Assignments() {
 
 function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment; tags: StandardTag[]; onChange: () => void }) {
   const [tagging, setTagging] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   async function aiSuggest() {
     setTagging(true);
@@ -165,6 +166,29 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
       );
     }
     onChange();
+  }
+
+  async function importScores() {
+    setImporting(true);
+    const { data, error } = await supabase.functions.invoke("canvas-sync-question-scores", {
+      body: { assignment_ids: [assignment.id] },
+    });
+    setImporting(false);
+    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if ((data as any)?.error) { toast.error((data as any).error); return; }
+    const stats = (data as any).stats ?? {};
+    const recompute = (data as any).recompute;
+    const result = ((data as any).results ?? [])[0];
+    if (result?.status === "skipped") {
+      toast.message(`Skipped: ${result.reason ?? "no data"}`);
+    } else if (result?.status === "error") {
+      toast.error(result.reason ?? "Import failed");
+    } else {
+      const note = recompute && recompute.snapshots > 0
+        ? ` Mastery updated (${recompute.snapshots}).`
+        : "";
+      toast.success(`Imported ${stats.responses ?? 0} response${stats.responses === 1 ? "" : "s"}.${note}`);
+    }
   }
 
   async function confirmTag(t: StandardTag) {
@@ -197,6 +221,18 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
               {tagging ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
               AI suggest
             </Button>
+            {assignment.kind === "quiz" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={importScores}
+                disabled={importing || !assignment.canvas_quiz_id}
+                title={!assignment.canvas_quiz_id ? "No Canvas quiz linked" : "Import per-question scores from Canvas"}
+              >
+                {importing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Download className="h-3 w-3 mr-1" />}
+                Import scores
+              </Button>
+            )}
             <AddStandardDialog assignmentId={assignment.id} onAdded={onChange} />
           </div>
         </div>
