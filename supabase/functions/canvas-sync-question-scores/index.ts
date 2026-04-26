@@ -177,7 +177,9 @@ export async function syncQuestionScoresForTeacher(opts: {
       }
     }
 
-    // Fill in points_possible from quiz_questions and re-derive correctness when missing
+    // Fill in points_possible from quiz_questions and derive points from
+    // correctness when Canvas's /quiz_submissions/:id/questions endpoint
+    // omits per-question points (the common case for Classic Quizzes).
     if (responseRows.length) {
       const { data: qPoints } = await admin
         .from("quiz_questions").select("id, points_possible")
@@ -186,6 +188,11 @@ export async function syncQuestionScoresForTeacher(opts: {
       for (const r of responseRows) {
         const pp = ptsById.get(r.question_id) ?? null;
         r.points_possible = pp;
+        // If correctness is known but points are missing, derive points.
+        if (r.points == null && r.correct != null && pp != null && pp > 0) {
+          r.points = r.correct ? pp : 0;
+        }
+        // If points are known but correctness isn't, derive correctness.
         if (r.correct == null && r.points != null && pp != null && pp > 0) {
           r.correct = r.points >= pp * 0.999;
         }
