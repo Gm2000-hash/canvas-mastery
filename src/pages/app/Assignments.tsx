@@ -274,3 +274,78 @@ function AddStandardDialog({ assignmentId, onAdded }: { assignmentId: string; on
     </Dialog>
   );
 }
+
+function discLabel(d: Discipline | null): string {
+  if (!d) return "—";
+  const fw = d.framework && d.framework !== "STATE" ? d.framework : (d.state || "STATE");
+  return `${fw} · ${d.subject} · Grade ${d.grade}`;
+}
+
+function DisciplinePicker({
+  course, disciplines, effective, onChange,
+}: {
+  course: Course;
+  disciplines: Discipline[];
+  effective: Discipline | null;
+  onChange: (newId: string | null) => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const isExplicit = !!course.discipline_id;
+  const sorted = useMemo(() => {
+    return [...disciplines].sort((a, b) => {
+      const ag = parseInt(a.grade) || 99;
+      const bg = parseInt(b.grade) || 99;
+      if (ag !== bg) return ag - bg;
+      return a.subject.localeCompare(b.subject);
+    });
+  }, [disciplines]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2 h-9">
+          <BookOpen className="h-3.5 w-3.5" />
+          <span className="text-xs">
+            <span className="text-muted-foreground">Discipline:</span>{" "}
+            <span className="font-medium">{discLabel(effective)}</span>
+            {!isExplicit && <span className="text-muted-foreground italic"> (default)</span>}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-2">
+        <div className="text-xs text-muted-foreground px-2 pt-1 pb-2">
+          AI suggestions and standards lookups will use this discipline for this course.
+        </div>
+        <div className="space-y-1">
+          {sorted.map((d) => {
+            const selected = course.discipline_id === d.id || (!course.discipline_id && d.is_default);
+            return (
+              <button
+                key={d.id}
+                onClick={async () => { await onChange(d.id); setOpen(false); }}
+                className={`w-full text-left text-sm rounded-md px-2 py-1.5 hover:bg-accent flex items-center justify-between gap-2 ${selected ? "bg-accent/50" : ""}`}
+              >
+                <span className="truncate">{discLabel(d)}</span>
+                {selected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+              </button>
+            );
+          })}
+          {disciplines.length === 0 && (
+            <div className="text-xs text-muted-foreground px-2 py-3">
+              No disciplines yet. Add one in Settings.
+            </div>
+          )}
+          {isExplicit && (
+            <button
+              onClick={async () => { await onChange(null); setOpen(false); }}
+              className="w-full text-left text-xs text-muted-foreground rounded-md px-2 py-1.5 hover:bg-accent mt-1 border-t pt-2"
+            >
+              Reset to teacher default
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
