@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: assignment, error: aErr } = await admin
-      .from("assignments").select("id, name, description, teacher_id, course_id").eq("id", assignment_id).single();
+      .from("assignments").select("id, name, kind, description, teacher_id, course_id").eq("id", assignment_id).single();
     if (aErr || !assignment) throw new Error("Assignment not found");
     if (assignment.teacher_id !== teacherId) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
