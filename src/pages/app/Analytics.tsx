@@ -351,6 +351,8 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   type RosterStudent = { id: string; name: string; sortable: string | null };
   const [roster, setRoster] = useState<RosterStudent[] | null>(null);
+  type PlaceholderStandard = { id: string; code: string; description: string; subject: string; framework: string };
+  const [placeholderStandards, setPlaceholderStandards] = useState<PlaceholderStandard[] | null>(null);
 
   useEffect(() => {
     if (collapsed) return;
@@ -369,7 +371,26 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
           id: r.id, name: r.name, sortable: r.sortable_name,
         }))));
     }
-  }, [course.course_id, collapsed, data, roster]);
+    if (placeholderStandards === null) {
+      // Fetch the discipline-wide standards as placeholder columns so the
+      // matrix shows empty mastery cells for every student even before any
+      // assessments are tagged.
+      (async () => {
+        const { data: disc } = await supabase.rpc("get_effective_discipline", { _course_id: course.course_id });
+        const d = (disc as any[])?.[0];
+        if (!d) { setPlaceholderStandards([]); return; }
+        let q = supabase.from("standards")
+          .select("id, code, description, subject, framework")
+          .eq("subject", d.subject);
+        if (d.framework) q = q.eq("framework", d.framework);
+        const { data: stds } = await q.order("code");
+        setPlaceholderStandards(((stds as any) ?? []).map((s: any) => ({
+          id: s.id, code: s.code, description: s.description ?? "",
+          subject: s.subject, framework: s.framework ?? "STATE",
+        })));
+      })();
+    }
+  }, [course.course_id, collapsed, data, roster, placeholderStandards]);
 
   // Distinct students and standards out of the long-form rows.
   // Students are seeded from the roster fetch so they appear even when the
@@ -381,11 +402,29 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
     const valueMap = new Map<string, MatrixRow>();
     const subjs = new Set<string>();
     const fws = new Set<string>();
+
+    function deriveParent(code: string) {
+      const m = code.match(/^(.+)[-.][^-.]+$/);
+      return m ? m[1] : code;
+    }
+
+    // Seed columns from the discipline-wide standards so the matrix has
+    // placeholder columns even when nothing has been tagged yet.
+    (placeholderStandards ?? []).forEach((s) => {
+      stdMap.set(s.id, {
+        id: s.id, code: s.code, parent_code: deriveParent(s.code),
+        description: s.description, subject: s.subject, framework: s.framework,
+      });
+      if (s.subject) subjs.add(s.subject);
+      if (s.framework) fws.add(s.framework);
+    });
+
     (data ?? []).forEach((r) => {
       // Backfill in case a student is in the matrix but missing from the roster fetch.
       if (!studentMap.has(r.student_id)) {
         studentMap.set(r.student_id, { id: r.student_id, name: r.student_name, sortable: r.student_sortable });
       }
+      // Tagged standards override placeholders (same id, fresher metadata + parent_code from RPC).
       stdMap.set(r.standard_id, {
         id: r.standard_id, code: r.code, parent_code: r.parent_code,
         description: r.description, subject: r.subject, framework: r.framework,
@@ -402,7 +441,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
       subjects: Array.from(subjs).sort(),
       frameworks: Array.from(fws).sort(),
     };
-  }, [data, roster]);
+  }, [data, roster, placeholderStandards]);
 
   // Apply subject/framework filters to the standard list.
   const filteredStandards = useMemo(() => {
@@ -600,37 +639,22 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
       </CardHeader>
       {!collapsed && (
       <CardContent>
-        {(data === null || roster === null) ? <Skeleton className="h-60 w-full" /> :
+        {(data === null || roster === null || placeholderStandards === null) ? <Skeleton className="h-60 w-full" /> :
          students.length === 0 ? <EmptyState message="No students enrolled in this course yet. Sync your roster from Courses." /> :
          leafColumns.length === 0 ? (
-          <div className="space-y-3">
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
-              <strong>No confirmed standards for this course yet.</strong> Tag assessments on{" "}
-              <Link to="/app/review" className="underline font-medium">Tag Review</Link>{" "}
-              and run mastery to populate the matrix below.
-            </div>
-            <div className="overflow-auto border rounded-lg max-h-[70vh]">
-              <table className="w-full border-collapse text-xs">
-                <thead className="sticky top-0 z-10 bg-card">
-                  <tr>
-                    <th className="sticky left-0 z-20 bg-card border-b border-r p-2 text-left font-medium min-w-[180px]">Student</th>
-                    <th className="border-b p-2 text-right font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleStudents.map((st) => (
-                    <tr key={st.id} className="hover:bg-muted/30">
-                      <td className="sticky left-0 z-10 bg-card border-b border-r p-2 font-medium whitespace-nowrap">{st.name}</td>
-                      <td className="border-b p-2 text-right text-muted-foreground italic">awaiting tagged standards</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <EmptyState message="No standards available for this course's discipline. Seed standards from Standards, then tag assessments on Tag Review." />
          ) :
          visibleStudents.length === 0 ? <EmptyState message="No students match this filter." /> : (
-          <div className="overflow-auto border rounded-lg max-h-[70vh]">
+          <div className="space-y-3">
+            {(data ?? []).length === 0 && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+                <strong>Showing placeholder columns from your discipline standards.</strong>{" "}
+                Mastery cells stay empty until you tag assessments on{" "}
+                <Link to="/app/review" className="underline font-medium">Tag Review</Link>{" "}
+                and recompute mastery.
+              </div>
+            )}
+            <div className="overflow-auto border rounded-lg max-h-[70vh]">
             <table className="w-full border-collapse text-xs">
               <thead className="sticky top-0 z-10 bg-card">
                 <tr>
@@ -727,6 +751,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
