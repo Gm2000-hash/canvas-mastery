@@ -351,6 +351,8 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   type RosterStudent = { id: string; name: string; sortable: string | null };
   const [roster, setRoster] = useState<RosterStudent[] | null>(null);
+  type PlaceholderStandard = { id: string; code: string; description: string; subject: string; framework: string };
+  const [placeholderStandards, setPlaceholderStandards] = useState<PlaceholderStandard[] | null>(null);
 
   useEffect(() => {
     if (collapsed) return;
@@ -369,7 +371,26 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
           id: r.id, name: r.name, sortable: r.sortable_name,
         }))));
     }
-  }, [course.course_id, collapsed, data, roster]);
+    if (placeholderStandards === null) {
+      // Fetch the discipline-wide standards as placeholder columns so the
+      // matrix shows empty mastery cells for every student even before any
+      // assessments are tagged.
+      (async () => {
+        const { data: disc } = await supabase.rpc("get_effective_discipline", { _course_id: course.course_id });
+        const d = (disc as any[])?.[0];
+        if (!d) { setPlaceholderStandards([]); return; }
+        let q = supabase.from("standards")
+          .select("id, code, description, subject, framework")
+          .eq("subject", d.subject);
+        if (d.framework) q = q.eq("framework", d.framework);
+        const { data: stds } = await q.order("code");
+        setPlaceholderStandards(((stds as any) ?? []).map((s: any) => ({
+          id: s.id, code: s.code, description: s.description ?? "",
+          subject: s.subject, framework: s.framework ?? "STATE",
+        })));
+      })();
+    }
+  }, [course.course_id, collapsed, data, roster, placeholderStandards]);
 
   // Distinct students and standards out of the long-form rows.
   // Students are seeded from the roster fetch so they appear even when the
