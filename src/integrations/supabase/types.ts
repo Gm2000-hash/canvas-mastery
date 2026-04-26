@@ -672,6 +672,21 @@ export type Database = {
           subject: string
         }[]
       }
+      analytics_question_bank: {
+        Args: { _course_id?: string; _framework?: string; _subject?: string }
+        Returns: {
+          avg_pct_correct: number
+          code: string
+          description: string
+          framework: string
+          grade: string
+          parent_code: string
+          response_count: number
+          standard_id: string
+          subject: string
+          tagged_question_count: number
+        }[]
+      }
       analytics_question_breakdown: {
         Args: { _assignment_id?: string; _course_id?: string }
         Returns: {
