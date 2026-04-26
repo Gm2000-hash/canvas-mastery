@@ -34,21 +34,19 @@ export default function Mastery() {
       .from("students").select("id, name, sortable_name").eq("course_id", courseId).order("sortable_name", { nullsFirst: false });
     setStudents(studs ?? []);
 
-    // Standards that are tagged (confirmed) on assignments in this course
+    // Standards that are tagged on assignments in this course, plus any
+    // standards already produced by question-level mastery rollups.
     const { data: assigns } = await supabase.from("assignments").select("id").eq("course_id", courseId);
     const aIds = (assigns ?? []).map((a) => a.id);
-    let stdIds: string[] = [];
+    const stdIdSet = new Set<string>();
     if (aIds.length) {
       const { data: tags } = await supabase
-        .from("assignment_standards").select("standard_id").in("assignment_id", aIds).eq("confirmed", true);
-      stdIds = Array.from(new Set((tags ?? []).map((t) => t.standard_id)));
+        .from("assignment_standards")
+        .select("standard_id")
+        .in("assignment_id", aIds)
+        .or("confirmed.eq.true,ai_suggested.eq.true");
+      (tags ?? []).forEach((t) => stdIdSet.add(t.standard_id));
     }
-    if (stdIds.length === 0) { setStandards([]); setLatestByKey({}); return; }
-
-    const { data: stdRows } = await supabase
-      .from("standards").select("id, code, description").in("id", stdIds).order("code");
-    setStandards(stdRows ?? []);
-
     const studentIds = (studs ?? []).map((s) => s.id);
     if (!studentIds.length) { setLatestByKey({}); return; }
 
@@ -56,11 +54,18 @@ export default function Mastery() {
       .from("mastery_snapshots")
       .select("student_id, standard_id, mastery_score, mastered, attempts, computed_at")
       .in("student_id", studentIds)
-      .in("standard_id", stdIds)
       .order("computed_at", { ascending: false });
 
+    ((snaps as Snap[]) ?? []).forEach((s) => stdIdSet.add(s.standard_id));
+    const stdIds = Array.from(stdIdSet);
+    if (stdIds.length === 0) { setStandards([]); setLatestByKey({}); return; }
+
+    const { data: stdRows } = await supabase
+      .from("standards").select("id, code, description").in("id", stdIds).order("code");
+    setStandards(stdRows ?? []);
+
     const map: Record<string, Snap> = {};
-    for (const s of (snaps as Snap[]) ?? []) {
+    for (const s of ((snaps as Snap[]) ?? []).filter((snap) => stdIdSet.has(snap.standard_id))) {
       const key = `${s.student_id}::${s.standard_id}`;
       if (!map[key]) map[key] = s; // first wins (newest)
     }
