@@ -50,29 +50,46 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Resolve effective discipline: course mapping → teacher default → profile fallback
+    // Resolve effective discipline: course mapping → infer from course name → teacher default → profile fallback
     let state: string | null = null;
     let subject: string | null = null;
     let grade: string | null = null;
     let framework: string | null = null;
+    let disciplineSource = "course"; // for the response, so the UI can explain mismatches
 
     const { data: course } = await admin
-      .from("courses").select("discipline_id").eq("id", assignment.course_id).maybeSingle();
+      .from("courses").select("discipline_id, name, course_code").eq("id", assignment.course_id).maybeSingle();
 
     let disciplineId: string | null = course?.discipline_id ?? null;
-    if (!disciplineId) {
-      const { data: def } = await admin
-        .from("teacher_disciplines").select("id, state, subject, grade, framework")
-        .eq("teacher_id", teacherId).eq("is_default", true).maybeSingle();
-      if (def) {
-        disciplineId = def.id;
-        state = def.state; subject = def.subject; grade = def.grade;
-        framework = (def as any).framework ?? null;
-      }
-    } else {
+    if (disciplineId) {
       const { data: d } = await admin
         .from("teacher_disciplines").select("state, subject, grade, framework").eq("id", disciplineId).maybeSingle();
       if (d) { state = d.state; subject = d.subject; grade = d.grade; framework = (d as any).framework ?? null; }
+    } else {
+      // Load all the teacher's disciplines so we can both pick a default AND try grade inference
+      const { data: allDisc } = await admin
+        .from("teacher_disciplines").select("id, state, subject, grade, framework, is_default")
+        .eq("teacher_id", teacherId);
+      const def = (allDisc ?? []).find((d) => d.is_default) ?? (allDisc ?? [])[0] ?? null;
+
+      // Try to infer the course's grade from its name/code (e.g. "8th Science B", "Grade 6 Math")
+      const haystack = `${course?.name ?? ""} ${course?.course_code ?? ""}`.toLowerCase();
+      const inferredGrade = inferGradeFromText(haystack);
+      let matched: typeof def | null = null;
+      if (inferredGrade && def && allDisc) {
+        matched = allDisc.find((d) =>
+          String(d.grade).trim() === inferredGrade &&
+          d.subject === def.subject &&
+          (d.framework ?? null) === (def.framework ?? null),
+        ) ?? null;
+      }
+      const chosen = matched ?? def;
+      if (chosen) {
+        disciplineId = chosen.id;
+        state = chosen.state; subject = chosen.subject; grade = chosen.grade;
+        framework = (chosen as any).framework ?? null;
+        disciplineSource = matched ? "inferred" : "default";
+      }
     }
 
     // Profile fallback (legacy, before disciplines were introduced)
@@ -82,6 +99,7 @@ Deno.serve(async (req) => {
       state ??= profile?.state ?? null;
       subject ??= profile?.default_subject ?? null;
       grade ??= profile?.default_grade ?? null;
+      disciplineSource = "profile";
     }
 
     // State is optional (national frameworks like NGSS/CCSS don't need one).
