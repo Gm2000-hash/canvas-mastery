@@ -16,6 +16,15 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+function normalizeQuestionText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 export async function recomputeMasteryForTeacher(teacherId: string) {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -33,7 +42,9 @@ export async function recomputeMasteryForTeacher(teacherId: string) {
   // ---- 1) Question-grain signal (preferred) ----
   // Include both confirmed and ai_suggested tags so freshly-imported scores
   // surface immediately. Confirmed tags carry weight 1.0; suggested tags use
-  // their confidence (default 0.5).
+  // their confidence (default 0.5). Canvas often stores copied quizzes as
+  // separate question IDs, so we also match tagged questions to scored copied
+  // questions by exact normalized text.
   const { data: qTags, error: qtErr } = await admin
     .from("question_standards")
     .select("question_id, standard_id, confirmed, ai_suggested, confidence")
@@ -41,8 +52,9 @@ export async function recomputeMasteryForTeacher(teacherId: string) {
     .or("confirmed.eq.true,ai_suggested.eq.true");
   if (qtErr) throw qtErr;
 
-  // question_id -> Map<standard_id, weight> (best weight wins if duplicates)
+  // question_id/text -> Map<standard_id, weight> (best weight wins if duplicates)
   const questionToStandards = new Map<string, Map<string, number>>();
+  const textToStandards = new Map<string, Map<string, number>>();
   for (const t of qTags ?? []) {
     const w = t.confirmed
       ? 1.0
@@ -52,28 +64,70 @@ export async function recomputeMasteryForTeacher(teacherId: string) {
     if (w > prev) m.set(t.standard_id as string, w);
     questionToStandards.set(t.question_id as string, m);
   }
-  const questionIds = Array.from(questionToStandards.keys());
 
-  if (questionIds.length) {
+  const taggedQuestionIds = Array.from(questionToStandards.keys());
+  const questionTextById = new Map<string, string>();
+  for (let i = 0; i < taggedQuestionIds.length; i += 200) {
+    const chunk = taggedQuestionIds.slice(i, i + 200);
+    const { data: qs, error: qErr } = await admin
+      .from("quiz_questions")
+      .select("id, question_text")
+      .eq("teacher_id", teacherId)
+      .in("id", chunk);
+    if (qErr) throw qErr;
+    for (const q of qs ?? []) {
+      const text = normalizeQuestionText(q.question_text);
+      if (!text) continue;
+      questionTextById.set(q.id as string, text);
+      const standards = questionToStandards.get(q.id as string);
+      if (!standards) continue;
+      const textMap = textToStandards.get(text) ?? new Map<string, number>();
+      for (const [standardId, weight] of standards) {
+        const prev = textMap.get(standardId) ?? 0;
+        if (weight > prev) textMap.set(standardId, weight);
+      }
+      textToStandards.set(text, textMap);
+    }
+  }
+
+  if (taggedQuestionIds.length) {
     const responses: any[] = [];
-    for (let i = 0; i < questionIds.length; i += 200) {
-      const chunk = questionIds.slice(i, i + 200);
+    for (let from = 0; ; from += 1000) {
       const { data: rs, error: rErr } = await admin
         .from("question_responses")
         .select("student_id, question_id, points, points_possible, created_at")
         .eq("teacher_id", teacherId)
-        .in("question_id", chunk)
         .not("points", "is", null)
-        .not("points_possible", "is", null);
+        .not("points_possible", "is", null)
+        .range(from, from + 999);
       if (rErr) throw rErr;
       responses.push(...(rs ?? []));
+      if (!rs || rs.length < 1000) break;
     }
+
+    const missingTextIds = Array.from(new Set(
+      responses
+        .map((r) => r.question_id as string)
+        .filter((id) => !questionTextById.has(id)),
+    ));
+    for (let i = 0; i < missingTextIds.length; i += 200) {
+      const chunk = missingTextIds.slice(i, i + 200);
+      const { data: qs, error: qErr } = await admin
+        .from("quiz_questions")
+        .select("id, question_text")
+        .eq("teacher_id", teacherId)
+        .in("id", chunk);
+      if (qErr) throw qErr;
+      for (const q of qs ?? []) questionTextById.set(q.id as string, normalizeQuestionText(q.question_text));
+    }
+
     for (const r of responses) {
       const pp = Number(r.points_possible);
       if (!pp || pp <= 0) continue;
       const pct = Math.max(0, Math.min(1, Number(r.points) / pp));
       const ts = new Date((r.created_at ?? 0) as string).getTime() || 0;
-      const stds = questionToStandards.get(r.question_id as string);
+      const stds = questionToStandards.get(r.question_id as string)
+        ?? textToStandards.get(questionTextById.get(r.question_id as string) ?? "");
       if (!stds) continue;
       for (const [stdId, weight] of stds) {
         const key = `${r.student_id}::${stdId}`;
