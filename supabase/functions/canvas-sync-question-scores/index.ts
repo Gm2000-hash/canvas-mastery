@@ -234,14 +234,33 @@ Deno.serve(async (req) => {
     try { body = req.method === "POST" ? await req.json() : {}; } catch { /* empty ok */ }
     const courseId: string | null = body?.course_id ?? null;
     const assignmentIds: string[] | null = Array.isArray(body?.assignment_ids) ? body.assignment_ids : null;
-    if (!courseId && (!assignmentIds || assignmentIds.length === 0)) {
-      return new Response(JSON.stringify({ error: "Provide course_id or assignment_ids" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // No filter = sync every quiz the teacher owns.
 
     const out = await syncQuestionScoresForTeacher({ teacherId, courseId, assignmentIds });
-    return new Response(JSON.stringify({ success: true, ...out }), {
+
+    // Auto-recompute mastery so freshly imported scores roll up to standards
+    // immediately. Best-effort — failures here don't fail the import.
+    let recompute: { snapshots: number; error?: string } | null = null;
+    if ((out.stats?.responses ?? 0) > 0) {
+      try {
+        const authHeader = req.headers.get("Authorization") ?? "";
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/recompute-mastery`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": authHeader,
+            "apikey": Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+          },
+          body: "{}",
+        });
+        const j = await r.json().catch(() => ({}));
+        recompute = { snapshots: Number(j?.snapshots ?? 0), error: j?.error };
+      } catch (e) {
+        recompute = { snapshots: 0, error: (e as Error).message.slice(0, 200) };
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true, ...out, recompute }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
