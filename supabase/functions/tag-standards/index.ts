@@ -166,12 +166,43 @@ Deno.serve(async (req) => {
       `These keywords should be the specific concepts, skills, verbs, nouns, or domain terms that overlap (e.g., "linear equation", "slope", "two variables", "graph", "solve", "y-intercept", "table of values", "system"). ` +
       `Do not repeat the same word; do not use generic filler ("the", "students", "learn"). If you cannot find at least 8 substantive overlapping keywords for a standard, DO NOT include that standard in the matches.`;
 
+    // For quizzes: pull a sampling of stored question text so the AI has real
+    // content to ground its match on (descriptions are often boilerplate).
+    let questionsBlock = "";
+    let questionsUsed = 0;
+    if ((assignment as any).kind === "quiz") {
+      const { data: qs } = await admin
+        .from("quiz_questions")
+        .select("position, question_text")
+        .eq("assignment_id", assignment_id)
+        .order("position", { ascending: true, nullsFirst: false })
+        .limit(40);
+      if (qs && qs.length) {
+        const lines: string[] = [];
+        let used = 0;
+        const CHAR_BUDGET = 6000;
+        for (const q of qs) {
+          const txt = stripHtml(q.question_text ?? "");
+          if (!txt) continue;
+          const line = `Q${q.position ?? "?"}: ${txt}`;
+          if (used + line.length > CHAR_BUDGET) break;
+          lines.push(line);
+          used += line.length + 1;
+          questionsUsed++;
+        }
+        if (lines.length) {
+          questionsBlock = `\nQUIZ QUESTIONS (sample of ${lines.length} of ${qs.length}):\n${lines.join("\n")}\n`;
+        }
+      }
+    }
+
     const userPrompt =
       `STATE: ${state}\nSUBJECT: ${subject}\nGRADE: ${grade}\n\n` +
       `ASSIGNMENT NAME: ${assignment.name}\n` +
-      `ASSIGNMENT DESCRIPTION: ${assignment.description ?? "(none)"}\n\n` +
+      `ASSIGNMENT DESCRIPTION: ${assignment.description ?? "(none)"}\n` +
+      questionsBlock + `\n` +
       `CANDIDATE STANDARDS:\n${candidateList}\n\n` +
-      `Remember: each match needs ≥ 8 substantive keywords/phrases drawn from both the assignment and the standard description. Drop any standard that doesn't meet this bar.`;
+      `Remember: each match needs ≥ 8 substantive keywords/phrases drawn from both the assignment (including any quiz questions above) and the standard description. Drop any standard that doesn't meet this bar.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
