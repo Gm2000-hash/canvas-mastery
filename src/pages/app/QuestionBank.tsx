@@ -398,6 +398,47 @@ export default function QuestionBank() {
         </CardContent>
       </Card>
 
+      {/* Per-quiz import results */}
+      {importResults && importResults.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center justify-between">
+              <span>Import results</span>
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setImportResults(null)}
+              >
+                Dismiss
+              </button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 max-h-64 overflow-y-auto">
+            <ul className="text-xs divide-y">
+              {importResults.map((r, i) => (
+                <li key={i} className="py-1.5 flex items-center justify-between gap-2">
+                  <span className="truncate">{r.name}</span>
+                  <span className="shrink-0 flex items-center gap-2">
+                    {r.status === "ok" ? (
+                      <Badge variant="outline" className="text-[10px] bg-mastery-high/10 border-mastery-high/30 text-mastery-high">
+                        {r.responses} response{r.responses === 1 ? "" : "s"}
+                      </Badge>
+                    ) : r.status === "skipped" ? (
+                      <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                        skipped{r.reason ? ` — ${r.reason}` : ""}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] bg-mastery-low/10 border-mastery-low/30 text-mastery-low">
+                        error{r.reason ? ` — ${r.reason}` : ""}
+                      </Badge>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Body: tree + question list */}
       {bank === null ? (
         <div className="grid lg:grid-cols-[420px_1fr] gap-4">
