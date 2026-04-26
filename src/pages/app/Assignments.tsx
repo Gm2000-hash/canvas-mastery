@@ -143,6 +143,7 @@ export default function Assignments() {
 
 function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment; tags: StandardTag[]; onChange: () => void }) {
   const [tagging, setTagging] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   async function aiSuggest() {
     setTagging(true);
@@ -165,6 +166,29 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
       );
     }
     onChange();
+  }
+
+  async function importScores() {
+    setImporting(true);
+    const { data, error } = await supabase.functions.invoke("canvas-sync-question-scores", {
+      body: { assignment_ids: [assignment.id] },
+    });
+    setImporting(false);
+    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if ((data as any)?.error) { toast.error((data as any).error); return; }
+    const stats = (data as any).stats ?? {};
+    const recompute = (data as any).recompute;
+    const result = ((data as any).results ?? [])[0];
+    if (result?.status === "skipped") {
+      toast.message(`Skipped: ${result.reason ?? "no data"}`);
+    } else if (result?.status === "error") {
+      toast.error(result.reason ?? "Import failed");
+    } else {
+      const note = recompute && recompute.snapshots > 0
+        ? ` Mastery updated (${recompute.snapshots}).`
+        : "";
+      toast.success(`Imported ${stats.responses ?? 0} response${stats.responses === 1 ? "" : "s"}.${note}`);
+    }
   }
 
   async function confirmTag(t: StandardTag) {
