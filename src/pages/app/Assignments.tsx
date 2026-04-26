@@ -150,8 +150,20 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
     setTagging(false);
     if (error) { toast.error((error as any).message ?? "Failed"); return; }
     if ((data as any)?.error) { toast.error((data as any).error); return; }
-    const n = (data as any).suggestions?.length ?? 0;
-    toast.success(n ? `${n} suggestion${n > 1 ? "s" : ""} added — review & confirm` : "AI couldn't find a strong match");
+    const d = data as any;
+    const n = d.suggestions?.length ?? 0;
+    if (n > 0) {
+      toast.success(`${n} suggestion${n > 1 ? "s" : ""} added — review & confirm`);
+    } else {
+      const disc = d.discipline ?? {};
+      const label = `${disc.framework ?? "STATE"} ${disc.subject ?? ""} grade ${disc.grade ?? "?"}`.trim();
+      const used = d.questions_used ?? 0;
+      const candidates = d.candidate_count ?? 0;
+      toast.warning(
+        `No strong match in ${label} (${candidates} standards, ${used} quiz question${used === 1 ? "" : "s"} read).`,
+        { description: "Try changing this course's discipline above, or use + Add to tag manually." },
+      );
+    }
     onChange();
   }
 
