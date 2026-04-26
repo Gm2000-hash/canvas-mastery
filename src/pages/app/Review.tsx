@@ -66,7 +66,25 @@ export default function Review() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [scoreImportBusy, setScoreImportBusy] = useState<Set<string>>(new Set());
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  async function importQuestionScores(assignmentId: string) {
+    setScoreImportBusy((p) => new Set(p).add(assignmentId));
+    const { data, error } = await supabase.functions.invoke("canvas-sync-question-scores", {
+      body: { assignment_ids: [assignmentId] },
+    });
+    setScoreImportBusy((p) => { const n = new Set(p); n.delete(assignmentId); return n; });
+    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if ((data as any)?.error) { toast.error((data as any).error); return; }
+    const stats = (data as any).stats ?? {};
+    const results = (data as any).results ?? [];
+    const r = results[0];
+    if (r?.status === "error") toast.error(`Import failed: ${r.reason ?? "unknown"}`);
+    else if (r?.status === "skipped") toast.message(`Skipped: ${r.reason ?? "no eligible questions"}`);
+    else toast.success(`Imported ${stats.responses ?? 0} per-question response${stats.responses === 1 ? "" : "s"}.`);
+  }
+
 
   async function loadAll() {
     setLoading(true);
@@ -522,6 +540,19 @@ export default function Review() {
                               >
                                 {qBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ListChecks className="h-3 w-3 mr-1" />}
                                 Tag by question
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 text-xs"
+                                disabled={scoreImportBusy.has(a.id)}
+                                onClick={(e) => { e.stopPropagation(); importQuestionScores(a.id); }}
+                                title="Pull per-student per-question scores from Canvas"
+                              >
+                                {scoreImportBusy.has(a.id)
+                                  ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  : <Sparkles className="h-3 w-3 mr-1" />}
+                                Import scores
                               </Button>
                               <Button
                                 size="sm"

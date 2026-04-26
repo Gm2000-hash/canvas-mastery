@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
-import { BarChart3, BookMarked, CheckCheck, GraduationCap, LayoutDashboard, ListChecks, Settings as SettingsIcon, Sparkles } from "lucide-react";
+import { BarChart3, BookMarked, CheckCheck, GraduationCap, LayoutDashboard, Library, ListChecks, Settings as SettingsIcon, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
 
@@ -13,6 +13,7 @@ const nav = [
   { to: "/app/assignments", label: "Assignments", icon: ListChecks },
   { to: "/app/review", label: "Tag Review", icon: CheckCheck },
   { to: "/app/standards", label: "Standards", icon: BookMarked },
+  { to: "/app/question-bank", label: "Question Bank", icon: Library },
   { to: "/app/mastery", label: "Mastery", icon: Sparkles },
   { to: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },

@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
     }
 
     const stats = { courses: 0, students: 0, assignments: 0, submissions: 0 };
+    const syncedCourseIds: string[] = [];
 
     // 1) Courses (active teacher enrollment by default; if course_ids provided we widen state filter)
     const allCourses = courseIdFilter
@@ -120,6 +121,7 @@ Deno.serve(async (req) => {
       if (insErr) { console.error("course upsert", insErr); continue; }
       stats.courses++;
       const courseId = courseRow!.id as string;
+      syncedCourseIds.push(courseId);
 
       // 2) Students
       const students = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/students`).catch(() => []);
@@ -231,7 +233,24 @@ Deno.serve(async (req) => {
 
     await admin.from("canvas_credentials").update({ last_sync_at: new Date().toISOString() }).eq("teacher_id", teacherId);
 
-    return new Response(JSON.stringify({ success: true, stats }), {
+    // 5) Per-question scores (best-effort; never fails the sync)
+    const questionScores = { quizzes: 0, responses: 0 };
+    try {
+      const { syncQuestionScoresForTeacher } = await import("../canvas-sync-question-scores/index.ts");
+      for (const cid of syncedCourseIds) {
+        try {
+          const out = await syncQuestionScoresForTeacher({ teacherId, courseId: cid, assignmentIds: null });
+          questionScores.quizzes += out.stats.quizzes;
+          questionScores.responses += out.stats.responses;
+        } catch (e) {
+          console.warn(`question-score sync failed for course ${cid}:`, (e as Error).message);
+        }
+      }
+    } catch (e) {
+      console.warn("question-score helper unavailable:", (e as Error).message);
+    }
+
+    return new Response(JSON.stringify({ success: true, stats, question_scores: questionScores }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

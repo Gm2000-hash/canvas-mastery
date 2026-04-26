@@ -15,6 +15,7 @@ import Standards from "./pages/app/Standards";
 import Mastery from "./pages/app/Mastery";
 import Review from "./pages/app/Review";
 import Analytics from "./pages/app/Analytics";
+import QuestionBank from "./pages/app/QuestionBank";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="assignments" element={<Assignments />} />
             <Route path="review" element={<Review />} />
             <Route path="standards" element={<Standards />} />
+            <Route path="question-bank" element={<QuestionBank />} />
             <Route path="mastery" element={<Mastery />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="settings" element={<Settings />} />
