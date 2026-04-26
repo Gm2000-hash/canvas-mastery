@@ -44,6 +44,7 @@ type QuestionRow = {
   response_count?: number;
   avg_pct?: number | null;
   standards?: { code: string; description: string }[];
+  is_suggested_only?: boolean; // true when none of this question's tags are confirmed
 };
 
 type TreeNode = {
