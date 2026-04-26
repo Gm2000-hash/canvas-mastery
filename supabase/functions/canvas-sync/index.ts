@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
     }
 
     const stats = { courses: 0, students: 0, assignments: 0, submissions: 0 };
+    const syncedCourseIds: string[] = [];
 
     // 1) Courses (active teacher enrollment by default; if course_ids provided we widen state filter)
     const allCourses = courseIdFilter
@@ -120,6 +121,7 @@ Deno.serve(async (req) => {
       if (insErr) { console.error("course upsert", insErr); continue; }
       stats.courses++;
       const courseId = courseRow!.id as string;
+      syncedCourseIds.push(courseId);
 
       // 2) Students
       const students = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/students`).catch(() => []);
