@@ -70,6 +70,9 @@ export default function QuestionBank() {
   const [loadingQs, setLoadingQs] = useState(false);
   const [openQuestion, setOpenQuestion] = useState<QuestionRow | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState<
+    { name: string; status: "ok" | "skipped" | "error"; responses: number; reason?: string }[] | null
+  >(null);
 
   // --- Load courses ---
   useEffect(() => {
@@ -298,19 +301,23 @@ export default function QuestionBank() {
   // --- Import scores ---
   async function importAllScores() {
     setImporting(true);
+    setImportResults(null);
     const body: any = {};
     if (courseId !== "ALL") body.course_id = courseId;
-    else {
-      // No course selected — pick first course as a safety default; ask user instead
-      toast.message("Pick a course first to import quiz scores from Canvas.");
-      setImporting(false); return;
-    }
+    // No filter = sync every quiz the teacher owns.
     const { data, error } = await supabase.functions.invoke("canvas-sync-question-scores", { body });
     setImporting(false);
     if (error) { toast.error((error as any).message ?? "Failed"); return; }
     if ((data as any)?.error) { toast.error((data as any).error); return; }
     const stats = (data as any).stats ?? {};
-    toast.success(`Imported ${stats.responses ?? 0} response${stats.responses === 1 ? "" : "s"} from ${stats.quizzes ?? 0} quiz${stats.quizzes === 1 ? "" : "zes"}.`);
+    const recompute = (data as any).recompute;
+    const recomputeNote = recompute && recompute.snapshots > 0
+      ? ` Mastery updated for ${recompute.snapshots} entries.`
+      : "";
+    toast.success(
+      `Imported ${stats.responses ?? 0} response${stats.responses === 1 ? "" : "s"} from ${stats.quizzes ?? 0} quiz${stats.quizzes === 1 ? "" : "zes"}.${recomputeNote}`,
+    );
+    setImportResults(((data as any).results ?? []) as any);
     loadBank();
     if (selectedStandardId) loadQuestionsForStandard(selectedStandardId);
   }
