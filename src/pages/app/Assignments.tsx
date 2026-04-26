@@ -18,7 +18,7 @@ type Assignment = {
   id: string; name: string; kind: "assignment" | "quiz"; description: string | null;
   course_id: string; due_at: string | null;
 };
-type Course = { id: string; name: string };
+type Course = { id: string; name: string; discipline_id: string | null };
 type StandardTag = {
   id: string; standard_id: string; ai_suggested: boolean; confirmed: boolean; confidence: number | null; rationale: string | null;
   standards: { code: string; description: string };
