@@ -11,6 +11,26 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Infer a grade label (e.g. "6", "7", "8", "K") from a course name/code.
+function inferGradeFromText(text: string): string | null {
+  const t = text.toLowerCase();
+  const m1 = t.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/);
+  if (m1) return m1[1];
+  const m2 = t.match(/\bgrade\s*(\d{1,2})\b/);
+  if (m2) return m2[1];
+  const m3 = t.match(/\b(\d{1,2})\s*grade\b/);
+  if (m3) return m3[1];
+  if (/\b(kindergarten|kinder)\b/.test(t)) return "K";
+  return null;
+}
+
+// Strip HTML tags and collapse whitespace — Canvas question text is usually HTML.
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ").trim();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -42,7 +62,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: assignment, error: aErr } = await admin
-      .from("assignments").select("id, name, description, teacher_id, course_id").eq("id", assignment_id).single();
+      .from("assignments").select("id, name, kind, description, teacher_id, course_id").eq("id", assignment_id).single();
     if (aErr || !assignment) throw new Error("Assignment not found");
     if (assignment.teacher_id !== teacherId) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
@@ -50,29 +70,46 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Resolve effective discipline: course mapping → teacher default → profile fallback
+    // Resolve effective discipline: course mapping → infer from course name → teacher default → profile fallback
     let state: string | null = null;
     let subject: string | null = null;
     let grade: string | null = null;
     let framework: string | null = null;
+    let disciplineSource = "course"; // for the response, so the UI can explain mismatches
 
     const { data: course } = await admin
-      .from("courses").select("discipline_id").eq("id", assignment.course_id).maybeSingle();
+      .from("courses").select("discipline_id, name, course_code").eq("id", assignment.course_id).maybeSingle();
 
     let disciplineId: string | null = course?.discipline_id ?? null;
-    if (!disciplineId) {
-      const { data: def } = await admin
-        .from("teacher_disciplines").select("id, state, subject, grade, framework")
-        .eq("teacher_id", teacherId).eq("is_default", true).maybeSingle();
-      if (def) {
-        disciplineId = def.id;
-        state = def.state; subject = def.subject; grade = def.grade;
-        framework = (def as any).framework ?? null;
-      }
-    } else {
+    if (disciplineId) {
       const { data: d } = await admin
         .from("teacher_disciplines").select("state, subject, grade, framework").eq("id", disciplineId).maybeSingle();
       if (d) { state = d.state; subject = d.subject; grade = d.grade; framework = (d as any).framework ?? null; }
+    } else {
+      // Load all the teacher's disciplines so we can both pick a default AND try grade inference
+      const { data: allDisc } = await admin
+        .from("teacher_disciplines").select("id, state, subject, grade, framework, is_default")
+        .eq("teacher_id", teacherId);
+      const def = (allDisc ?? []).find((d) => d.is_default) ?? (allDisc ?? [])[0] ?? null;
+
+      // Try to infer the course's grade from its name/code (e.g. "8th Science B", "Grade 6 Math")
+      const haystack = `${course?.name ?? ""} ${course?.course_code ?? ""}`.toLowerCase();
+      const inferredGrade = inferGradeFromText(haystack);
+      let matched: typeof def | null = null;
+      if (inferredGrade && def && allDisc) {
+        matched = allDisc.find((d) =>
+          String(d.grade).trim() === inferredGrade &&
+          d.subject === def.subject &&
+          (d.framework ?? null) === (def.framework ?? null),
+        ) ?? null;
+      }
+      const chosen = matched ?? def;
+      if (chosen) {
+        disciplineId = chosen.id;
+        state = chosen.state; subject = chosen.subject; grade = chosen.grade;
+        framework = (chosen as any).framework ?? null;
+        disciplineSource = matched ? "inferred" : "default";
+      }
     }
 
     // Profile fallback (legacy, before disciplines were introduced)
@@ -82,6 +119,7 @@ Deno.serve(async (req) => {
       state ??= profile?.state ?? null;
       subject ??= profile?.default_subject ?? null;
       grade ??= profile?.default_grade ?? null;
+      disciplineSource = "profile";
     }
 
     // State is optional (national frameworks like NGSS/CCSS don't need one).
@@ -128,12 +166,43 @@ Deno.serve(async (req) => {
       `These keywords should be the specific concepts, skills, verbs, nouns, or domain terms that overlap (e.g., "linear equation", "slope", "two variables", "graph", "solve", "y-intercept", "table of values", "system"). ` +
       `Do not repeat the same word; do not use generic filler ("the", "students", "learn"). If you cannot find at least 8 substantive overlapping keywords for a standard, DO NOT include that standard in the matches.`;
 
+    // For quizzes: pull a sampling of stored question text so the AI has real
+    // content to ground its match on (descriptions are often boilerplate).
+    let questionsBlock = "";
+    let questionsUsed = 0;
+    if ((assignment as any).kind === "quiz") {
+      const { data: qs } = await admin
+        .from("quiz_questions")
+        .select("position, question_text")
+        .eq("assignment_id", assignment_id)
+        .order("position", { ascending: true, nullsFirst: false })
+        .limit(40);
+      if (qs && qs.length) {
+        const lines: string[] = [];
+        let used = 0;
+        const CHAR_BUDGET = 6000;
+        for (const q of qs) {
+          const txt = stripHtml(q.question_text ?? "");
+          if (!txt) continue;
+          const line = `Q${q.position ?? "?"}: ${txt}`;
+          if (used + line.length > CHAR_BUDGET) break;
+          lines.push(line);
+          used += line.length + 1;
+          questionsUsed++;
+        }
+        if (lines.length) {
+          questionsBlock = `\nQUIZ QUESTIONS (sample of ${lines.length} of ${qs.length}):\n${lines.join("\n")}\n`;
+        }
+      }
+    }
+
     const userPrompt =
       `STATE: ${state}\nSUBJECT: ${subject}\nGRADE: ${grade}\n\n` +
       `ASSIGNMENT NAME: ${assignment.name}\n` +
-      `ASSIGNMENT DESCRIPTION: ${assignment.description ?? "(none)"}\n\n` +
+      `ASSIGNMENT DESCRIPTION: ${assignment.description ?? "(none)"}\n` +
+      questionsBlock + `\n` +
       `CANDIDATE STANDARDS:\n${candidateList}\n\n` +
-      `Remember: each match needs ≥ 8 substantive keywords/phrases drawn from both the assignment and the standard description. Drop any standard that doesn't meet this bar.`;
+      `Remember: each match needs ≥ 8 substantive keywords/phrases drawn from both the assignment (including any quiz questions above) and the standard description. Drop any standard that doesn't meet this bar.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -231,7 +300,14 @@ Deno.serve(async (req) => {
       if (insErr) console.error("insert suggestions", insErr);
     }
 
-    return new Response(JSON.stringify({ success: true, suggestions: matches, discipline: { state, subject, grade } }), {
+    return new Response(JSON.stringify({
+      success: true,
+      suggestions: matches,
+      stored: rows.length,
+      candidate_count: standards.length,
+      questions_used: questionsUsed,
+      discipline: { state, subject, grade, framework, source: disciplineSource },
+    }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

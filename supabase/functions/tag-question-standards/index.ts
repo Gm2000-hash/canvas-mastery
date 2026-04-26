@@ -11,6 +11,18 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+function inferGradeFromText(text: string): string | null {
+  const t = text.toLowerCase();
+  const m1 = t.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/);
+  if (m1) return m1[1];
+  const m2 = t.match(/\bgrade\s*(\d{1,2})\b/);
+  if (m2) return m2[1];
+  const m3 = t.match(/\b(\d{1,2})\s*grade\b/);
+  if (m3) return m3[1];
+  if (/\b(kindergarten|kinder)\b/.test(t)) return "K";
+  return null;
+}
+
 type Match = { standard_code: string; confidence: number; rationale: string; keywords?: string[] };
 
 Deno.serve(async (req) => {
@@ -52,30 +64,47 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Resolve effective discipline (course → teacher default → legacy profile)
+    // Resolve effective discipline (course → infer-from-name → teacher default → legacy profile)
     let state: string | null = null, subject: string | null = null, grade: string | null = null;
     let framework: string | null = null;
     const { data: course } = await admin
-      .from("courses").select("discipline_id").eq("id", assignment.course_id).maybeSingle();
+      .from("courses").select("discipline_id, name, course_code").eq("id", assignment.course_id).maybeSingle();
     let disciplineId: string | null = course?.discipline_id ?? null;
-    if (!disciplineId) {
-      const { data: def } = await admin
-        .from("teacher_disciplines").select("id, state, subject, grade, framework")
-        .eq("teacher_id", teacherId).eq("is_default", true).maybeSingle();
-      if (def) { disciplineId = def.id; state = def.state; subject = def.subject; grade = def.grade; framework = (def as any).framework ?? null; }
-    } else {
+    if (disciplineId) {
       const { data: d } = await admin
         .from("teacher_disciplines").select("state, subject, grade, framework").eq("id", disciplineId).maybeSingle();
       if (d) { state = d.state; subject = d.subject; grade = d.grade; framework = (d as any).framework ?? null; }
+    } else {
+      const { data: allDisc } = await admin
+        .from("teacher_disciplines").select("id, state, subject, grade, framework, is_default")
+        .eq("teacher_id", teacherId);
+      const def = (allDisc ?? []).find((d) => d.is_default) ?? (allDisc ?? [])[0] ?? null;
+      const haystack = `${course?.name ?? ""} ${course?.course_code ?? ""}`.toLowerCase();
+      const inferredGrade = inferGradeFromText(haystack);
+      let matched: typeof def | null = null;
+      if (inferredGrade && def && allDisc) {
+        matched = allDisc.find((d) =>
+          String(d.grade).trim() === inferredGrade &&
+          d.subject === def.subject &&
+          (d.framework ?? null) === (def.framework ?? null),
+        ) ?? null;
+      }
+      const chosen = matched ?? def;
+      if (chosen) {
+        disciplineId = chosen.id;
+        state = chosen.state; subject = chosen.subject; grade = chosen.grade;
+        framework = (chosen as any).framework ?? null;
+      }
     }
-    if (!state || !subject || !grade) {
+    if (!subject || !grade) {
       const { data: profile } = await admin
         .from("profiles").select("state, default_subject, default_grade").eq("id", teacherId).maybeSingle();
       state ??= profile?.state ?? null;
       subject ??= profile?.default_subject ?? null;
       grade ??= profile?.default_grade ?? null;
     }
-    if (!state || !subject || !grade) {
+    if (state === "") state = null;
+    if (!subject || !grade) {
       return new Response(JSON.stringify({
         error: "No discipline set. Add a discipline in Settings (or assign one to this course).",
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });

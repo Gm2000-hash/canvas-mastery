@@ -6,16 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Check, Trash2, Loader2, RefreshCw } from "lucide-react";
+import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+type Discipline = { id: string; state: string | null; subject: string; grade: string; framework: string | null; is_default: boolean };
 
 type Assignment = {
   id: string; name: string; kind: "assignment" | "quiz"; description: string | null;
   course_id: string; due_at: string | null;
 };
-type Course = { id: string; name: string };
+type Course = { id: string; name: string; discipline_id: string | null };
 type StandardTag = {
   id: string; standard_id: string; ai_suggested: boolean; confirmed: boolean; confidence: number | null; rationale: string | null;
   standards: { code: string; description: string };
@@ -28,13 +31,28 @@ export default function Assignments() {
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const [tagsByAssignment, setTagsByAssignment] = useState<Record<string, StandardTag[]>>({});
   const [recomputing, setRecomputing] = useState(false);
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+
+  const currentCourse = useMemo(() => (courses ?? []).find((c) => c.id === courseId) ?? null, [courses, courseId]);
+  const effectiveDiscipline = useMemo(() => {
+    if (!currentCourse) return null;
+    if (currentCourse.discipline_id) return disciplines.find((d) => d.id === currentCourse.discipline_id) ?? null;
+    return disciplines.find((d) => d.is_default) ?? null;
+  }, [currentCourse, disciplines]);
 
   async function loadCourses() {
-    const { data } = await supabase.from("courses").select("id, name").order("name");
-    setCourses(data ?? []);
+    const { data } = await supabase.from("courses").select("id, name, discipline_id").order("name");
+    setCourses((data as Course[]) ?? []);
     if (!courseId && data?.length) setCourseId(data[0].id);
   }
-  useEffect(() => { loadCourses(); /* eslint-disable-next-line */ }, []);
+  async function loadDisciplines() {
+    const { data } = await supabase
+      .from("teacher_disciplines")
+      .select("id, state, subject, grade, framework, is_default")
+      .order("grade");
+    setDisciplines((data as Discipline[]) ?? []);
+  }
+  useEffect(() => { loadCourses(); loadDisciplines(); /* eslint-disable-next-line */ }, []);
 
   async function loadAssignments(cid: string) {
     setAssignments(null);
@@ -78,12 +96,29 @@ export default function Assignments() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <span className="text-sm text-muted-foreground">Course:</span>
         <Select value={courseId} onValueChange={setCourseId}>
           <SelectTrigger className="w-72"><SelectValue placeholder="Select course" /></SelectTrigger>
           <SelectContent>{(courses ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
         </Select>
+
+        {currentCourse && (
+          <DisciplinePicker
+            course={currentCourse}
+            disciplines={disciplines}
+            effective={effectiveDiscipline}
+            onChange={async (newId) => {
+              const { error } = await supabase
+                .from("courses")
+                .update({ discipline_id: newId })
+                .eq("id", currentCourse.id);
+              if (error) { toast.error(error.message); return; }
+              toast.success("Discipline updated for this course");
+              await loadCourses();
+            }}
+          />
+        )}
       </div>
 
       {assignments === null ? (
@@ -115,8 +150,20 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
     setTagging(false);
     if (error) { toast.error((error as any).message ?? "Failed"); return; }
     if ((data as any)?.error) { toast.error((data as any).error); return; }
-    const n = (data as any).suggestions?.length ?? 0;
-    toast.success(n ? `${n} suggestion${n > 1 ? "s" : ""} added — review & confirm` : "AI couldn't find a strong match");
+    const d = data as any;
+    const n = d.suggestions?.length ?? 0;
+    if (n > 0) {
+      toast.success(`${n} suggestion${n > 1 ? "s" : ""} added — review & confirm`);
+    } else {
+      const disc = d.discipline ?? {};
+      const label = `${disc.framework ?? "STATE"} ${disc.subject ?? ""} grade ${disc.grade ?? "?"}`.trim();
+      const used = d.questions_used ?? 0;
+      const candidates = d.candidate_count ?? 0;
+      toast.warning(
+        `No strong match in ${label} (${candidates} standards, ${used} quiz question${used === 1 ? "" : "s"} read).`,
+        { description: "Try changing this course's discipline above, or use + Add to tag manually." },
+      );
+    }
     onChange();
   }
 
@@ -227,3 +274,78 @@ function AddStandardDialog({ assignmentId, onAdded }: { assignmentId: string; on
     </Dialog>
   );
 }
+
+function discLabel(d: Discipline | null): string {
+  if (!d) return "—";
+  const fw = d.framework && d.framework !== "STATE" ? d.framework : (d.state || "STATE");
+  return `${fw} · ${d.subject} · Grade ${d.grade}`;
+}
+
+function DisciplinePicker({
+  course, disciplines, effective, onChange,
+}: {
+  course: Course;
+  disciplines: Discipline[];
+  effective: Discipline | null;
+  onChange: (newId: string | null) => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const isExplicit = !!course.discipline_id;
+  const sorted = useMemo(() => {
+    return [...disciplines].sort((a, b) => {
+      const ag = parseInt(a.grade) || 99;
+      const bg = parseInt(b.grade) || 99;
+      if (ag !== bg) return ag - bg;
+      return a.subject.localeCompare(b.subject);
+    });
+  }, [disciplines]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2 h-9">
+          <BookOpen className="h-3.5 w-3.5" />
+          <span className="text-xs">
+            <span className="text-muted-foreground">Discipline:</span>{" "}
+            <span className="font-medium">{discLabel(effective)}</span>
+            {!isExplicit && <span className="text-muted-foreground italic"> (default)</span>}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-2">
+        <div className="text-xs text-muted-foreground px-2 pt-1 pb-2">
+          AI suggestions and standards lookups will use this discipline for this course.
+        </div>
+        <div className="space-y-1">
+          {sorted.map((d) => {
+            const selected = course.discipline_id === d.id || (!course.discipline_id && d.is_default);
+            return (
+              <button
+                key={d.id}
+                onClick={async () => { await onChange(d.id); setOpen(false); }}
+                className={`w-full text-left text-sm rounded-md px-2 py-1.5 hover:bg-accent flex items-center justify-between gap-2 ${selected ? "bg-accent/50" : ""}`}
+              >
+                <span className="truncate">{discLabel(d)}</span>
+                {selected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+              </button>
+            );
+          })}
+          {disciplines.length === 0 && (
+            <div className="text-xs text-muted-foreground px-2 py-3">
+              No disciplines yet. Add one in Settings.
+            </div>
+          )}
+          {isExplicit && (
+            <button
+              onClick={async () => { await onChange(null); setOpen(false); }}
+              className="w-full text-left text-xs text-muted-foreground rounded-md px-2 py-1.5 hover:bg-accent mt-1 border-t pt-2"
+            >
+              Reset to teacher default
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
