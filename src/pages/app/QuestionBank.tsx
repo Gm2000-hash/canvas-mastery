@@ -222,26 +222,24 @@ export default function QuestionBank() {
   async function loadQuestionsForStandard(standardId: string) {
     setLoadingQs(true);
     setQuestions(null);
-    // Find all standard ids in the selected subtree (so clicking a parent shows its descendants too)
     const node = findNodeByStandardId(tree, standardId);
     const stdIds = collectStandardIds(node);
     if (stdIds.length === 0) { setQuestions([]); setLoadingQs(false); return; }
 
-    // 1) Confirmed question_standards joining to questions + assignments
+    // Pull tags honoring the status filter (default: all — confirmed AND ai-suggested)
     let qsQuery = supabase
       .from("question_standards")
-      .select("question_id, standard_id, standards(code, description), quiz_questions!inner(id, position, question_text, points_possible, assignment_id, assignments!inner(id, name, course_id))")
-      .eq("confirmed", true)
+      .select("question_id, standard_id, ai_suggested, confirmed, standards(code, description), quiz_questions!inner(id, position, question_text, points_possible, assignment_id, assignments!inner(id, name, course_id))")
       .in("standard_id", stdIds);
+    if (statusFilter === "CONFIRMED") qsQuery = qsQuery.eq("confirmed", true);
+    if (statusFilter === "SUGGESTED") qsQuery = qsQuery.eq("confirmed", false).eq("ai_suggested", true);
     const { data: qsRows, error: qsErr } = await qsQuery;
     if (qsErr) { toast.error(qsErr.message); setLoadingQs(false); return; }
 
-    // De-dupe by question_id + collect tag list
-    const byId = new Map<string, QuestionRow>();
+    const byId = new Map<string, QuestionRow & { _anyConfirmed: boolean }>();
     for (const t of (qsRows as any[]) ?? []) {
       const q = t.quiz_questions;
       if (!q) continue;
-      // Filter by course if needed
       if (courseId !== "ALL" && q.assignments?.course_id !== courseId) continue;
       if (!byId.has(q.id)) {
         byId.set(q.id, {
@@ -252,14 +250,20 @@ export default function QuestionBank() {
           assignment_id: q.assignment_id,
           assignments: q.assignments,
           standards: [],
+          _anyConfirmed: false,
         });
       }
+      const row = byId.get(q.id)!;
+      if (t.confirmed) row._anyConfirmed = true;
       const std = t.standards;
-      if (std) byId.get(q.id)!.standards!.push({ code: std.code, description: std.description });
+      if (std) row.standards!.push({ code: std.code, description: std.description });
     }
 
-    const list = Array.from(byId.values());
-    // 2) Per-question response stats
+    const list: QuestionRow[] = Array.from(byId.values()).map((r) => ({
+      ...r,
+      is_suggested_only: !r._anyConfirmed,
+    }));
+
     if (list.length) {
       const ids = list.map((q) => q.id);
       const { data: responses } = await supabase
@@ -282,7 +286,6 @@ export default function QuestionBank() {
       }
     }
     list.sort((a, b) => {
-      // by avg_pct asc (lowest first — highlights pain points), then by code, then position
       const ap = a.avg_pct ?? 999;
       const bp = b.avg_pct ?? 999;
       if (ap !== bp) return ap - bp;
