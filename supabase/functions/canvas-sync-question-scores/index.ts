@@ -10,6 +10,7 @@
 // At least one filter must be provided. Returns per-quiz results so the UI can
 // show which quizzes succeeded, were skipped, or failed.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { recomputeMasteryForTeacher } from "../recompute-mastery/index.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
