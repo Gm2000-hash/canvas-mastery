@@ -365,6 +365,7 @@ export type Database = {
       }
       quiz_questions: {
         Row: {
+          answers: Json | null
           assignment_id: string
           canvas_question_id: number
           created_at: string
@@ -375,6 +376,7 @@ export type Database = {
           teacher_id: string
         }
         Insert: {
+          answers?: Json | null
           assignment_id: string
           canvas_question_id: number
           created_at?: string
@@ -385,6 +387,7 @@ export type Database = {
           teacher_id: string
         }
         Update: {
+          answers?: Json | null
           assignment_id?: string
           canvas_question_id?: number
           created_at?: string

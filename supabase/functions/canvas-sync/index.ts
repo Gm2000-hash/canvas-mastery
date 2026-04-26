@@ -182,6 +182,14 @@ Deno.serve(async (req) => {
               ? String(q.question_text).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000)
               : null,
             points_possible: q.points_possible ?? null,
+            // Persist answer choices so the AI tagger can read CHOICES (vocabulary often anchors the standard)
+            answers: Array.isArray(q.answers)
+              ? q.answers.slice(0, 12).map((a: any) => ({
+                  text: typeof a?.text === "string" ? a.text.slice(0, 600) : null,
+                  html: typeof a?.html === "string" ? a.html.slice(0, 800) : null,
+                  weight: a?.weight ?? null,
+                }))
+              : null,
           }));
           if (qRows.length) {
             const { error: qErr } = await admin.from("quiz_questions")

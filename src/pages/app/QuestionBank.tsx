@@ -44,6 +44,7 @@ type QuestionRow = {
   response_count?: number;
   avg_pct?: number | null;
   standards?: { code: string; description: string }[];
+  is_suggested_only?: boolean; // true when none of this question's tags are confirmed
 };
 
 type TreeNode = {
@@ -53,11 +54,14 @@ type TreeNode = {
   totals: { questions: number; responses: number; weightedPct: number; weight: number };
 };
 
+type StatusFilter = "ALL" | "SUGGESTED" | "CONFIRMED";
+
 export default function QuestionBank() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseId, setCourseId] = useState<string>("ALL");
   const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [search, setSearch] = useState("");
   const [bank, setBank] = useState<BankRow[] | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -67,24 +71,95 @@ export default function QuestionBank() {
   const [openQuestion, setOpenQuestion] = useState<QuestionRow | null>(null);
   const [importing, setImporting] = useState(false);
 
-  // --- Load courses + bank rows ---
+  // --- Load courses ---
   useEffect(() => {
     supabase.from("courses").select("id, name").order("name").then(({ data }) => {
       setCourses((data ?? []) as Course[]);
     });
   }, []);
 
+  // Build the bank ourselves so we can include AI-suggested rows (the
+  // analytics_question_bank RPC only counts confirmed=true).
   async function loadBank() {
     setBank(null);
-    const { data, error } = await supabase.rpc("analytics_question_bank", {
-      _course_id: courseId === "ALL" ? null : courseId,
-      _subject: subjectFilter === "ALL" ? null : subjectFilter,
-      _framework: frameworkFilter === "ALL" ? null : frameworkFilter,
+
+    // 1) Pull tags filtered by status, joined to question -> assignment -> course
+    let tagsQuery = supabase
+      .from("question_standards")
+      .select("standard_id, ai_suggested, confirmed, quiz_questions!inner(id, assignment_id, assignments!inner(course_id))");
+    if (statusFilter === "CONFIRMED") tagsQuery = tagsQuery.eq("confirmed", true);
+    if (statusFilter === "SUGGESTED") tagsQuery = tagsQuery.eq("confirmed", false).eq("ai_suggested", true);
+    const { data: tagRows, error: tErr } = await tagsQuery;
+    if (tErr) { toast.error(tErr.message); setBank([]); return; }
+
+    // Filter by course in JS (since the join is nested)
+    const filteredTags = (tagRows ?? []).filter((t: any) => {
+      if (courseId === "ALL") return true;
+      return t.quiz_questions?.assignments?.course_id === courseId;
     });
-    if (error) { toast.error(error.message); setBank([]); return; }
-    setBank((data ?? []) as BankRow[]);
+
+    if (filteredTags.length === 0) { setBank([]); return; }
+
+    // Aggregate per standard: distinct question count
+    const perStd = new Map<string, { questionIds: Set<string> }>();
+    for (const t of filteredTags as any[]) {
+      const cur = perStd.get(t.standard_id) ?? { questionIds: new Set<string>() };
+      cur.questionIds.add(t.quiz_questions.id);
+      perStd.set(t.standard_id, cur);
+    }
+    const stdIds = Array.from(perStd.keys());
+
+    // 2) Pull standards metadata
+    const { data: stdRows } = await supabase
+      .from("standards")
+      .select("id, code, description, framework, subject, grade")
+      .in("id", stdIds);
+
+    // 3) Response stats — average pct correct per standard
+    const allQuestionIds = Array.from(new Set(filteredTags.map((t: any) => t.quiz_questions.id)));
+    const { data: respRows } = await supabase
+      .from("question_responses")
+      .select("question_id, points, points_possible")
+      .in("question_id", allQuestionIds);
+    const respByQ = new Map<string, { n: number; sumPct: number }>();
+    for (const r of (respRows ?? []) as any[]) {
+      const pp = Number(r.points_possible);
+      if (!pp || pp <= 0 || r.points == null) continue;
+      const pct = Math.max(0, Math.min(1, Number(r.points) / pp));
+      const cur = respByQ.get(r.question_id) ?? { n: 0, sumPct: 0 };
+      cur.n += 1; cur.sumPct += pct;
+      respByQ.set(r.question_id, cur);
+    }
+
+    const rows: BankRow[] = [];
+    for (const std of (stdRows ?? []) as any[]) {
+      const info = perStd.get(std.id);
+      if (!info) continue;
+      // Apply subject/framework filters here
+      if (subjectFilter !== "ALL" && std.subject !== subjectFilter) continue;
+      const fw = std.framework ?? "STATE";
+      if (frameworkFilter !== "ALL" && fw !== frameworkFilter) continue;
+      let n = 0, sum = 0;
+      for (const qid of info.questionIds) {
+        const r = respByQ.get(qid);
+        if (r) { n += r.n; sum += r.sumPct; }
+      }
+      rows.push({
+        standard_id: std.id,
+        code: std.code,
+        parent_code: std.code.replace(/[-.][^-.]+$/, ""),
+        description: std.description,
+        framework: fw,
+        subject: std.subject,
+        grade: std.grade,
+        tagged_question_count: info.questionIds.size,
+        response_count: n,
+        avg_pct_correct: n > 0 ? sum / n : null,
+      });
+    }
+    setBank(rows);
   }
-  useEffect(() => { loadBank(); /* eslint-disable-next-line */ }, [courseId, subjectFilter, frameworkFilter]);
+  useEffect(() => { loadBank(); /* eslint-disable-next-line */ }, [courseId, subjectFilter, frameworkFilter, statusFilter]);
 
   // --- Distinct filter options from bank rows ---
   const subjects = useMemo(() => {
@@ -142,31 +217,29 @@ export default function QuestionBank() {
     if (!selectedStandardId || !bank) { setQuestions(null); return; }
     loadQuestionsForStandard(selectedStandardId);
     // eslint-disable-next-line
-  }, [selectedStandardId, bank, courseId]);
+  }, [selectedStandardId, bank, courseId, statusFilter]);
 
   async function loadQuestionsForStandard(standardId: string) {
     setLoadingQs(true);
     setQuestions(null);
-    // Find all standard ids in the selected subtree (so clicking a parent shows its descendants too)
     const node = findNodeByStandardId(tree, standardId);
     const stdIds = collectStandardIds(node);
     if (stdIds.length === 0) { setQuestions([]); setLoadingQs(false); return; }
 
-    // 1) Confirmed question_standards joining to questions + assignments
+    // Pull tags honoring the status filter (default: all — confirmed AND ai-suggested)
     let qsQuery = supabase
       .from("question_standards")
-      .select("question_id, standard_id, standards(code, description), quiz_questions!inner(id, position, question_text, points_possible, assignment_id, assignments!inner(id, name, course_id))")
-      .eq("confirmed", true)
+      .select("question_id, standard_id, ai_suggested, confirmed, standards(code, description), quiz_questions!inner(id, position, question_text, points_possible, assignment_id, assignments!inner(id, name, course_id))")
       .in("standard_id", stdIds);
+    if (statusFilter === "CONFIRMED") qsQuery = qsQuery.eq("confirmed", true);
+    if (statusFilter === "SUGGESTED") qsQuery = qsQuery.eq("confirmed", false).eq("ai_suggested", true);
     const { data: qsRows, error: qsErr } = await qsQuery;
     if (qsErr) { toast.error(qsErr.message); setLoadingQs(false); return; }
 
-    // De-dupe by question_id + collect tag list
-    const byId = new Map<string, QuestionRow>();
+    const byId = new Map<string, QuestionRow & { _anyConfirmed: boolean }>();
     for (const t of (qsRows as any[]) ?? []) {
       const q = t.quiz_questions;
       if (!q) continue;
-      // Filter by course if needed
       if (courseId !== "ALL" && q.assignments?.course_id !== courseId) continue;
       if (!byId.has(q.id)) {
         byId.set(q.id, {
@@ -177,14 +250,20 @@ export default function QuestionBank() {
           assignment_id: q.assignment_id,
           assignments: q.assignments,
           standards: [],
+          _anyConfirmed: false,
         });
       }
+      const row = byId.get(q.id)!;
+      if (t.confirmed) row._anyConfirmed = true;
       const std = t.standards;
-      if (std) byId.get(q.id)!.standards!.push({ code: std.code, description: std.description });
+      if (std) row.standards!.push({ code: std.code, description: std.description });
     }
 
-    const list = Array.from(byId.values());
-    // 2) Per-question response stats
+    const list: QuestionRow[] = Array.from(byId.values()).map((r) => ({
+      ...r,
+      is_suggested_only: !r._anyConfirmed,
+    }));
+
     if (list.length) {
       const ids = list.map((q) => q.id);
       const { data: responses } = await supabase
@@ -207,7 +286,6 @@ export default function QuestionBank() {
       }
     }
     list.sort((a, b) => {
-      // by avg_pct asc (lowest first — highlights pain points), then by code, then position
       const ap = a.avg_pct ?? 999;
       const bp = b.avg_pct ?? 999;
       if (ap !== bp) return ap - bp;
@@ -288,6 +366,17 @@ export default function QuestionBank() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Status</label>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+              <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All tags</SelectItem>
+                <SelectItem value="SUGGESTED">AI-suggested only</SelectItem>
+                <SelectItem value="CONFIRMED">Confirmed only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1 flex-1 min-w-[220px]">
             <label className="text-xs text-muted-foreground">Search standards</label>
             <div className="relative">
@@ -360,6 +449,11 @@ export default function QuestionBank() {
                     <div className="mt-1.5 flex items-center gap-2 flex-wrap">
                       {q.assignments?.name && (
                         <Badge variant="outline" className="text-[10px]">{q.assignments.name}</Badge>
+                      )}
+                      {q.is_suggested_only && (
+                        <Badge className="text-[10px] bg-accent/15 text-accent border-accent/30 hover:bg-accent/15">
+                          <Sparkles className="h-2.5 w-2.5 mr-0.5" /> AI
+                        </Badge>
                       )}
                       {q.points_possible != null && (
                         <span className="text-[10px] text-muted-foreground">{q.points_possible} pts</span>
