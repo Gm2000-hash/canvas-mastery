@@ -221,6 +221,18 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
               {tagging ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
               AI suggest
             </Button>
+            {assignment.kind === "quiz" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={importScores}
+                disabled={importing || !assignment.canvas_quiz_id}
+                title={!assignment.canvas_quiz_id ? "No Canvas quiz linked" : "Import per-question scores from Canvas"}
+              >
+                {importing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Download className="h-3 w-3 mr-1" />}
+                Import scores
+              </Button>
+            )}
             <AddStandardDialog assignmentId={assignment.id} onAdded={onChange} />
           </div>
         </div>
