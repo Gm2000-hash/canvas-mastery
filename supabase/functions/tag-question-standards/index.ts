@@ -11,6 +11,18 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+function inferGradeFromText(text: string): string | null {
+  const t = text.toLowerCase();
+  const m1 = t.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/);
+  if (m1) return m1[1];
+  const m2 = t.match(/\bgrade\s*(\d{1,2})\b/);
+  if (m2) return m2[1];
+  const m3 = t.match(/\b(\d{1,2})\s*grade\b/);
+  if (m3) return m3[1];
+  if (/\b(kindergarten|kinder)\b/.test(t)) return "K";
+  return null;
+}
+
 type Match = { standard_code: string; confidence: number; rationale: string; keywords?: string[] };
 
 Deno.serve(async (req) => {
