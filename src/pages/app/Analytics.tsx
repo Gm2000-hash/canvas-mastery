@@ -441,7 +441,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
       subjects: Array.from(subjs).sort(),
       frameworks: Array.from(fws).sort(),
     };
-  }, [data, roster]);
+  }, [data, roster, placeholderStandards]);
 
   // Apply subject/framework filters to the standard list.
   const filteredStandards = useMemo(() => {
