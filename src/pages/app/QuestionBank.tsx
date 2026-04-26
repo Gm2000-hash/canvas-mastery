@@ -217,7 +217,7 @@ export default function QuestionBank() {
     if (!selectedStandardId || !bank) { setQuestions(null); return; }
     loadQuestionsForStandard(selectedStandardId);
     // eslint-disable-next-line
-  }, [selectedStandardId, bank, courseId]);
+  }, [selectedStandardId, bank, courseId, statusFilter]);
 
   async function loadQuestionsForStandard(standardId: string) {
     setLoadingQs(true);
