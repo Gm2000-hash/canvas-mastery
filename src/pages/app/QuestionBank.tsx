@@ -450,6 +450,11 @@ export default function QuestionBank() {
                       {q.assignments?.name && (
                         <Badge variant="outline" className="text-[10px]">{q.assignments.name}</Badge>
                       )}
+                      {q.is_suggested_only && (
+                        <Badge className="text-[10px] bg-accent/15 text-accent border-accent/30 hover:bg-accent/15">
+                          <Sparkles className="h-2.5 w-2.5 mr-0.5" /> AI
+                        </Badge>
+                      )}
                       {q.points_possible != null && (
                         <span className="text-[10px] text-muted-foreground">{q.points_possible} pts</span>
                       )}
