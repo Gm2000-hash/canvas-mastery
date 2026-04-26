@@ -1,37 +1,79 @@
-## Why "AI suggest" appears broken on ECA 8B_2025
+## The disconnect
 
-I traced the call. The edge function actually runs and returns **HTTP 200** in ~1.5s — it just returns **zero matches**, so the toast says "AI couldn't find a strong match" and nothing visible changes. Three real problems are stacking:
+The Question Bank shows nothing because **0 of your 3,531 synced quiz questions are tagged**. Two compounding problems:
 
-1. **Wrong grade level.** The course `8th Science B - Section 14` has no `discipline_id`, so the function falls back to the teacher's *default* discipline = **NGSS Grade 6**. AI then tries to match an 8th-grade quiz against grade-6 standards. (All 10 courses in this account have `discipline_id = NULL`, so this affects everything.)
-2. **Quiz body ignored.** The function only sends `assignment.name` + `assignment.description` to the AI. For this quiz the description is generic test instructions ("don't open other browser windows…"). The actual 82 stored quiz questions (~7.5K chars of real science content) are never sent — so the AI legitimately can't find ≥8 substantive overlapping keywords.
-3. **Silent failure UX.** When AI returns 0 matches the user only sees a tiny toast. Nothing on the row hints at *why*.
+1. **Tagger is too strict**: the current `tag-question-standards` calls the AI **once per question** and then *throws away* every match that doesn't include ≥ 8 distinct keywords. With Gemini Flash that filter rejects almost every match — net result, no rows ever get inserted.
+2. **UI hides AI suggestions**: `QuestionBank.tsx` only loads rows where `confirmed = true`. Even when the AI does tag a question, you'd never see it on this page until you went to Review and clicked confirm on every one.
 
-## Fix
+## Approach — port the Canvas Quiz Export tagger
 
-### 1. Smarter discipline resolution in `tag-standards` (and `tag-question-standards`)
-- Keep current order: course mapping → teacher default.
-- **Add a grade-inference step** before falling back: parse the course name/code for `7th`, `8th`, `Grade 6`, etc. If we match a number, look for a `teacher_disciplines` row for the same teacher with that grade + the default's subject/framework. If found, use it instead of the default.
-- For `8th Science B - Section 14` this picks the existing **NGSS Grade 8** discipline (59 standards) automatically.
-- Falls back to the default cleanly if no grade is detected.
+Your Canvas Quiz Export project solves the same problem with a much simpler, more reliable shape. We'll mirror it here:
 
-### 2. Include quiz question text for quiz-kind assignments
-In `tag-standards`, after loading the assignment, if `kind = 'quiz'` pull up to ~40 rows from `quiz_questions` ordered by `position`, take their `question_text`, strip HTML, and append a `QUIZ QUESTIONS:` block to the user prompt (cap at ~6000 chars to keep the request lean).
+- **Batch ~10 questions per AI call** (instead of 1) — same prompt sees more context, ~10× fewer API calls, dramatically faster.
+- **Enrich each question with answer choices** as `STEM: … / CHOICES: A) … B) …` — the choices often carry the topic vocabulary that anchors a standard ("mitochondria", "tectonic plates", etc.).
+- **Drop the 8-keyword gate.** Replace it with the lighter "matched_terms" hint (2–5 terms) used in Canvas Quiz Export, which the model reliably produces.
+- **Show AI suggestions in the Question Bank**, not just confirmed ones (with a visual "AI" badge so you can tell at a glance).
 
-### 3. Better empty-result feedback
-In `Assignments.tsx`:
-- When the response succeeds but `suggestions.length === 0`, show a more useful toast: *"AI found no strong match for grade {grade} {framework}. Try assigning a different discipline to this course in Courses, or use + Add."*
-- Return `discipline` info (already in the response) and surface the resolved grade/framework in the toast so the user immediately sees the grade-6 mismatch when it happens.
+## Changes
 
-### 4. One-time UI affordance: assign discipline per course
-Add a small "Discipline: NGSS Grade 6 (default) — change" link on the Assignments page header (next to the course selector) that opens a popover to pick from the teacher's existing disciplines and updates `courses.discipline_id`. This lets the user fix grade mappings without leaving the page. (No new tables, no migration — just an UPDATE on `courses`.)
+### 1. Rewrite `supabase/functions/tag-question-standards/index.ts`
+- Resolve discipline exactly as today (course → infer-from-name → teacher default → profile).
+- Load synced `quiz_questions` for the assignment.
+- Build sanitized text per question via a `buildTaggerText` helper (HTML strip + decode entities + append `CHOICES:` when answers exist). Note: our `quiz_questions` table currently doesn't store answer choices, so as a follow-up we'll start capturing them in `canvas-sync` (see #4); until then this still works on the stem alone.
+- Send the AI **batches of 10 questions** with the candidate standards list inlined in the system prompt (same shape as the Canvas Quiz Export `standards-tagger`).
+- Tool schema returns `tags: [{ question_id, standards: [{ code, description, matched_terms[] }] }]`.
+- Insert rows into `question_standards` as `ai_suggested = true, confirmed = false`, with rationale `"AI match · key terms: …"`.
+- Roll the union of question-level matches up to `assignment_standards` (unchanged).
+- Return `{ questions_tagged, total_question_matches, batches, discipline }`.
+
+### 2. Rewrite `supabase/functions/tag-standards/index.ts` to share the same prompt style
+- Keep the assignment-level entrypoint, but use the same batched, choice-enriched approach when the assignment is a quiz: tag each question, then roll up to assignment-level. For non-quiz assignments fall back to the current single-shot description tagging (without the 8-keyword gate).
+
+### 3. Update `src/pages/app/QuestionBank.tsx`
+- Stop filtering `question_standards` by `confirmed = true` — load both confirmed and AI-suggested rows.
+- Add a small `AI` badge on suggested-only questions so you can tell which are confirmed vs. proposed.
+- Add a "Suggested only / Confirmed only / All" toggle in the filter bar.
+- Add a "Tag this standard's questions" button on the empty-state pane that runs the new tagger across the selected course's untagged questions.
+
+### 4. Capture answer choices in `canvas-sync` (small, additive)
+- Add an `answers jsonb` column to `quiz_questions` (nullable, defaults to `null`) via migration.
+- In `canvas-sync`, when fetching `/api/v1/courses/{id}/quizzes/{qid}/questions`, persist `q.answers` (array of `{text, html}`) into the new column.
+- The tagger will use this column when present to build the `CHOICES:` block, exactly like `buildTaggerText` does in Canvas Quiz Export.
+
+## Technical details
+
+```text
+Old flow                                New flow
+────────────────                        ─────────────────────────────────
+For each Q (3,531×):                    For each batch of 10 Qs (~350×):
+  1 AI call                               1 AI call with all 10 stems+choices
+  require 8 keywords/match → drop         model returns matched_terms (2-5)
+  upsert (almost always 0 rows)          upsert ai_suggested rows
+                                         roll up to assignment_standards
+```
+
+Tool schema (matches Canvas Quiz Export):
+```ts
+{
+  name: "tag_standards",
+  parameters: { tags: [{
+    question_id: number,
+    standards: [{ code, description, matched_terms: string[] }]
+  }] }
+}
+```
+
+## Why this fixes it
+
+- The 8-keyword gate was effectively a "return nothing" filter — removing it lets actual matches land.
+- Batching cuts AI cost/latency ~10× so we can re-tag your whole 3,531-question bank in one pass.
+- Showing AI suggestions in the bank means the page populates the moment tagging finishes, instead of waiting on manual confirmation in Review.
+- Capturing answer choices gives the model the topic vocabulary it needs for vague stems ("Which of the following…").
 
 ## Files
 
-- **Edit** `supabase/functions/tag-standards/index.ts` — grade inference + quiz question fetch + include in prompt.
-- **Edit** `supabase/functions/tag-question-standards/index.ts` — same grade inference (so per-question tagging picks the right grade too).
-- **Edit** `src/pages/app/Assignments.tsx` — better empty toast; small "Discipline: … change" picker.
-
-## Out of scope (not doing now)
-
-- Bulk-assigning disciplines to all 10 existing courses automatically. The picker makes it a 2-click fix per course; auto-guessing every course feels presumptuous.
-- Changing the ≥8-keyword evidence rule. It's working as intended; the problem was inputs, not the bar.
+- **Edit**: `supabase/functions/tag-question-standards/index.ts`
+- **Edit**: `supabase/functions/tag-standards/index.ts`
+- **Edit**: `supabase/functions/canvas-sync/index.ts` (persist `answers` jsonb)
+- **Edit**: `src/pages/app/QuestionBank.tsx` (show AI suggestions + bulk re-tag)
+- **New**: migration to add `quiz_questions.answers jsonb`
