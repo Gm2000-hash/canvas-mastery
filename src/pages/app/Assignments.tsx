@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen } from "lucide-react";
+import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -16,7 +16,7 @@ type Discipline = { id: string; state: string | null; subject: string; grade: st
 
 type Assignment = {
   id: string; name: string; kind: "assignment" | "quiz"; description: string | null;
-  course_id: string; due_at: string | null;
+  course_id: string; due_at: string | null; canvas_quiz_id: number | null;
 };
 type Course = { id: string; name: string; discipline_id: string | null };
 type StandardTag = {
@@ -57,7 +57,7 @@ export default function Assignments() {
   async function loadAssignments(cid: string) {
     setAssignments(null);
     const { data: a } = await supabase
-      .from("assignments").select("id, name, kind, description, course_id, due_at")
+      .from("assignments").select("id, name, kind, description, course_id, due_at, canvas_quiz_id")
       .eq("course_id", cid).order("due_at", { ascending: false, nullsFirst: false }).order("name");
     setAssignments(a ?? []);
     if (a?.length) {
