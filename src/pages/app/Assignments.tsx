@@ -92,11 +92,25 @@ export default function Assignments() {
           <h1 className="font-display text-4xl font-semibold mb-2">Assignments</h1>
           <p className="text-muted-foreground">Tag each assignment with one or more standards.</p>
         </div>
-        <Button variant="outline" onClick={recompute} disabled={recomputing}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${recomputing ? "animate-spin" : ""}`} />
-          Recompute mastery
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCsvOpen(true)}>
+            <FileUp className="h-4 w-4 mr-2" />
+            Import CSV
+          </Button>
+          <Button variant="outline" onClick={recompute} disabled={recomputing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${recomputing ? "animate-spin" : ""}`} />
+            Recompute mastery
+          </Button>
+        </div>
       </div>
+
+      <ImportQuizCsvDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        courses={(courses ?? []).map((c) => ({ id: c.id, name: c.name }))}
+        defaultCourseId={courseId}
+        onImported={() => loadAssignments(courseId)}
+      />
 
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-sm text-muted-foreground">Course:</span>
