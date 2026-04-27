@@ -112,16 +112,41 @@ export default function Courses() {
             <Link to="/app/settings#canvas"><Button variant="outline">Set up Canvas</Button></Link>
           </CardContent>
         </Card>
+      ) : displayRows!.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <EyeOff className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <CardTitle className="font-display text-xl mb-2">All classes are hidden</CardTitle>
+            <CardDescription className="mb-4">Toggle <span className="font-medium">Show hidden</span> above to bring them back.</CardDescription>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {rows.map((c) => {
+          {displayRows!.map((c) => {
             const disc = disciplines.find((d) => d.id === c.discipline_id) ?? null;
             const effective = disc ?? defaultDisc;
             return (
-              <Card key={c.id}>
+              <Card key={c.id} className={c.hidden ? "opacity-60" : ""}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="font-display text-xl">{c.name}</CardTitle>
-                  <CardDescription>{c.course_code ?? "—"} {c.term ? `· ${c.term}` : ""}</CardDescription>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <CardTitle className="font-display text-xl flex items-center gap-2">
+                        <span className="truncate">{c.name}</span>
+                        {c.hidden && <Badge variant="outline" className="text-[9px]">hidden</Badge>}
+                      </CardTitle>
+                      <CardDescription>{c.course_code ?? "—"} {c.term ? `· ${c.term}` : ""}</CardDescription>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 shrink-0"
+                      onClick={() => toggleHidden(c.id, !c.hidden)}
+                      title={c.hidden ? "Restore class" : "Hide class"}
+                      aria-label={c.hidden ? "Restore class" : "Hide class"}
+                    >
+                      {c.hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </Button>
+                  </div>
                   <div className="pt-2">
                     <Popover>
                       <PopoverTrigger asChild>
