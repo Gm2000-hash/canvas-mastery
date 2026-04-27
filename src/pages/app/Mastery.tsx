@@ -7,6 +7,8 @@ import { Bug, RefreshCw, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRevealedNames } from "@/hooks/useRevealedNames";
+import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 
 type Course = { id: string; name: string };
 type Student = { id: string; name: string; sortable_name: string | null };
@@ -20,6 +22,7 @@ export default function Mastery() {
   const [standards, setStandards] = useState<Standard[]>([]);
   const [latestByKey, setLatestByKey] = useState<Record<string, Snap>>({});
   const [recomputing, setRecomputing] = useState(false);
+  const reveal = useRevealedNames(courseId);
 
   useEffect(() => {
     supabase.from("courses").select("id, name").order("name").then(({ data }) => {
@@ -72,7 +75,7 @@ export default function Mastery() {
     }
     setLatestByKey(map);
   }
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [courseId]);
+  useEffect(() => { load(); reveal.hide(); /* eslint-disable-next-line */ }, [courseId]);
 
   async function recompute() {
     setRecomputing(true);
@@ -112,6 +115,13 @@ export default function Mastery() {
           <Button asChild variant="ghost">
             <Link to="/app/mastery/debug"><Bug className="h-4 w-4 mr-2" /> Debug</Link>
           </Button>
+          <RevealNamesToggle
+            revealed={reveal.revealed}
+            loading={reveal.loading}
+            onReveal={reveal.reveal}
+            onHide={reveal.hide}
+            disabled={!courseId}
+          />
           <Button variant="outline" onClick={recompute} disabled={recomputing}>
             <RefreshCw className={`h-4 w-4 mr-2 ${recomputing ? "animate-spin" : ""}`} />
             Recompute
@@ -178,7 +188,7 @@ export default function Mastery() {
                 <tbody>
                   {students.map((stu) => (
                     <tr key={stu.id}>
-                      <td className="pr-3 sticky left-0 bg-card z-10 font-medium whitespace-nowrap">{stu.name}</td>
+                      <td className="pr-3 sticky left-0 bg-card z-10 font-medium whitespace-nowrap">{reveal.display(stu.id, stu.name)}</td>
                       {standards.map((s) => {
                         const snap = latestByKey[`${stu.id}::${s.id}`];
                         const v = snap?.mastery_score ?? null;
@@ -190,7 +200,7 @@ export default function Mastery() {
                                 background: v == null ? "hsl(var(--mastery-bg))" : bandColor(Number(v)),
                                 color: v == null ? "hsl(var(--muted-foreground))" : "white",
                               }}
-                              title={v == null ? "No data" : `${stu.name} — ${s.code}\n${Math.round(Number(v) * 100)}% (${snap!.attempts} attempts)`}
+                              title={v == null ? "No data" : `${reveal.display(stu.id, stu.name)} — ${s.code}\n${Math.round(Number(v) * 100)}% (${snap!.attempts} attempts)`}
                             >
                               {v == null ? "·" : Math.round(Number(v) * 100)}
                             </div>

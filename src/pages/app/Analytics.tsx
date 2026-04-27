@@ -14,6 +14,8 @@ import { ArrowLeft, ArrowRight, BarChart3, TrendingUp, GraduationCap, BookMarked
 import { Button } from "@/components/ui/button";
 import { getFramework, FRAMEWORKS } from "@/lib/frameworks";
 import { Link } from "react-router-dom";
+import { useRevealedNames } from "@/hooks/useRevealedNames";
+import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 
 type Course = { id: string; name: string };
 type Trend = { bucket_label: string; bucket_ts: string | null; framework: string; subject: string; avg_mastery: number; sample_size: number };
@@ -367,6 +369,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
   const [roster, setRoster] = useState<RosterStudent[] | null>(null);
   type PlaceholderStandard = { id: string; code: string; description: string; subject: string; framework: string };
   const [placeholderStandards, setPlaceholderStandards] = useState<PlaceholderStandard[] | null>(null);
+  const reveal = useRevealedNames(course.course_id);
 
   useEffect(() => {
     if (collapsed) return;
@@ -562,8 +565,11 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
     });
   }
 
-  const visibleStudents = students.filter((s) =>
-    !studentFilter || s.name.toLowerCase().includes(studentFilter.toLowerCase()));
+  const visibleStudents = students.filter((s) => {
+    if (!studentFilter) return true;
+    const display = reveal.display(s.id, s.name);
+    return display.toLowerCase().includes(studentFilter.toLowerCase());
+  });
 
   // CSV export of exactly what's on screen.
   function exportCsv() {
@@ -580,7 +586,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
         .map((c) => leafValue(st.id, c).score)
         .filter((s): s is number => s != null);
       const avg = studentVals.length ? (studentVals.reduce((a, b) => a + b, 0) / studentVals.length * 100).toFixed(0) : "";
-      lines.push([JSON.stringify(st.name), ...cells, avg].join(","));
+      lines.push([JSON.stringify(reveal.display(st.id, st.name)), ...cells, avg].join(","));
     });
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -647,6 +653,12 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
                 {allOpen ? "Collapse all" : "Expand all"}
               </Button>
             )}
+            <RevealNamesToggle
+              revealed={reveal.revealed}
+              loading={reveal.loading}
+              onReveal={reveal.reveal}
+              onHide={reveal.hide}
+            />
             <Button size="sm" variant="outline" onClick={exportCsv}><Download className="h-3.5 w-3.5 mr-1" />CSV</Button>
           </div>
         </div>
@@ -722,7 +734,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
                   const studentAvg = studentScores.length ? studentScores.reduce((a, b) => a + b, 0) / studentScores.length : null;
                   return (
                     <tr key={st.id} className="hover:bg-muted/30">
-                      <td className="sticky left-0 z-10 bg-card border-b border-r p-2 font-medium whitespace-nowrap">{st.name}</td>
+                      <td className="sticky left-0 z-10 bg-card border-b border-r p-2 font-medium whitespace-nowrap">{reveal.display(st.id, st.name)}</td>
                       {leafColumns.map((c) => {
                         const v = leafValue(st.id, c);
                         const label = c.kind === "parent" ? c.group.label : `${c.group.label} › ${c.childCode}`;
