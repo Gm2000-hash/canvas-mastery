@@ -47,11 +47,18 @@ function pctRaw(n: number | null | undefined) {
 
 export default function Analytics() {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [hiddenCourseIds, setHiddenCourseIds] = useState<Set<string>>(new Set());
   const [courseId, setCourseId] = useState<string>("ALL");
   const [activeDims, setActiveDims] = useState<ActiveDim[]>([]);
 
   useEffect(() => {
-    supabase.from("courses").select("id, name").order("name").then(({ data }) => setCourses(data ?? []));
+    // Only show non-hidden classes in the picker. Hidden classes are also
+    // filtered out of the Classes tab below.
+    supabase.from("courses").select("id, name, hidden").order("name").then(({ data }) => {
+      const all = (data ?? []) as Array<Course & { hidden: boolean }>;
+      setCourses(all.filter((c) => !c.hidden).map(({ id, name }) => ({ id, name })));
+      setHiddenCourseIds(new Set(all.filter((c) => c.hidden).map((c) => c.id)));
+    });
     supabase.rpc("analytics_active_dimensions").then(({ data }) => setActiveDims((data as any) ?? []));
   }, []);
 
@@ -91,7 +98,7 @@ export default function Analytics() {
           <TabsTrigger value="questions"><HelpCircle className="h-4 w-4 mr-1.5" /> Questions</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="classes"><ClassesView courseFilter={courseFilter} /></TabsContent>
+        <TabsContent value="classes"><ClassesView courseFilter={courseFilter} hiddenCourseIds={hiddenCourseIds} /></TabsContent>
         <TabsContent value="trends"><TrendsView courseId={courseFilter} subjects={subjects} /></TabsContent>
         <TabsContent value="standards"><StandardsView courseId={courseFilter} subjects={subjects} /></TabsContent>
         <TabsContent value="assignments"><AssignmentsView courseId={courseFilter} /></TabsContent>
