@@ -57,7 +57,7 @@ export default function MasteryDebug() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    supabase.from("courses").select("id, name").order("name").then(({ data }) => {
+    supabase.from("courses").select("id, name").eq("hidden", false).order("name").then(({ data }) => {
       setCourses(data ?? []);
       if (data?.length) setCourseId(data[0].id);
     });
