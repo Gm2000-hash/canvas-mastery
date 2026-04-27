@@ -123,18 +123,83 @@ Deno.serve(async (req) => {
       const courseId = courseRow!.id as string;
       syncedCourseIds.push(courseId);
 
-      // 2) Students
+      // 2) Students — pseudonymize: real names go ONLY to student_identities;
+      // the public students table stores a per-teacher "Student NNN" pseudonym.
       const students = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/students`).catch(() => []);
-      const studentRows = students.map((s) => ({
-        teacher_id: teacherId,
-        course_id: courseId,
-        canvas_user_id: s.id,
-        name: s.name ?? `Student ${s.id}`,
-        sortable_name: s.sortable_name ?? null,
-      }));
-      if (studentRows.length) {
-        const { error: sErr } = await admin.from("students").upsert(studentRows, { onConflict: "course_id,canvas_user_id" });
-        if (sErr) console.error("students upsert", sErr); else stats.students += studentRows.length;
+
+      if (students.length) {
+        // Find current max pseudonym_seq for this teacher to assign new ones
+        const { data: maxRow } = await admin
+          .from("students").select("pseudonym_seq")
+          .eq("teacher_id", teacherId)
+          .order("pseudonym_seq", { ascending: false, nullsFirst: false })
+          .limit(1).maybeSingle();
+        let nextSeq = (maxRow?.pseudonym_seq ?? 0) + 1;
+
+        // Existing students for this course/teacher (by canvas_user_id) so we
+        // preserve their existing pseudonym instead of regenerating it.
+        const canvasIds = students.map((s) => Number(s.id));
+        const { data: existingRows } = await admin
+          .from("students")
+          .select("id, canvas_user_id, pseudonym, pseudonym_seq")
+          .eq("teacher_id", teacherId)
+          .eq("course_id", courseId)
+          .in("canvas_user_id", canvasIds);
+        const existingByCanvas = new Map(
+          (existingRows ?? []).map((r) => [Number(r.canvas_user_id), r])
+        );
+
+        const studentRows: any[] = [];
+        const identityRows: any[] = [];
+
+        for (const s of students) {
+          const existing = existingByCanvas.get(Number(s.id));
+          let seq = existing?.pseudonym_seq ?? null;
+          let pseudo = existing?.pseudonym ?? null;
+          if (!pseudo) {
+            seq = nextSeq++;
+            pseudo = `Student ${String(seq).padStart(3, "0")}`;
+          }
+          studentRows.push({
+            teacher_id: teacherId,
+            course_id: courseId,
+            canvas_user_id: s.id,
+            name: pseudo,
+            sortable_name: pseudo,
+            pseudonym: pseudo,
+            pseudonym_seq: seq,
+            email: null,
+          });
+        }
+
+        const { data: upserted, error: sErr } = await admin
+          .from("students")
+          .upsert(studentRows, { onConflict: "course_id,canvas_user_id" })
+          .select("id, canvas_user_id");
+        if (sErr) {
+          console.error("students upsert", sErr);
+        } else {
+          stats.students += studentRows.length;
+          const idByCanvas = new Map((upserted ?? []).map((r) => [Number(r.canvas_user_id), r.id as string]));
+          for (const s of students) {
+            const studentId = idByCanvas.get(Number(s.id));
+            if (!studentId) continue;
+            identityRows.push({
+              student_id: studentId,
+              teacher_id: teacherId,
+              real_name: s.name ?? `Student ${s.id}`,
+              real_sortable_name: s.sortable_name ?? null,
+              email: s.email ?? s.login_id ?? null,
+              canvas_user_id: s.id,
+            });
+          }
+          if (identityRows.length) {
+            const { error: idErr } = await admin
+              .from("student_identities")
+              .upsert(identityRows, { onConflict: "student_id" });
+            if (idErr) console.error("student_identities upsert", idErr);
+          }
+        }
       }
 
       // 3) Assignments
