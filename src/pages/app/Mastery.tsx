@@ -188,7 +188,7 @@ export default function Mastery() {
                 <tbody>
                   {students.map((stu) => (
                     <tr key={stu.id}>
-                      <td className="pr-3 sticky left-0 bg-card z-10 font-medium whitespace-nowrap">{stu.name}</td>
+                      <td className="pr-3 sticky left-0 bg-card z-10 font-medium whitespace-nowrap">{reveal.display(stu.id, stu.name)}</td>
                       {standards.map((s) => {
                         const snap = latestByKey[`${stu.id}::${s.id}`];
                         const v = snap?.mastery_score ?? null;
@@ -200,7 +200,7 @@ export default function Mastery() {
                                 background: v == null ? "hsl(var(--mastery-bg))" : bandColor(Number(v)),
                                 color: v == null ? "hsl(var(--muted-foreground))" : "white",
                               }}
-                              title={v == null ? "No data" : `${stu.name} — ${s.code}\n${Math.round(Number(v) * 100)}% (${snap!.attempts} attempts)`}
+                              title={v == null ? "No data" : `${reveal.display(stu.id, stu.name)} — ${s.code}\n${Math.round(Number(v) * 100)}% (${snap!.attempts} attempts)`}
                             >
                               {v == null ? "·" : Math.round(Number(v) * 100)}
                             </div>
