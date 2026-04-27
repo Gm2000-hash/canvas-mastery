@@ -150,16 +150,50 @@ export default function Courses() {
                       </CardTitle>
                       <CardDescription>{c.course_code ?? "—"} {c.term ? `· ${c.term}` : ""}</CardDescription>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 shrink-0"
-                      onClick={() => toggleHidden(c.id, !c.hidden)}
-                      title={c.hidden ? "Restore class" : "Hide class"}
-                      aria-label={c.hidden ? "Restore class" : "Hide class"}
-                    >
-                      {c.hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            disabled={reshufflingId === c.id}
+                            title="Re-pseudonymize this class"
+                            aria-label="Re-pseudonymize this class"
+                          >
+                            {reshufflingId === c.id
+                              ? <Loader2 className="h-4 w-4 animate-spin" />
+                              : <Shuffle className="h-4 w-4" />}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Re-pseudonymize {c.name}?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Every student in this class will get a new "Student NNN" label. Mastery scores,
+                              submissions, and tags are unaffected — only the displayed pseudonym changes.
+                              Real names in the identity vault are not touched. This action is logged.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => repseudonymize(c.id)}>
+                              Reassign pseudonyms
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => toggleHidden(c.id, !c.hidden)}
+                        title={c.hidden ? "Restore class" : "Hide class"}
+                        aria-label={c.hidden ? "Restore class" : "Hide class"}
+                      >
+                        {c.hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </div>
                   <div className="pt-2">
                     <Popover>
