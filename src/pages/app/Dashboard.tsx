@@ -170,13 +170,89 @@ function StatCard({ icon: Icon, label, value }: { icon: any; label: string; valu
   );
 }
 
-function Step({ n, done, children }: { n: number; done: boolean; children: React.ReactNode }) {
+function AssignmentsList({
+  title,
+  description,
+  icon: Icon,
+  items,
+  emptyMessage,
+  mode,
+}: {
+  title: string;
+  description: string;
+  icon: any;
+  items: AssignmentItem[] | null;
+  emptyMessage: string;
+  mode: "upcoming" | "recent";
+}) {
   return (
-    <div className="flex items-center gap-3">
-      <div className={`h-6 w-6 rounded-full text-xs flex items-center justify-center font-medium ${
-        done ? "bg-mastery-high text-primary-foreground" : "bg-muted text-muted-foreground"
-      }`}>{done ? "✓" : n}</div>
-      <span className={done ? "text-muted-foreground line-through" : ""}>{children}</span>
-    </div>
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4 text-accent" />
+              <CardTitle>{title}</CardTitle>
+            </div>
+            <CardDescription className="mt-1">{description}</CardDescription>
+          </div>
+          <Link to="/app/assignments">
+            <Button variant="ghost" size="sm" className="h-8 -mr-2">
+              All <ArrowRight className="h-3 w-3 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {items === null ? (
+          <div className="text-sm text-muted-foreground py-4">Loading…</div>
+        ) : items.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-4">{emptyMessage}</div>
+        ) : (
+          <ul className="divide-y">
+            {items.map((a) => (
+              <li key={a.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Link
+                    to={`/app/assignments?course=${a.course_id}`}
+                    className="text-sm font-medium truncate block hover:underline"
+                  >
+                    {a.name}
+                  </Link>
+                  <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
+                    <span className="truncate">{a.course?.name ?? "—"}</span>
+                    {a.kind === "quiz" && <Badge variant="outline" className="text-[9px] py-0 h-4">quiz</Badge>}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground tabular-nums shrink-0 text-right">
+                  {formatDue(a.due_at, mode)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
+}
+
+function formatDue(due: string | null, mode: "upcoming" | "recent"): string {
+  if (!due) return "—";
+  const d = new Date(due);
+  const now = new Date();
+  const diffMs = d.getTime() - now.getTime();
+  const dayMs = 86400000;
+  const days = Math.round(diffMs / dayMs);
+  const datePart = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (mode === "upcoming") {
+    if (days <= 0) return `Today · ${datePart}`;
+    if (days === 1) return `Tomorrow · ${datePart}`;
+    if (days < 7) return `In ${days}d · ${datePart}`;
+    return datePart;
+  }
+  const ago = Math.abs(days);
+  if (ago === 0) return `Today · ${datePart}`;
+  if (ago === 1) return `Yesterday · ${datePart}`;
+  if (ago < 7) return `${ago}d ago · ${datePart}`;
+  return datePart;
 }
