@@ -1,10 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
-import { GraduationCap, ListChecks, BookMarked, Sparkles, RefreshCw, AlertCircle } from "lucide-react";
+import { GraduationCap, ListChecks, BookMarked, Sparkles, RefreshCw, AlertCircle, CalendarClock, CalendarCheck, ArrowRight } from "lucide-react";
 import { useSync } from "@/contexts/SyncContext";
+
+type AssignmentItem = {
+  id: string;
+  name: string;
+  kind: string;
+  due_at: string | null;
+  course_id: string;
+  course: { name: string; hidden: boolean } | null;
+};
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ courses: 0, students: 0, assignments: 0, taggedAssignments: 0, standards: 0 });
