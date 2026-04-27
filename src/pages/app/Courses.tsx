@@ -29,6 +29,16 @@ export default function Courses() {
   const [rows, setRows] = useState<CourseRow[] | null>(null);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [showHidden, setShowHidden] = useState(false);
+  const [reshufflingId, setReshufflingId] = useState<string | null>(null);
+
+  async function repseudonymize(courseId: string) {
+    setReshufflingId(courseId);
+    const { data, error } = await supabase.rpc("repseudonymize_course", { _course_id: courseId });
+    setReshufflingId(null);
+    if (error) { toast.error(error.message); return; }
+    const n = (data as any[])?.length ?? 0;
+    toast.success(`Reassigned ${n} pseudonym${n === 1 ? "" : "s"} for this class`);
+  }
 
   async function load() {
     const [{ data: courses }, { data: ds }] = await Promise.all([
