@@ -84,7 +84,17 @@ export default function Courses() {
           <h1 className="font-display text-4xl font-semibold mb-2">Courses</h1>
           <p className="text-muted-foreground">Pick which Canvas courses to track and tag each with a discipline.</p>
         </div>
-        <ImportCoursesDialog onImported={load} />
+        <div className="flex items-center gap-4">
+          {hiddenCount > 0 && (
+            <div className="flex items-center gap-2">
+              <Switch id="show-hidden" checked={showHidden} onCheckedChange={setShowHidden} />
+              <Label htmlFor="show-hidden" className="text-sm text-muted-foreground cursor-pointer">
+                Show hidden ({hiddenCount})
+              </Label>
+            </div>
+          )}
+          <ImportCoursesDialog onImported={load} />
+        </div>
       </div>
 
       {rows === null ? (
