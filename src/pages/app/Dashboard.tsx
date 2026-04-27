@@ -26,8 +26,28 @@ export default function Dashboard() {
 
   async function load() {
     const nowIso = new Date().toISOString();
+
+    // Get visible (non-hidden) course ids first so all stats exclude hidden classes.
+    const { data: visibleCourses } = await supabase
+      .from("courses").select("id").eq("hidden", false);
+    const visibleIds = (visibleCourses ?? []).map((c) => c.id);
+    const hasVisible = visibleIds.length > 0;
+
+    const studentsQ = hasVisible
+      ? supabase.from("students").select("id", { count: "exact", head: true }).in("course_id", visibleIds)
+      : Promise.resolve({ count: 0 } as any);
+    const assignmentsQ = hasVisible
+      ? supabase.from("assignments").select("id", { count: "exact", head: true }).in("course_id", visibleIds)
+      : Promise.resolve({ count: 0 } as any);
+    const taggedQ = hasVisible
+      ? supabase
+          .from("assignment_standards")
+          .select("assignment_id, assignments!inner(course_id)", { count: "exact", head: true })
+          .eq("confirmed", true)
+          .in("assignments.course_id", visibleIds)
+      : Promise.resolve({ count: 0 } as any);
+
     const [
-      { count: courses },
       { count: students },
       { count: assignments },
       { count: tagged },
@@ -37,10 +57,9 @@ export default function Dashboard() {
       { data: up },
       { data: rc },
     ] = await Promise.all([
-      supabase.from("courses").select("id", { count: "exact", head: true }),
-      supabase.from("students").select("id", { count: "exact", head: true }),
-      supabase.from("assignments").select("id", { count: "exact", head: true }),
-      supabase.from("assignment_standards").select("assignment_id", { count: "exact", head: true }).eq("confirmed", true),
+      studentsQ,
+      assignmentsQ,
+      taggedQ,
       supabase.from("standards").select("id", { count: "exact", head: true }),
       supabase.rpc("get_canvas_connection_status"),
       supabase.from("profiles").select("state, default_subject, default_grade").maybeSingle(),
@@ -60,7 +79,7 @@ export default function Dashboard() {
         .limit(20),
     ]);
     setStats({
-      courses: courses ?? 0,
+      courses: visibleIds.length,
       students: students ?? 0,
       assignments: assignments ?? 0,
       taggedAssignments: tagged ?? 0,
