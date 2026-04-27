@@ -7,6 +7,8 @@ import { Bug, RefreshCw, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRevealedNames } from "@/hooks/useRevealedNames";
+import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 
 type Course = { id: string; name: string };
 type Student = { id: string; name: string; sortable_name: string | null };
