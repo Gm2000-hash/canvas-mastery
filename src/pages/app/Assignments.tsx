@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen, Download } from "lucide-react";
+import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen, Download, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
 
 type Discipline = { id: string; state: string | null; subject: string; grade: string; framework: string | null; is_default: boolean };
 
@@ -32,6 +33,7 @@ export default function Assignments() {
   const [tagsByAssignment, setTagsByAssignment] = useState<Record<string, StandardTag[]>>({});
   const [recomputing, setRecomputing] = useState(false);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [csvOpen, setCsvOpen] = useState(false);
 
   const currentCourse = useMemo(() => (courses ?? []).find((c) => c.id === courseId) ?? null, [courses, courseId]);
   const effectiveDiscipline = useMemo(() => {
@@ -90,11 +92,25 @@ export default function Assignments() {
           <h1 className="font-display text-4xl font-semibold mb-2">Assignments</h1>
           <p className="text-muted-foreground">Tag each assignment with one or more standards.</p>
         </div>
-        <Button variant="outline" onClick={recompute} disabled={recomputing}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${recomputing ? "animate-spin" : ""}`} />
-          Recompute mastery
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCsvOpen(true)}>
+            <FileUp className="h-4 w-4 mr-2" />
+            Import CSV
+          </Button>
+          <Button variant="outline" onClick={recompute} disabled={recomputing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${recomputing ? "animate-spin" : ""}`} />
+            Recompute mastery
+          </Button>
+        </div>
       </div>
+
+      <ImportQuizCsvDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        courses={(courses ?? []).map((c) => ({ id: c.id, name: c.name }))}
+        defaultCourseId={courseId}
+        onImported={() => loadAssignments(courseId)}
+      />
 
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-sm text-muted-foreground">Course:</span>

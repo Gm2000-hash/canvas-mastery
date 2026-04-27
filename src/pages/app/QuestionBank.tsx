@@ -12,11 +12,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Library, Search, ChevronRight, ChevronDown, Sparkles, Download, Loader2,
-  ExternalLink, BookOpen, AlertCircle,
+  ExternalLink, BookOpen, AlertCircle, FileUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
 
 type BankRow = {
   standard_id: string;
@@ -73,6 +74,7 @@ export default function QuestionBank() {
   const [importResults, setImportResults] = useState<
     { name: string; status: "ok" | "skipped" | "error"; responses: number; reason?: string }[] | null
   >(null);
+  const [csvOpen, setCsvOpen] = useState(false);
 
   // --- Load courses ---
   useEffect(() => {
@@ -334,11 +336,25 @@ export default function QuestionBank() {
             Every imported quiz question, organized by the standards (and substandards) it assesses.
           </p>
         </div>
-        <Button onClick={importAllScores} disabled={importing}>
-          {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-          Import quiz scores
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCsvOpen(true)}>
+            <FileUp className="h-4 w-4 mr-2" />
+            Import CSV
+          </Button>
+          <Button onClick={importAllScores} disabled={importing}>
+            {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            Import quiz scores
+          </Button>
+        </div>
       </div>
+
+      <ImportQuizCsvDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        courses={courses}
+        defaultCourseId={courseId !== "ALL" ? courseId : undefined}
+        onImported={() => { loadBank(); if (selectedStandardId) loadQuestionsForStandard(selectedStandardId); }}
+      />
 
       {/* Filter bar */}
       <Card>

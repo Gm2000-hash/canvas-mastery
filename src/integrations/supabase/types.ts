@@ -448,6 +448,7 @@ export type Database = {
           canvas_user_id: number
           course_id: string
           created_at: string
+          email: string | null
           id: string
           name: string
           sortable_name: string | null
@@ -457,6 +458,7 @@ export type Database = {
           canvas_user_id: number
           course_id: string
           created_at?: string
+          email?: string | null
           id?: string
           name: string
           sortable_name?: string | null
@@ -466,6 +468,7 @@ export type Database = {
           canvas_user_id?: number
           course_id?: string
           created_at?: string
+          email?: string | null
           id?: string
           name?: string
           sortable_name?: string | null
