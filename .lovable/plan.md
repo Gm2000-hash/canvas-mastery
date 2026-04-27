@@ -1,68 +1,121 @@
-## Goal
+# CSV Quiz Score Importer
 
-Enable teachers to import per-student, per-question scores for their quizzes and have those scores attribute correctly to the standard / substandard each question is tagged with — so the Question Bank, Mastery, and Analytics views all reflect real student performance at the standard level.
+Add a one-shot CSV importer for per-student, per-question quiz scores that lands in the same tables as the Canvas pipeline — so Question Bank, Mastery, and Analytics all light up the same way. Bake AI auto-tagging and mastery recompute into the import flow so it's one click end-to-end.
 
-The Canvas → `question_responses` pipeline already exists. The missing pieces are: (a) easier ways to trigger the import (whole course, selected quizzes, single quiz), (b) honoring AI-suggested tags during mastery rollup so teachers see signal immediately, (c) auto-recompute after import, and (d) clearer per-quiz progress feedback.
+## What you'll be able to do
 
-## What you'll be able to do after this
+1. From **Assignments** (and **Question Bank**), click **"Import quiz from CSV"**.
+2. Pick the **course** the quiz belongs to and (optionally) name the quiz.
+3. Upload a CSV. The importer detects two layouts automatically:
+   - **Long format** — one row per (student, question, score). Columns like `student_email | student_name | question | points | points_possible | correct`.
+   - **Wide format** — one row per student; first columns identify the student, every remaining column is a question (header = question text, cell = points earned). A second header row with points-possible is detected if present.
+4. Preview a parsed sample (first 5 students × 5 questions) with detected column mapping. Adjust mappings if needed.
+5. Two checkboxes, both **on by default**:
+   - **Auto-tag new questions with AI** — runs `tag-question-standards` after import.
+   - **Recompute mastery when finished** — runs `recompute-mastery`.
+6. Click **Import**. Progress bar shows: Parsing → Matching students → Writing responses → AI tagging → Recomputing mastery → Done. Final summary shows counts and any skipped rows.
 
-1. **From Question Bank** — "Import quiz scores" works for *all* courses (not just one), shows a per-quiz progress summary, and auto-recomputes mastery when finished.
-2. **From Assignments** — every quiz row gets an "Import scores" button so you can pull a single quiz's scores without bulk-importing.
-3. **Mastery & Question Bank percentages** populate using both *confirmed* and *AI-suggested* question→standard tags, with confirmed weighted higher. Once you confirm tags later, the numbers strengthen but never disappear.
-4. **Per-question class %** in the Question Bank reflects the freshly imported scores immediately, broken out by standard and substandard via the existing tree.
+After import, the new quiz appears under the chosen course on the Assignments page (kind = `quiz`, no `canvas_quiz_id`). Question Bank shows the new questions tagged to standards. Mastery and Analytics reflect the scores.
 
 ## Approach
 
-### 1. Mastery rollup honors AI-suggested tags (edge function: `recompute-mastery`)
+### 1. New edge function: `import-quiz-csv`
 
-Currently `recompute-mastery` filters question→standard tags with `confirmed = true`, so until a teacher confirms each tag, imported scores never appear in mastery. Change it to:
+Single endpoint that does the whole pipeline server-side. Body:
 
-- Include any tag where `confirmed = true OR ai_suggested = true`.
-- Weight each response by the tag's confidence: `weight = confirmed ? 1.0 : (confidence ?? 0.5)`.
-- Compute per-(student, standard) mastery as a confidence-weighted average of the most recent `attempt_window` responses.
-- Same fallback to assignment-grain submissions when a standard has no question signal.
+```
+{
+  course_id: string,                  // required
+  quiz_name: string,                  // required (defaults to filename)
+  due_at?: string,                    // optional ISO date
+  layout: "long" | "wide",
+  mapping: {                          // for "long"
+    student_email?: string,
+    student_name?: string,
+    question_text?: string,
+    points?: string,
+    points_possible?: string,
+    correct?: string,
+  } | {                               // for "wide"
+    student_email?: string,
+    student_name?: string,
+    points_possible_row?: number,     // optional row index for per-question points possible
+  },
+  rows: Array<Record<string, string>>,// already parsed on the client
+  options: { auto_tag: boolean, recompute: boolean }
+}
+```
 
-This means imported scores show up immediately, and confirming tags later just sharpens the numbers.
+Pipeline:
 
-### 2. Bulk import across all courses (edge function: `canvas-sync-question-scores`)
+1. **Create or reuse the assignment.** Match on `(teacher_id, course_id, name, kind='quiz', canvas_assignment_id=0)` — for CSV imports we use a synthetic negative `canvas_assignment_id` (e.g. `-hash(teacher+course+name)`) so the existing unique constraint is satisfied without colliding with Canvas IDs. If a row already exists, reuse it.
+2. **Upsert `quiz_questions`.** One row per unique question text in the CSV. Match on `(teacher_id, assignment_id, canvas_question_id)` where `canvas_question_id` is also synthetic (negative hash of the normalized question text scoped to the assignment). Store `position` based on column order. New questions get `points_possible` from the wide-format header row, the `points_possible` column in long format, or `null`.
+3. **Match students.** For each unique `(email, name)`:
+   - Try `students` rows in this `course_id` by email if a `student_email` column exists *and* an existing student has been written there before (we don't currently store email — see migration below).
+   - Else match by case-insensitive `name`.
+   - Else create a new `students` row with synthetic negative `canvas_user_id` (hash of `lower(email||name)`).
+4. **Insert `question_responses`.** For each (student, question) cell with a value: parse `points` and `points_possible`, derive `correct` if both present (`points >= points_possible`) or take the explicit `correct` column. Upsert by `(teacher_id, question_id, student_id)`.
+5. **Optional: AI tagging.** If `options.auto_tag`, call `tag-question-standards` for the new assignment, but only for questions that are not already linked via text-match (so we save AI calls on duplicates that already inherit standards from other quizzes).
+6. **Optional: recompute.** If `options.recompute`, fetch-invoke `recompute-mastery` server-to-server with the teacher's auth header.
+7. Return: `{ assignment_id, stats: { questions_created, students_matched, students_created, responses_written, questions_skipped, ai_tagged }, recompute?: {...} }`.
 
-Today the function requires `course_id` or `assignment_ids`. Add an "all my courses" path:
+### 2. Small DB migration
 
-- If neither filter is provided, sync every quiz assignment owned by the teacher that has `canvas_quiz_id` set.
-- Keep the existing per-quiz result array so the UI can show which quizzes succeeded / were skipped / failed.
-- After successful upserts to `question_responses`, invoke `recompute-mastery` internally (server-to-server) so the teacher doesn't have to click a second button.
+- Add `email text` to `students` (nullable, indexed by `(teacher_id, lower(email))`). Lets future CSV imports match students reliably across courses.
+- Relax the existing unique constraint on `assignments.canvas_assignment_id` to be unique per `(teacher_id, course_id, canvas_assignment_id)` if it isn't already, so synthetic negative IDs don't collide across teachers/courses. (Inspect first; only add if needed.)
+- Same for `quiz_questions.canvas_question_id` → unique per `(teacher_id, assignment_id, canvas_question_id)`.
 
-### 3. Question Bank UI updates (`src/pages/app/QuestionBank.tsx`)
+### 3. New UI: `ImportQuizCsvDialog.tsx`
 
-- "Import quiz scores" button works whether course filter is "All my courses" or a specific course (drop the current "Pick a course first" guard).
-- After import, show a compact summary toast plus an inline collapsible card listing each quiz with its status (✓ N responses / skipped: reason / error).
-- Show a small "Last imported: <timestamp>" hint based on `canvas_credentials.last_sync_at` (read via the existing RPC) — purely informational.
+Reusable dialog component. Steps:
 
-### 4. Per-quiz import on Assignments page (`src/pages/app/Assignments.tsx`)
+```text
+Step 1: Course + name + file picker
+Step 2: Layout detection + column mapping preview
+Step 3: Options (auto-tag, recompute) + Import button
+Step 4: Progress + final summary
+```
 
-- For rows where `kind === "quiz"`, add an "Import scores" button next to "AI suggest" / "+ Add".
-- Calls `canvas-sync-question-scores` with `{ assignment_ids: [a.id] }`, then triggers `recompute-mastery` and toasts the response count.
-- Disabled when the quiz has no `canvas_quiz_id` (assignment-only).
+CSV parsing happens **client-side** with a tiny dependency-free parser (handles quoted fields, commas, newlines, BOM). Send the parsed `rows` array to the edge function so we don't need to handle multipart uploads.
 
-### 5. Small data-quality fix
+Layout detection heuristic:
+- If a column is named like `question`, `item`, `score`, `points`, the file is **long**.
+- Otherwise, if the first 1–3 columns look like student identifiers (`name`, `email`, `student`, `id`) and the rest are arbitrary text, it's **wide**.
+- User can override.
 
-In `canvas-sync-question-scores`, when an answer has `points = null` but the submission is graded and the question is single-correct (`question_type` like `multiple_choice_question`/`true_false_question`), keep `correct = null` rather than guessing — current behavior is fine, just verify by checking a couple of recent rows after a real import.
+### 4. Wire-up
+
+- **`src/pages/app/Assignments.tsx`** — add an **"Import CSV"** button in the page header (next to existing actions). Opens the dialog with the current course pre-selected if a course filter is active. After success, refresh the assignments list.
+- **`src/pages/app/QuestionBank.tsx`** — add an **"Import CSV"** button next to the existing "Import quiz scores" button. After success, refresh the bank and any open standard.
+- **`src/contexts/SyncContext.tsx`** — if there's a global "syncing" indicator, surface CSV imports there too (optional, only if the context already supports arbitrary tasks).
+
+### 5. Edge cases handled
+
+- **Duplicate student names** in a course → match by email if present, otherwise warn in the summary and skip the ambiguous rows.
+- **Empty cells** in wide format → skipped (no response written), not treated as 0.
+- **Non-numeric scores** → the response is skipped and listed in `questions_skipped`.
+- **Re-import** of the same CSV → idempotent because we upsert on synthetic IDs; scores get overwritten with the latest values.
+- **Very large files** → cap at 5,000 responses per request in the UI; if larger, the dialog suggests splitting (we can add chunked uploads later if it becomes a real problem).
+- **Question text matching** with existing tagged questions still works — the importer writes raw question text to `quiz_questions.question_text`, and the existing normalization in `recompute-mastery` and `mastery_debug` handles the matching.
 
 ## Technical details
 
+**Files added**
+- `supabase/functions/import-quiz-csv/index.ts` — the pipeline above.
+- `src/components/ImportQuizCsvDialog.tsx` — multi-step dialog with client-side CSV parsing.
+- `supabase/migrations/<ts>_csv_import_support.sql` — `students.email` column + index, plus any constraint relaxations confirmed necessary after inspecting current indexes.
+
 **Files changed**
+- `src/pages/app/Assignments.tsx` — add "Import CSV" header button.
+- `src/pages/app/QuestionBank.tsx` — add "Import CSV" button next to existing import.
 
-- `supabase/functions/recompute-mastery/index.ts` — include `ai_suggested` tags, add confidence weighting, keep assignment-grain fallback unchanged.
-- `supabase/functions/canvas-sync-question-scores/index.ts` — allow "no filter = all teacher quizzes"; after successful imports, fetch-invoke `recompute-mastery` with the teacher's auth header; return both stats and the recompute summary.
-- `src/pages/app/QuestionBank.tsx` — remove course-required guard on import; render per-quiz results panel; refresh bank + selected standard after import.
-- `src/pages/app/Assignments.tsx` — add per-quiz "Import scores" action; call `canvas-sync-question-scores` and then `recompute-mastery`.
+**No changes** to `recompute-mastery` or `tag-question-standards` — both already work on any `quiz_questions` rows regardless of source.
 
-**No DB migration required** — `question_responses`, `question_standards`, and `mastery_snapshots` already have the columns we need.
+**Auth** — `import-quiz-csv` requires JWT; uses the service role internally for upserts (to bypass per-row RLS round-trips) but always scopes every write to `teacher_id = auth.uid()` from the validated JWT.
 
-**Edge function auth** — `canvas-sync-question-scores` and `recompute-mastery` already require JWT. Server-to-server invoke from `canvas-sync-question-scores` will forward the teacher's `Authorization` header.
+## Out of scope
 
-## Out of scope (not changing now)
-
-- New Question Bank columns (e.g. per-student breakdown per question) — the drawer already shows class average and response count; we can add a student list later if you want.
-- Quiz score sync for non-Classic Quizzes (New Quizzes / LTI). The current Canvas API path is Classic Quizzes only; New Quizzes would need a separate integration.
-- Changing the `analytics_question_bank` RPC — the bank UI already aggregates client-side and includes AI-suggested rows.
+- **Direct Google Forms API** integration (still planned as a follow-on; CSV unlocks Forms today via "Download responses → CSV" from Forms).
+- **CSV export** of existing scores.
+- **Student roster CSV import** independent of a quiz (could come later by reusing the student-matching logic).
+- **Per-question standard hints in the CSV** (e.g. a `standard_code` column) — easy to add later; for now AI tagging covers it.
