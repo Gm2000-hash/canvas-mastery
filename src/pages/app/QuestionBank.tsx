@@ -12,11 +12,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Library, Search, ChevronRight, ChevronDown, Sparkles, Download, Loader2,
-  ExternalLink, BookOpen, AlertCircle,
+  ExternalLink, BookOpen, AlertCircle, FileUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
 
 type BankRow = {
   standard_id: string;
