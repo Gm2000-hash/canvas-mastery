@@ -226,7 +226,12 @@ function ClassesView({ courseFilter }: { courseFilter: string | null }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    supabase.rpc("analytics_class_breakdown").then(({ data }) => setRows((data as any) ?? []));
+    supabase.rpc("analytics_class_breakdown").then(({ data }) => {
+      const list = (data as any as ClassRow[]) ?? [];
+      setRows(list);
+      // Default to collapsed: hide every class table until the user opens it.
+      setCollapsed(new Set(list.map((r) => r.course_id)));
+    });
   }, []);
 
   // Honor the global course filter at the top of the page.
