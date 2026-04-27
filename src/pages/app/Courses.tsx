@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, ExternalLink, Tag } from "lucide-react";
+import { GraduationCap, ExternalLink, Tag, Eye, EyeOff } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { ImportCoursesDialog } from "@/components/ImportCoursesDialog";
 import { toast } from "sonner";
 
@@ -15,16 +17,18 @@ type Discipline = { id: string; state: string; subject: string; grade: string; i
 type CourseRow = {
   id: string; name: string; course_code: string | null; term: string | null; last_synced_at: string | null;
   discipline_id: string | null;
+  hidden: boolean;
   studentCount: number; assignmentCount: number;
 };
 
 export default function Courses() {
   const [rows, setRows] = useState<CourseRow[] | null>(null);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [showHidden, setShowHidden] = useState(false);
 
   async function load() {
     const [{ data: courses }, { data: ds }] = await Promise.all([
-      supabase.from("courses").select("id, name, course_code, term, last_synced_at, discipline_id").order("name"),
+      supabase.from("courses").select("id, name, course_code, term, last_synced_at, discipline_id, hidden").order("name"),
       supabase.from("teacher_disciplines").select("id, state, subject, grade, is_default").order("created_at"),
     ]);
     setDisciplines((ds ?? []) as Discipline[]);
@@ -53,7 +57,25 @@ export default function Courses() {
     }
   }
 
+  async function toggleHidden(courseId: string, hidden: boolean) {
+    // Optimistic flip; teachers can hide a class to remove it from the
+    // Courses grid and the Analytics scope without losing data.
+    setRows((prev) => prev?.map((r) => (r.id === courseId ? { ...r, hidden } : r)) ?? prev);
+    const { error } = await supabase.from("courses").update({ hidden }).eq("id", courseId);
+    if (error) {
+      toast.error(error.message);
+      load();
+    } else {
+      toast.success(hidden ? "Class hidden" : "Class restored");
+    }
+  }
+
   const defaultDisc = disciplines.find((d) => d.is_default) ?? null;
+  const hiddenCount = useMemo(() => (rows ?? []).filter((r) => r.hidden).length, [rows]);
+  const displayRows = useMemo(() => {
+    if (!rows) return rows;
+    return showHidden ? rows : rows.filter((r) => !r.hidden);
+  }, [rows, showHidden]);
 
   return (
     <div className="space-y-8">
@@ -62,7 +84,17 @@ export default function Courses() {
           <h1 className="font-display text-4xl font-semibold mb-2">Courses</h1>
           <p className="text-muted-foreground">Pick which Canvas courses to track and tag each with a discipline.</p>
         </div>
-        <ImportCoursesDialog onImported={load} />
+        <div className="flex items-center gap-4">
+          {hiddenCount > 0 && (
+            <div className="flex items-center gap-2">
+              <Switch id="show-hidden" checked={showHidden} onCheckedChange={setShowHidden} />
+              <Label htmlFor="show-hidden" className="text-sm text-muted-foreground cursor-pointer">
+                Show hidden ({hiddenCount})
+              </Label>
+            </div>
+          )}
+          <ImportCoursesDialog onImported={load} />
+        </div>
       </div>
 
       {rows === null ? (
@@ -80,16 +112,41 @@ export default function Courses() {
             <Link to="/app/settings#canvas"><Button variant="outline">Set up Canvas</Button></Link>
           </CardContent>
         </Card>
+      ) : displayRows!.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <EyeOff className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <CardTitle className="font-display text-xl mb-2">All classes are hidden</CardTitle>
+            <CardDescription className="mb-4">Toggle <span className="font-medium">Show hidden</span> above to bring them back.</CardDescription>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {rows.map((c) => {
+          {displayRows!.map((c) => {
             const disc = disciplines.find((d) => d.id === c.discipline_id) ?? null;
             const effective = disc ?? defaultDisc;
             return (
-              <Card key={c.id}>
+              <Card key={c.id} className={c.hidden ? "opacity-60" : ""}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="font-display text-xl">{c.name}</CardTitle>
-                  <CardDescription>{c.course_code ?? "—"} {c.term ? `· ${c.term}` : ""}</CardDescription>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <CardTitle className="font-display text-xl flex items-center gap-2">
+                        <span className="truncate">{c.name}</span>
+                        {c.hidden && <Badge variant="outline" className="text-[9px]">hidden</Badge>}
+                      </CardTitle>
+                      <CardDescription>{c.course_code ?? "—"} {c.term ? `· ${c.term}` : ""}</CardDescription>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 shrink-0"
+                      onClick={() => toggleHidden(c.id, !c.hidden)}
+                      title={c.hidden ? "Restore class" : "Hide class"}
+                      aria-label={c.hidden ? "Restore class" : "Hide class"}
+                    >
+                      {c.hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </Button>
+                  </div>
                   <div className="pt-2">
                     <Popover>
                       <PopoverTrigger asChild>

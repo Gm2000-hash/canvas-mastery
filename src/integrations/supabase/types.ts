@@ -148,6 +148,7 @@ export type Database = {
           course_code: string | null
           created_at: string
           discipline_id: string | null
+          hidden: boolean
           id: string
           last_synced_at: string | null
           name: string
@@ -159,6 +160,7 @@ export type Database = {
           course_code?: string | null
           created_at?: string
           discipline_id?: string | null
+          hidden?: boolean
           id?: string
           last_synced_at?: string | null
           name: string
@@ -170,6 +172,7 @@ export type Database = {
           course_code?: string | null
           created_at?: string
           discipline_id?: string | null
+          hidden?: boolean
           id?: string
           last_synced_at?: string | null
           name?: string
