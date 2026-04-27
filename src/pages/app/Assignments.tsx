@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen, Download } from "lucide-react";
+import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen, Download, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
 
 type Discipline = { id: string; state: string | null; subject: string; grade: string; framework: string | null; is_default: boolean };
 
