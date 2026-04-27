@@ -74,6 +74,7 @@ export default function QuestionBank() {
   const [importResults, setImportResults] = useState<
     { name: string; status: "ok" | "skipped" | "error"; responses: number; reason?: string }[] | null
   >(null);
+  const [csvOpen, setCsvOpen] = useState(false);
 
   // --- Load courses ---
   useEffect(() => {
