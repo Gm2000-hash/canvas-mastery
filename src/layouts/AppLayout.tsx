@@ -37,12 +37,12 @@ export default function AppLayout() {
 
   return (
     <SyncProvider>
-    <div className="min-h-screen flex bg-paper">
+    <div className="min-h-screen flex bg-paper p-4 gap-4">
       <SyncStatusPill />
-      <aside className="w-60 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col">
+      <aside className="w-64 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col rounded-[1.75rem] shadow-soft border border-sidebar-border">
         <Link to="/app" className="px-6 py-6 border-b border-sidebar-border">
-          <div className="font-display text-2xl font-semibold text-sidebar-foreground">StandardsTrack</div>
-          <div className="text-xs text-sidebar-foreground/60 mt-1">Mastery for Canvas teachers</div>
+          <div className="font-display text-2xl text-sidebar-foreground">StandardsTrack</div>
+          <div className="text-xs text-sidebar-foreground/60 mt-1 font-medium">Mastery for Canvas teachers</div>
         </Link>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {nav.map((item) => (
@@ -52,10 +52,10 @@ export default function AppLayout() {
               end={item.end}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                  "flex items-center gap-3 px-4 py-2.5 rounded-full text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                    : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 )
               }
             >
@@ -69,7 +69,7 @@ export default function AppLayout() {
           <Button
             variant="secondary"
             size="sm"
-            className="w-full"
+            className="w-full rounded-full"
             onClick={async () => {
               await supabase.auth.signOut();
               navigate("/auth", { replace: true });
@@ -79,7 +79,7 @@ export default function AppLayout() {
           </Button>
         </div>
       </aside>
-      <main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0 bg-card rounded-[1.75rem] shadow-soft border overflow-hidden">
         <div className="max-w-6xl mx-auto px-8 py-10">
           <Outlet />
         </div>
