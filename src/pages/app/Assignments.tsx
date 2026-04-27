@@ -33,6 +33,7 @@ export default function Assignments() {
   const [tagsByAssignment, setTagsByAssignment] = useState<Record<string, StandardTag[]>>({});
   const [recomputing, setRecomputing] = useState(false);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [csvOpen, setCsvOpen] = useState(false);
 
   const currentCourse = useMemo(() => (courses ?? []).find((c) => c.id === courseId) ?? null, [courses, courseId]);
   const effectiveDiscipline = useMemo(() => {
