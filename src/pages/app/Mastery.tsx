@@ -22,6 +22,7 @@ export default function Mastery() {
   const [standards, setStandards] = useState<Standard[]>([]);
   const [latestByKey, setLatestByKey] = useState<Record<string, Snap>>({});
   const [recomputing, setRecomputing] = useState(false);
+  const reveal = useRevealedNames(courseId);
 
   useEffect(() => {
     supabase.from("courses").select("id, name").order("name").then(({ data }) => {
