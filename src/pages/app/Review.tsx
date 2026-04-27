@@ -94,9 +94,11 @@ export default function Review() {
       supabase.from("assignments").select("id, name, kind, course_id, due_at, description"),
       supabase.from("standards").select("id, code, description, state, subject, grade").order("code").limit(2000),
     ]);
+    const visibleCourseIds = new Set(((cs ?? []) as Course[]).map((c) => c.id));
+    const visibleAssignments = ((a ?? []) as Assignment[]).filter((x) => visibleCourseIds.has(x.course_id));
     setCourses((cs ?? []) as Course[]);
     setDisciplines((ds ?? []) as Discipline[]);
-    setAssignments((a ?? []) as Assignment[]);
+    setAssignments(visibleAssignments);
     setAllStandards((stds ?? []) as any);
 
     if ((a ?? []).length) {
