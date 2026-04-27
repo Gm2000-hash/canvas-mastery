@@ -14,6 +14,8 @@ import { ArrowLeft, ArrowRight, BarChart3, TrendingUp, GraduationCap, BookMarked
 import { Button } from "@/components/ui/button";
 import { getFramework, FRAMEWORKS } from "@/lib/frameworks";
 import { Link } from "react-router-dom";
+import { useRevealedNames } from "@/hooks/useRevealedNames";
+import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 
 type Course = { id: string; name: string };
 type Trend = { bucket_label: string; bucket_ts: string | null; framework: string; subject: string; avg_mastery: number; sample_size: number };
@@ -367,6 +369,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
   const [roster, setRoster] = useState<RosterStudent[] | null>(null);
   type PlaceholderStandard = { id: string; code: string; description: string; subject: string; framework: string };
   const [placeholderStandards, setPlaceholderStandards] = useState<PlaceholderStandard[] | null>(null);
+  const reveal = useRevealedNames(course.course_id);
 
   useEffect(() => {
     if (collapsed) return;
