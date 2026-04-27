@@ -24,10 +24,11 @@ type CourseRow = {
 export default function Courses() {
   const [rows, setRows] = useState<CourseRow[] | null>(null);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [showHidden, setShowHidden] = useState(false);
 
   async function load() {
     const [{ data: courses }, { data: ds }] = await Promise.all([
-      supabase.from("courses").select("id, name, course_code, term, last_synced_at, discipline_id").order("name"),
+      supabase.from("courses").select("id, name, course_code, term, last_synced_at, discipline_id, hidden").order("name"),
       supabase.from("teacher_disciplines").select("id, state, subject, grade, is_default").order("created_at"),
     ]);
     setDisciplines((ds ?? []) as Discipline[]);
@@ -56,7 +57,25 @@ export default function Courses() {
     }
   }
 
+  async function toggleHidden(courseId: string, hidden: boolean) {
+    // Optimistic flip; teachers can hide a class to remove it from the
+    // Courses grid and the Analytics scope without losing data.
+    setRows((prev) => prev?.map((r) => (r.id === courseId ? { ...r, hidden } : r)) ?? prev);
+    const { error } = await supabase.from("courses").update({ hidden }).eq("id", courseId);
+    if (error) {
+      toast.error(error.message);
+      load();
+    } else {
+      toast.success(hidden ? "Class hidden" : "Class restored");
+    }
+  }
+
   const defaultDisc = disciplines.find((d) => d.is_default) ?? null;
+  const hiddenCount = useMemo(() => (rows ?? []).filter((r) => r.hidden).length, [rows]);
+  const displayRows = useMemo(() => {
+    if (!rows) return rows;
+    return showHidden ? rows : rows.filter((r) => !r.hidden);
+  }, [rows, showHidden]);
 
   return (
     <div className="space-y-8">
