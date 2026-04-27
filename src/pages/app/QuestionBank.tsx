@@ -336,11 +336,25 @@ export default function QuestionBank() {
             Every imported quiz question, organized by the standards (and substandards) it assesses.
           </p>
         </div>
-        <Button onClick={importAllScores} disabled={importing}>
-          {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-          Import quiz scores
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCsvOpen(true)}>
+            <FileUp className="h-4 w-4 mr-2" />
+            Import CSV
+          </Button>
+          <Button onClick={importAllScores} disabled={importing}>
+            {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            Import quiz scores
+          </Button>
+        </div>
       </div>
+
+      <ImportQuizCsvDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        courses={courses}
+        defaultCourseId={courseId !== "ALL" ? courseId : undefined}
+        onImported={() => { loadBank(); if (selectedStandardId) loadQuestionsForStandard(selectedStandardId); }}
+      />
 
       {/* Filter bar */}
       <Card>
