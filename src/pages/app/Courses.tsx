@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, ExternalLink, Tag } from "lucide-react";
+import { GraduationCap, ExternalLink, Tag, Eye, EyeOff } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { ImportCoursesDialog } from "@/components/ImportCoursesDialog";
 import { toast } from "sonner";
 
@@ -15,6 +17,7 @@ type Discipline = { id: string; state: string; subject: string; grade: string; i
 type CourseRow = {
   id: string; name: string; course_code: string | null; term: string | null; last_synced_at: string | null;
   discipline_id: string | null;
+  hidden: boolean;
   studentCount: number; assignmentCount: number;
 };
 
