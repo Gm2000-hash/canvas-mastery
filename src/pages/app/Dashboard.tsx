@@ -136,20 +136,24 @@ export default function Dashboard() {
         </CardHeader>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Next steps</CardTitle>
-          <CardDescription>Recommended workflow.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <Step n={1} done={profileReady === true}>Set your state, subject and grade in Settings.</Step>
-          <Step n={2} done={canvasConnected === true}>Connect your Canvas API token.</Step>
-          <Step n={3} done={stats.courses > 0}>Sync to import your courses & students.</Step>
-          <Step n={4} done={stats.standards > 0}>Seed your state standards (Settings → Standards).</Step>
-          <Step n={5} done={stats.taggedAssignments > 0}>Tag assignments with standards (AI suggests, you confirm).</Step>
-          <Step n={6} done={false}>View student-level mastery in the Mastery tab.</Step>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AssignmentsList
+          title="Upcoming assessments"
+          description="Due next, soonest first."
+          icon={CalendarClock}
+          items={upcoming}
+          emptyMessage="Nothing on the calendar yet."
+          mode="upcoming"
+        />
+        <AssignmentsList
+          title="Recent assessments"
+          description="Most recently due."
+          icon={CalendarCheck}
+          items={recent}
+          emptyMessage="No past assessments yet."
+          mode="recent"
+        />
+      </div>
     </div>
   );
 }
