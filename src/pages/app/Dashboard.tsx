@@ -20,10 +20,23 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ courses: 0, students: 0, assignments: 0, taggedAssignments: 0, standards: 0 });
   const [canvasConnected, setCanvasConnected] = useState<boolean | null>(null);
   const [profileReady, setProfileReady] = useState<boolean | null>(null);
+  const [upcoming, setUpcoming] = useState<AssignmentItem[] | null>(null);
+  const [recent, setRecent] = useState<AssignmentItem[] | null>(null);
   const { syncing, runCanvasSync } = useSync();
 
   async function load() {
-    const [{ count: courses }, { count: students }, { count: assignments }, { count: tagged }, { count: standards }, { data: ccRows }, { data: profile }] = await Promise.all([
+    const nowIso = new Date().toISOString();
+    const [
+      { count: courses },
+      { count: students },
+      { count: assignments },
+      { count: tagged },
+      { count: standards },
+      { data: ccRows },
+      { data: profile },
+      { data: up },
+      { data: rc },
+    ] = await Promise.all([
       supabase.from("courses").select("id", { count: "exact", head: true }),
       supabase.from("students").select("id", { count: "exact", head: true }),
       supabase.from("assignments").select("id", { count: "exact", head: true }),
@@ -31,6 +44,20 @@ export default function Dashboard() {
       supabase.from("standards").select("id", { count: "exact", head: true }),
       supabase.rpc("get_canvas_connection_status"),
       supabase.from("profiles").select("state, default_subject, default_grade").maybeSingle(),
+      // Upcoming: due in the future, soonest first.
+      supabase
+        .from("assignments")
+        .select("id, name, kind, due_at, course_id, course:courses!inner(name, hidden)")
+        .gte("due_at", nowIso)
+        .order("due_at", { ascending: true })
+        .limit(20),
+      // Recent: due in the past, most recent first.
+      supabase
+        .from("assignments")
+        .select("id, name, kind, due_at, course_id, course:courses!inner(name, hidden)")
+        .lt("due_at", nowIso)
+        .order("due_at", { ascending: false })
+        .limit(20),
     ]);
     setStats({
       courses: courses ?? 0,
@@ -42,6 +69,11 @@ export default function Dashboard() {
     const cc = Array.isArray(ccRows) ? ccRows[0] : null;
     setCanvasConnected(!!cc?.connected);
     setProfileReady(!!(profile?.state && profile?.default_subject && profile?.default_grade));
+    // Drop assignments whose course has been hidden, then keep top 5 of each.
+    const filterVisible = (rows: any[] | null) =>
+      ((rows ?? []) as AssignmentItem[]).filter((a) => a.course && !a.course.hidden).slice(0, 5);
+    setUpcoming(filterVisible(up));
+    setRecent(filterVisible(rc));
   }
 
   useEffect(() => {
