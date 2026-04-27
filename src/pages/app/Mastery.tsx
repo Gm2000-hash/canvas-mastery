@@ -75,7 +75,7 @@ export default function Mastery() {
     }
     setLatestByKey(map);
   }
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [courseId]);
+  useEffect(() => { load(); reveal.hide(); /* eslint-disable-next-line */ }, [courseId]);
 
   async function recompute() {
     setRecomputing(true);
@@ -115,6 +115,13 @@ export default function Mastery() {
           <Button asChild variant="ghost">
             <Link to="/app/mastery/debug"><Bug className="h-4 w-4 mr-2" /> Debug</Link>
           </Button>
+          <RevealNamesToggle
+            revealed={reveal.revealed}
+            loading={reveal.loading}
+            onReveal={reveal.reveal}
+            onHide={reveal.hide}
+            disabled={!courseId}
+          />
           <Button variant="outline" onClick={recompute} disabled={recomputing}>
             <RefreshCw className={`h-4 w-4 mr-2 ${recomputing ? "animate-spin" : ""}`} />
             Recompute
