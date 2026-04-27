@@ -101,8 +101,8 @@ export default function Review() {
     setAssignments(visibleAssignments);
     setAllStandards((stds ?? []) as any);
 
-    if ((a ?? []).length) {
-      const ids = (a ?? []).map((x) => x.id);
+    if (visibleAssignments.length) {
+      const ids = visibleAssignments.map((x) => x.id);
       const [{ data: tags }, { data: qs }] = await Promise.all([
         supabase
           .from("assignment_standards")
