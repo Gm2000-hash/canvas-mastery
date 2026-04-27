@@ -189,6 +189,33 @@ export type Database = {
           },
         ]
       }
+      identity_reveals: {
+        Row: {
+          course_id: string | null
+          id: string
+          reason: string | null
+          revealed_at: string
+          student_count: number
+          teacher_id: string
+        }
+        Insert: {
+          course_id?: string | null
+          id?: string
+          reason?: string | null
+          revealed_at?: string
+          student_count?: number
+          teacher_id: string
+        }
+        Update: {
+          course_id?: string | null
+          id?: string
+          reason?: string | null
+          revealed_at?: string
+          student_count?: number
+          teacher_id?: string
+        }
+        Relationships: []
+      }
       mastery_snapshots: {
         Row: {
           attempts: number
@@ -446,6 +473,39 @@ export type Database = {
         }
         Relationships: []
       }
+      student_identities: {
+        Row: {
+          canvas_user_id: number | null
+          created_at: string
+          email: string | null
+          real_name: string
+          real_sortable_name: string | null
+          student_id: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          canvas_user_id?: number | null
+          created_at?: string
+          email?: string | null
+          real_name: string
+          real_sortable_name?: string | null
+          student_id: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          canvas_user_id?: number | null
+          created_at?: string
+          email?: string | null
+          real_name?: string
+          real_sortable_name?: string | null
+          student_id?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       students: {
         Row: {
           canvas_user_id: number
@@ -454,6 +514,8 @@ export type Database = {
           email: string | null
           id: string
           name: string
+          pseudonym: string | null
+          pseudonym_seq: number | null
           sortable_name: string | null
           teacher_id: string
         }
@@ -464,6 +526,8 @@ export type Database = {
           email?: string | null
           id?: string
           name: string
+          pseudonym?: string | null
+          pseudonym_seq?: number | null
           sortable_name?: string | null
           teacher_id: string
         }
@@ -474,6 +538,8 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string
+          pseudonym?: string | null
+          pseudonym_seq?: number | null
           sortable_name?: string | null
           teacher_id?: string
         }
@@ -584,18 +650,24 @@ export type Database = {
         Row: {
           attempt_window: number
           mastery_threshold: number
+          pseudonym_style: string
+          reveal_default: boolean
           teacher_id: string
           updated_at: string
         }
         Insert: {
           attempt_window?: number
           mastery_threshold?: number
+          pseudonym_style?: string
+          reveal_default?: boolean
           teacher_id: string
           updated_at?: string
         }
         Update: {
           attempt_window?: number
           mastery_threshold?: number
+          pseudonym_style?: string
+          reveal_default?: boolean
           teacher_id?: string
           updated_at?: string
         }
@@ -779,6 +851,15 @@ export type Database = {
           question_text: string
           source: string
           weight: number
+        }[]
+      }
+      reveal_student_identities: {
+        Args: { _course_id: string; _reason?: string }
+        Returns: {
+          email: string
+          real_name: string
+          real_sortable_name: string
+          student_id: string
         }[]
       }
     }
