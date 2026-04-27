@@ -853,6 +853,14 @@ export type Database = {
           weight: number
         }[]
       }
+      repseudonymize_course: {
+        Args: { _course_id: string }
+        Returns: {
+          new_pseudonym: string
+          old_pseudonym: string
+          student_id: string
+        }[]
+      }
       reveal_student_identities: {
         Args: { _course_id: string; _reason?: string }
         Returns: {
