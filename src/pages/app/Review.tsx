@@ -89,18 +89,20 @@ export default function Review() {
   async function loadAll() {
     setLoading(true);
     const [{ data: cs }, { data: ds }, { data: a }, { data: stds }] = await Promise.all([
-      supabase.from("courses").select("id, name, discipline_id").order("name"),
+      supabase.from("courses").select("id, name, discipline_id").eq("hidden", false).order("name"),
       supabase.from("teacher_disciplines").select("id, state, subject, grade").order("created_at"),
       supabase.from("assignments").select("id, name, kind, course_id, due_at, description"),
       supabase.from("standards").select("id, code, description, state, subject, grade").order("code").limit(2000),
     ]);
+    const visibleCourseIds = new Set(((cs ?? []) as Course[]).map((c) => c.id));
+    const visibleAssignments = ((a ?? []) as Assignment[]).filter((x) => visibleCourseIds.has(x.course_id));
     setCourses((cs ?? []) as Course[]);
     setDisciplines((ds ?? []) as Discipline[]);
-    setAssignments((a ?? []) as Assignment[]);
+    setAssignments(visibleAssignments);
     setAllStandards((stds ?? []) as any);
 
-    if ((a ?? []).length) {
-      const ids = (a ?? []).map((x) => x.id);
+    if (visibleAssignments.length) {
+      const ids = visibleAssignments.map((x) => x.id);
       const [{ data: tags }, { data: qs }] = await Promise.all([
         supabase
           .from("assignment_standards")

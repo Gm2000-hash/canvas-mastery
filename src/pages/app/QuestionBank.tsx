@@ -78,7 +78,7 @@ export default function QuestionBank() {
 
   // --- Load courses ---
   useEffect(() => {
-    supabase.from("courses").select("id, name").order("name").then(({ data }) => {
+    supabase.from("courses").select("id, name").eq("hidden", false).order("name").then(({ data }) => {
       setCourses((data ?? []) as Course[]);
     });
   }, []);

@@ -43,7 +43,8 @@ export default function Assignments() {
   }, [currentCourse, disciplines]);
 
   async function loadCourses() {
-    const { data } = await supabase.from("courses").select("id, name, discipline_id").order("name");
+    // Hidden classes are excluded everywhere except the Courses page itself.
+    const { data } = await supabase.from("courses").select("id, name, discipline_id").eq("hidden", false).order("name");
     setCourses((data as Course[]) ?? []);
     if (!courseId && data?.length) setCourseId(data[0].id);
   }
