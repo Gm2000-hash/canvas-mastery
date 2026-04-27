@@ -755,6 +755,26 @@ export type Database = {
           teacher_id: string
         }[]
       }
+      mastery_debug: {
+        Args: { _standard_id: string; _student_id: string }
+        Returns: {
+          ai_suggested: boolean
+          assignment_id: string
+          assignment_name: string
+          confidence: number
+          confirmed: boolean
+          matched_via_question_id: string
+          occurred_at: string
+          pct: number
+          points: number
+          points_possible: number
+          question_id: string
+          question_position: number
+          question_text: string
+          source: string
+          weight: number
+        }[]
+      }
     }
     Enums: {
       assignment_kind: "assignment" | "quiz"

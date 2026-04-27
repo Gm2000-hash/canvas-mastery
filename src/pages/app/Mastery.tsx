@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, Sparkles } from "lucide-react";
+import { Bug, RefreshCw, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -107,10 +108,15 @@ export default function Mastery() {
           <h1 className="font-display text-4xl font-semibold mb-2">Mastery</h1>
           <p className="text-muted-foreground">Per-student mastery on each standard tagged in this course.</p>
         </div>
-        <Button variant="outline" onClick={recompute} disabled={recomputing}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${recomputing ? "animate-spin" : ""}`} />
-          Recompute
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="ghost">
+            <Link to="/app/mastery/debug"><Bug className="h-4 w-4 mr-2" /> Debug</Link>
+          </Button>
+          <Button variant="outline" onClick={recompute} disabled={recomputing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${recomputing ? "animate-spin" : ""}`} />
+            Recompute
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
