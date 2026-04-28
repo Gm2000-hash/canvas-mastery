@@ -1,67 +1,49 @@
-# Add Canvas New Quizzes support to sync
+# First-login onboarding nudge
 
-Today the sync only collects question text, answer choices, and per-item correctness for **Classic Quizzes**. New Quizzes (the LTI-based replacement that most Canvas instances are migrating to) live behind a different API and are silently skipped. This plan closes that gap so item-level mastery works for both quiz engines.
+New teachers (especially friends invited by code) hit the dashboard cold and have to figure out the order of operations themselves: pick a discipline → connect Canvas → import courses → assign disciplines to courses. This adds a lightweight, dismissible 3-step checklist that walks them through exactly that sequence on the dashboard until they've completed it.
 
 ## What changes for the user
 
-- After connecting Canvas and running a sync, **New Quizzes assignments** will populate the Question Bank just like Classic Quizzes do today.
-- Per-question correctness for New Quiz submissions flows into `question_responses`, so item-level mastery, AI tagging, and analytics all work for New Quizzes.
-- Quizzes the API can't reach (e.g., a Canvas instance that hasn't enabled the New Quizzes API for the teacher's token) are reported as **skipped** in the back-fill report rather than failing the whole sync.
+- After signing up and reaching `/app`, a **"Get started"** card appears at the top of the dashboard with three checkable steps:
+  1. **Pick what you teach** → links to Settings → Disciplines tab; check turns green once they have at least one discipline.
+  2. **Connect Canvas** → links to Settings → Canvas tab; check turns green once `canvas_credentials` is connected.
+  3. **Import your courses** → opens the Import Courses dialog; check turns green once they have at least one non-hidden course.
+- Each step shows a one-line "why this matters" under it.
+- Once all three are done (or the user clicks "Dismiss"), the card disappears and never comes back.
+- A small "Show getting started" link in the dashboard footer area lets them re-open it if they dismissed it accidentally.
 
 ## Technical approach
 
-### 1. Detect New Quizzes during the assignments pass
-Canvas marks New Quiz assignments with `is_quiz_lti_assignment: true` (no `quiz_id`). Update `canvas-sync/index.ts` to:
-- Tag those rows as `kind = "quiz"` (already covered if we extend the conditional).
-- Store `canvas_quiz_id = a.id` (New Quizzes use the **assignment id** as the quiz id) and add a new column to distinguish engines.
+### State storage
+- Add one column to `profiles`: `onboarding_dismissed_at timestamptz` (nullable). When the user dismisses or auto-completes, we set this. Card hidden whenever non-null.
+- Step completion is **derived live** (no extra columns) by querying:
+  - `teacher_disciplines` count for the user
+  - `canvas_credentials` connected flag (already exposed via `get_canvas_connection_status` RPC)
+  - non-hidden, non-archived `courses` count
 
-### 2. Schema migration
-Add to `assignments`:
-- `quiz_engine text` — `'classic' | 'new' | null`. Lets us route per-question fetches to the right endpoint and lets the UI badge them.
+### New component
+`src/components/OnboardingChecklist.tsx`
+- Card with three numbered rows, each row showing: status icon (circle / check), title, subtitle, action button.
+- Loads all three signals in parallel on mount.
+- Subscribes to a tiny refresh trigger (re-fetches when the dashboard regains focus / on a window-level "onboarding-refresh" event) so checks update immediately after the user completes a step in another tab.
+- "Dismiss" button writes `onboarding_dismissed_at = now()` to profile.
 
-Add to `quiz_questions`:
-- `item_type text` — New Quizzes expose richer types (`choice`, `multi-answer`, `true-false`, `matching`, `categorization`, `ordering`, `essay`, `file-upload`, `numeric`, `formula`, `hot-spot`, `stimulus`). We store the raw type so the AI tagger and UI can reason about format.
+### Dashboard integration
+`src/pages/app/Dashboard.tsx`
+- Renders `<OnboardingChecklist />` at the top, conditionally on:
+  `profile.onboarding_dismissed_at == null`
+- Footer link "Show getting started" clears `onboarding_dismissed_at` to `null`.
 
-### 3. Fetch New Quiz items
-In `canvas-sync/index.ts`, after the existing Classic block, add a New Quizzes block:
-- Endpoint: `GET /api/quiz/v1/courses/:course_id/quizzes/:assignment_id/items` (paginated).
-- Map each item to a `quiz_questions` row:
-  - `canvas_question_id = item.id`
-  - `question_text` = stripped/trimmed `entry.item_body`
-  - `points_possible = item.points_possible`
-  - `answers` = normalized choices pulled from `entry.interaction_data` (shape varies by `interaction_type`; we'll handle `choice`, `multi-answer`, `true-false`, `matching`, `categorization`, `ordering` — others store `null`).
-  - `item_type = entry.interaction_type`
-
-Failures (404, 401, instance with API disabled) are caught per-quiz and reported, never fatal.
-
-### 4. Per-question scores for New Quizzes
-Extend `canvas-sync-question-scores/index.ts`:
-- For assignments where `quiz_engine = 'new'`, call `GET /api/quiz/v1/courses/:course_id/quizzes/:assignment_id/submissions` to list submissions, then `GET /api/quiz/v1/courses/:course_id/quizzes/:assignment_id/submissions/:submission_id/results` to get per-item scoring (`scored_items[]` with `item_id`, `score`, `score_given`, `score_maximum`).
-- Map `item_id` → internal `quiz_questions.id` and upsert into `question_responses` (same shape used today: `correct` derived from `score_given >= score_maximum`, `points`, `points_possible`).
-- Reuse existing student-id resolution by `canvas_user_id`.
-
-### 5. Surface results
-- `BackfillReportDialog` already shows `question_scores.quizzes` and `responses` counts. Extend the report to break those down by engine (`classic` vs `new`) and list any quizzes skipped because the New Quizzes API was unavailable on the teacher's instance.
-
-### 6. UI touch-ups
-- `QuestionBank.tsx`: small badge next to each question/quiz showing engine (`Classic` / `New`).
-- `Assignments.tsx`: same badge on quiz rows.
-No behavior changes beyond labeling.
-
-## Files to add / edit
+## Files
 
 ```text
-supabase/migrations/<new>_new_quizzes_support.sql      (new)  – add quiz_engine, item_type
-supabase/functions/canvas-sync/index.ts                 (edit) – new-quiz items pass + engine tag
-supabase/functions/canvas-sync-question-scores/index.ts (edit) – new-quiz results pass
-src/components/BackfillReportDialog.tsx                 (edit) – engine breakdown + skipped list
-src/pages/app/QuestionBank.tsx                          (edit) – engine badge
-src/pages/app/Assignments.tsx                           (edit) – engine badge
-src/integrations/supabase/types.ts                      (auto) – regenerated by migration
+supabase/migrations/<new>_onboarding_dismissed.sql       (new)
+src/components/OnboardingChecklist.tsx                    (new)
+src/pages/app/Dashboard.tsx                                (edit)
+src/integrations/supabase/types.ts                         (auto)
 ```
 
-## Caveats worth flagging
+## Notes
 
-- **API availability**: Some Canvas instances disable the New Quizzes public API for non-admin tokens. We surface this clearly in the back-fill report; the user may need to ask their Canvas admin to enable it.
-- **Essay / file-upload / hot-spot items**: We store the prompt and point value but cannot store a meaningful "answer choices" payload — `answers` will be `null`. Item-level correctness still works because Canvas returns the score either way.
-- **Rate limits**: New Quizzes endpoints are per-quiz and per-submission, so a course with many New Quizzes will add HTTP calls. We keep the existing per-call try/catch so a single slow quiz never blocks the rest.
+- No edge functions needed — pure client-side reads against existing RLS.
+- The card is informational only; it never blocks navigation, so power users can still ignore it.

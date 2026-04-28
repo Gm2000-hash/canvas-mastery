@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { GraduationCap, ListChecks, BookMarked, Sparkles, RefreshCw, AlertCircle, CalendarClock, CalendarCheck, ArrowRight } from "lucide-react";
 import { useSync } from "@/contexts/SyncContext";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 
 type AssignmentItem = {
   id: string;
@@ -115,6 +116,8 @@ export default function Dashboard() {
         <p className="text-muted-foreground">An at-a-glance look at your classes and standards coverage.</p>
       </div>
 
+      <OnboardingChecklist onChange={load} />
+
       {needsSetup && (
         <Card className="border-accent/40 bg-accent/5">
           <CardHeader>
@@ -172,6 +175,23 @@ export default function Dashboard() {
           emptyMessage="No past assessments yet."
           mode="recent"
         />
+      </div>
+
+      <div className="pt-2 text-center">
+        <button
+          type="button"
+          className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+          onClick={async () => {
+            const { data: u } = await supabase.auth.getUser();
+            if (!u.user) return;
+            await supabase.from("profiles")
+              .update({ onboarding_dismissed_at: null })
+              .eq("id", u.user.id);
+            window.dispatchEvent(new Event("onboarding:refresh"));
+          }}
+        >
+          Show getting started checklist
+        </button>
       </div>
     </div>
   );
