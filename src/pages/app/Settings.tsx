@@ -142,7 +142,23 @@ export default function Settings() {
     if (error) toast.error(error.message); else toast.success("Settings saved");
   }
 
-  // ----- Disciplines (multi) -----
+  async function updateAutoArchive(next: boolean) {
+    setAutoArchive(next); // optimistic
+    setSavingArchive(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) { setSavingArchive(false); return; }
+    const { error } = await supabase.from("teacher_settings").upsert({
+      teacher_id: u.user.id,
+      auto_archive_enabled: next,
+    });
+    setSavingArchive(false);
+    if (error) {
+      setAutoArchive(!next);
+      toast.error(error.message);
+    } else {
+      toast.success(next ? "Auto-archive enabled" : "Auto-archive disabled");
+    }
+  }
   async function addDisciplines() {
     const fw = getFramework(newFramework);
     if (!fw.national && !newState) { toast.error("Pick a state"); return; }
