@@ -116,6 +116,8 @@ export default function Dashboard() {
         <p className="text-muted-foreground">An at-a-glance look at your classes and standards coverage.</p>
       </div>
 
+      <OnboardingChecklist onChange={load} />
+
       {needsSetup && (
         <Card className="border-accent/40 bg-accent/5">
           <CardHeader>
