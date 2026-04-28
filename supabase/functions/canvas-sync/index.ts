@@ -217,12 +217,18 @@ Deno.serve(async (req) => {
 
       // 3) Assignments
       const assignments = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/assignments`).catch(() => []);
-      const aRows = assignments.map((a) => ({
+      const aRows = assignments.map((a) => {
+        const isClassicQuiz = !!a.quiz_id;
+        const isNewQuiz = !!a.is_quiz_lti_assignment && !isClassicQuiz;
+        const isQuiz = isClassicQuiz || isNewQuiz || !!a.is_quiz_assignment;
+        return {
         teacher_id: teacherId,
         course_id: courseId,
         canvas_assignment_id: a.id,
-        canvas_quiz_id: a.quiz_id ?? null,
-        kind: (a.is_quiz_assignment || a.quiz_id) ? "quiz" : "assignment",
+        // For New Quizzes, Canvas uses the assignment id as the quiz id in /api/quiz/v1
+        canvas_quiz_id: isClassicQuiz ? a.quiz_id : (isNewQuiz ? a.id : null),
+        kind: isQuiz ? "quiz" : "assignment",
+        quiz_engine: isClassicQuiz ? "classic" : (isNewQuiz ? "new" : null),
         name: a.name ?? `Assignment ${a.id}`,
         description: a.description ? String(a.description).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000) : null,
         points_possible: a.points_possible ?? null,
