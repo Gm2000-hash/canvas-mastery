@@ -111,6 +111,9 @@ Deno.serve(async (req) => {
         course_code: c.course_code ?? null,
         term: c.term?.name ?? null,
         last_synced_at: new Date().toISOString(),
+        // NEW: capture Canvas archive signals (used by run_auto_archive)
+        canvas_workflow_state: c.workflow_state ?? null,
+        end_at: c.end_at ?? null,
       };
       // Only set discipline_id when caller explicitly provided one (allows null to clear)
       if (overrideDiscipline !== undefined) upsertRow.discipline_id = overrideDiscipline;
@@ -126,6 +129,14 @@ Deno.serve(async (req) => {
       // 2) Students — pseudonymize: real names go ONLY to student_identities;
       // the public students table stores a per-teacher "Student NNN" pseudonym.
       const students = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/students`).catch(() => []);
+      // Also pull enrollments so we can capture each student's enrollment_state for auto-archive.
+      const enrollments = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/enrollments?type[]=StudentEnrollment&state[]=active&state[]=completed&state[]=inactive`).catch(() => []);
+      const enrollmentByUserId = new Map<number, string>();
+      for (const e of enrollments) {
+        if (e?.user_id != null && typeof e.enrollment_state === "string") {
+          enrollmentByUserId.set(Number(e.user_id), e.enrollment_state);
+        }
+      }
 
       if (students.length) {
         // Find current max pseudonym_seq for this teacher to assign new ones
@@ -169,6 +180,8 @@ Deno.serve(async (req) => {
             pseudonym: pseudo,
             pseudonym_seq: seq,
             email: null,
+            // NEW: enrollment state for auto-archive
+            enrollment_state: enrollmentByUserId.get(Number(s.id)) ?? "active",
           });
         }
 
@@ -323,7 +336,17 @@ Deno.serve(async (req) => {
       console.warn("question-score helper unavailable:", (e as Error).message);
     }
 
-    return new Response(JSON.stringify({ success: true, stats, question_scores: questionScores }), {
+    // 6) Auto-archive: roll any course whose Canvas state + school year both indicate "done"
+    let archived = { courses_archived: 0, students_archived: 0 };
+    try {
+      const { data: archResult, error: archErr } = await admin.rpc("run_auto_archive", { _teacher_id: teacherId });
+      if (archErr) console.warn("run_auto_archive failed:", archErr.message);
+      else if (Array.isArray(archResult) && archResult[0]) archived = archResult[0] as typeof archived;
+    } catch (e) {
+      console.warn("run_auto_archive call failed:", (e as Error).message);
+    }
+
+    return new Response(JSON.stringify({ success: true, stats, question_scores: questionScores, archived }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
