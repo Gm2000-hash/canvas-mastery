@@ -72,6 +72,16 @@ Deno.serve(async (req) => {
       "/api/v1/courses?enrollment_type=teacher&include[]=term&include[]=total_students&state[]=available&state[]=completed&state[]=unpublished",
     );
 
+    // Compute school year label (July 1 → June 9 next year) from the best-available date
+    function schoolYearLabel(iso: string | null | undefined): string | null {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      return m >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+    }
+
     // Cross-reference with already imported
     const { data: existing } = await admin
       .from("courses").select("canvas_course_id, discipline_id").eq("teacher_id", teacherId);
