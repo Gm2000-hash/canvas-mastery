@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Download, Loader2, RefreshCw, Search } from "lucide-react";
+import { Download, History as HistoryIcon, Loader2, RefreshCw, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useSync } from "@/contexts/SyncContext";
+import { currentSchoolYearLabel } from "@/lib/schoolYear";
 
 type CanvasCourse = {
   canvas_course_id: number;
@@ -20,13 +21,25 @@ type CanvasCourse = {
   term: string | null;
   workflow_state: string | null;
   total_students: number | null;
+  end_at: string | null;
+  school_year: string | null;
   already_imported: boolean;
   current_discipline_id: string | null;
 };
 
 type Discipline = { id: string; state: string; subject: string; grade: string; is_default: boolean };
 
-export function ImportCoursesDialog({ onImported }: { onImported?: () => void }) {
+type Props = {
+  onImported?: () => void;
+  /** "all" = standard import; "backfill" = focus on previous school years. */
+  mode?: "all" | "backfill";
+  /** Custom trigger button. Defaults to a primary "Import courses" button. */
+  trigger?: React.ReactNode;
+};
+
+const ANY = "__any__";
+
+export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [courses, setCourses] = useState<CanvasCourse[] | null>(null);
@@ -34,7 +47,13 @@ export function ImportCoursesDialog({ onImported }: { onImported?: () => void })
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [disciplineByCourse, setDisciplineByCourse] = useState<Record<number, string>>({});
   const [filter, setFilter] = useState("");
+  const [yearFilter, setYearFilter] = useState<string>(ANY);
+  const [hideAlreadyImported, setHideAlreadyImported] = useState(mode === "backfill");
+  const [pastOnly, setPastOnly] = useState(mode === "backfill");
   const { syncing: importing, runCanvasSync } = useSync();
+
+  const isBackfill = mode === "backfill";
+  const currentYear = useMemo(() => currentSchoolYearLabel(), []);
 
   async function load() {
     setLoading(true);
@@ -49,14 +68,12 @@ export function ImportCoursesDialog({ onImported }: { onImported?: () => void })
     if ((listRes.data as any)?.error) { toast.error((listRes.data as any).error); return; }
     const list = ((listRes.data as any)?.courses ?? []) as CanvasCourse[];
     setCourses(list);
-    // Pre-fill discipline picks from existing imports + default
     const defaultDisc = (ds ?? []).find((d) => d.is_default)?.id ?? "";
     const map: Record<number, string> = {};
     for (const c of list) {
       map[c.canvas_course_id] = c.current_discipline_id ?? defaultDisc;
     }
     setDisciplineByCourse(map);
-    // Pre-select already imported courses for convenience? No — leave selection empty.
     setSelected(new Set());
   }
 
@@ -81,8 +98,6 @@ export function ImportCoursesDialog({ onImported }: { onImported?: () => void })
       canvas_course_id: cid,
       discipline_id: disciplineByCourse[cid] || null,
     }));
-    // Close immediately — the global sync pill keeps the user informed
-    // and the sync continues even if they navigate away.
     setOpen(false);
     onImported?.();
     await runCanvasSync({
@@ -92,26 +107,59 @@ export function ImportCoursesDialog({ onImported }: { onImported?: () => void })
     onImported?.();
   }
 
-  const filtered = (courses ?? []).filter((c) => {
-    if (!filter.trim()) return true;
-    const q = filter.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(q) ||
-      (c.course_code ?? "").toLowerCase().includes(q) ||
-      (c.term ?? "").toLowerCase().includes(q)
-    );
-  });
+  // Available school years across all courses, newest first
+  const yearOptions = useMemo(() => {
+    const years = new Set<string>();
+    for (const c of courses ?? []) if (c.school_year) years.add(c.school_year);
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [courses]);
+
+  const filtered = useMemo(() => {
+    return (courses ?? []).filter((c) => {
+      if (hideAlreadyImported && c.already_imported) return false;
+      if (pastOnly && c.school_year && c.school_year === currentYear) return false;
+      if (yearFilter !== ANY && c.school_year !== yearFilter) return false;
+      if (!filter.trim()) return true;
+      const q = filter.toLowerCase();
+      return (
+        c.name.toLowerCase().includes(q) ||
+        (c.course_code ?? "").toLowerCase().includes(q) ||
+        (c.term ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [courses, filter, yearFilter, hideAlreadyImported, pastOnly, currentYear]);
+
+  // Group filtered courses by school year for back-fill view
+  const grouped = useMemo(() => {
+    const map = new Map<string, CanvasCourse[]>();
+    for (const c of filtered) {
+      const key = c.school_year ?? "Unknown year";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(c);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filtered]);
+
+  const defaultTrigger = isBackfill ? (
+    <Button variant="outline">
+      <HistoryIcon className="h-4 w-4 mr-2" /> Back-fill previous classes
+    </Button>
+  ) : (
+    <Button><Download className="h-4 w-4 mr-2" /> Import courses</Button>
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button><Download className="h-4 w-4 mr-2" /> Import courses</Button>
-      </DialogTrigger>
+      <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Import courses from Canvas</DialogTitle>
+          <DialogTitle>
+            {isBackfill ? "Back-fill previous classes" : "Import courses from Canvas"}
+          </DialogTitle>
           <DialogDescription>
-            Pick which Canvas courses to track and which discipline they belong to. You can change this later on the Courses page.
+            {isBackfill
+              ? "Pull in concluded Canvas courses to back-fill student data — past assignments, submissions, and quiz responses are imported and tied to each student's longitudinal record."
+              : "Pick which Canvas courses to track and which discipline they belong to. You can change this later on the Courses page."}
           </DialogDescription>
         </DialogHeader>
 
@@ -121,74 +169,134 @@ export function ImportCoursesDialog({ onImported }: { onImported?: () => void })
           </div>
         )}
 
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter by name, code, or term…" className="pl-7 h-8" />
           </div>
-          <Button size="sm" variant="ghost" onClick={() => selectAllVisible(filtered)}>Select all visible</Button>
+          <Select value={yearFilter} onValueChange={setYearFilter}>
+            <SelectTrigger className="h-8 w-[170px] text-xs"><SelectValue placeholder="School year" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY}>All school years</SelectItem>
+              {yearOptions.map((y) => (
+                <SelectItem key={y} value={y}>{y}{y === currentYear ? " (current)" : ""}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            variant={pastOnly ? "secondary" : "ghost"}
+            onClick={() => setPastOnly((v) => !v)}
+            title="Hide courses from the current school year"
+          >
+            Past years only
+          </Button>
+          <Button
+            size="sm"
+            variant={hideAlreadyImported ? "secondary" : "ghost"}
+            onClick={() => setHideAlreadyImported((v) => !v)}
+          >
+            Hide already imported
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => selectAllVisible(filtered)}>Select visible</Button>
           <Button size="sm" variant="ghost" onClick={clearSelection}>Clear</Button>
           <Button size="sm" variant="ghost" onClick={load} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? "animate-spin" : ""}`} /> Reload
           </Button>
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto border rounded-md divide-y">
+        <div className="max-h-[50vh] overflow-y-auto border rounded-md">
           {loading || courses === null ? (
             <div className="p-3 space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-12" />)}</div>
           ) : filtered.length === 0 ? (
-            <div className="p-6 text-sm text-center text-muted-foreground">No courses match.</div>
+            <div className="p-6 text-sm text-center text-muted-foreground">
+              {isBackfill
+                ? "No previous Canvas classes found that match these filters."
+                : "No courses match."}
+            </div>
           ) : (
-            filtered.map((c) => {
-              const isSelected = selected.has(c.canvas_course_id);
-              return (
-                <label key={c.canvas_course_id} className="flex items-start gap-3 p-3 hover:bg-muted/40 cursor-pointer">
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={() => toggle(c.canvas_course_id)}
-                    className="mt-1"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium truncate">{c.name}</span>
-                      {c.course_code && <Badge variant="outline" className="text-[10px]">{c.course_code}</Badge>}
-                      {c.already_imported && <Badge className="text-[10px] bg-mastery-high/10 text-mastery-high border-mastery-high/30" variant="outline">Already imported</Badge>}
-                      {c.workflow_state && c.workflow_state !== "available" && (
-                        <Badge variant="outline" className="text-[10px] capitalize">{c.workflow_state}</Badge>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {c.term ?? "No term"} · {c.total_students ?? 0} students
-                    </div>
-                  </div>
-                  <div className="w-44 shrink-0" onClick={(e) => e.preventDefault()}>
-                    <Select
-                      value={disciplineByCourse[c.canvas_course_id] ?? ""}
-                      onValueChange={(v) => setDisciplineByCourse((m) => ({ ...m, [c.canvas_course_id]: v }))}
-                      disabled={disciplines.length === 0}
-                    >
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Discipline" /></SelectTrigger>
-                      <SelectContent>
-                        {disciplines.map((d) => (
-                          <SelectItem key={d.id} value={d.id} className="text-xs">
-                            {d.subject} · {d.grade} · {d.state}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </label>
-              );
-            })
+            grouped.map(([year, list]) => (
+              <div key={year}>
+                <div className="sticky top-0 z-10 bg-muted/80 backdrop-blur px-3 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground border-b flex items-center justify-between">
+                  <span>
+                    {year}
+                    {year === currentYear && (
+                      <Badge variant="outline" className="ml-2 text-[9px]">current</Badge>
+                    )}
+                  </span>
+                  <button
+                    className="text-[10px] hover:text-foreground"
+                    onClick={() =>
+                      setSelected((prev) => {
+                        const next = new Set(prev);
+                        for (const c of list) next.add(c.canvas_course_id);
+                        return next;
+                      })
+                    }
+                  >
+                    Select all in {year}
+                  </button>
+                </div>
+                <div className="divide-y">
+                  {list.map((c) => {
+                    const isSelected = selected.has(c.canvas_course_id);
+                    return (
+                      <label key={c.canvas_course_id} className="flex items-start gap-3 p-3 hover:bg-muted/40 cursor-pointer">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggle(c.canvas_course_id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium truncate">{c.name}</span>
+                            {c.course_code && <Badge variant="outline" className="text-[10px]">{c.course_code}</Badge>}
+                            {c.already_imported && <Badge className="text-[10px] bg-mastery-high/10 text-mastery-high border-mastery-high/30" variant="outline">Already imported</Badge>}
+                            {c.workflow_state === "completed" && (
+                              <Badge variant="outline" className="text-[10px]">concluded</Badge>
+                            )}
+                            {c.workflow_state && c.workflow_state !== "available" && c.workflow_state !== "completed" && (
+                              <Badge variant="outline" className="text-[10px] capitalize">{c.workflow_state}</Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {c.term ?? "No term"} · {c.total_students ?? 0} students
+                          </div>
+                        </div>
+                        <div className="w-44 shrink-0" onClick={(e) => e.preventDefault()}>
+                          <Select
+                            value={disciplineByCourse[c.canvas_course_id] ?? ""}
+                            onValueChange={(v) => setDisciplineByCourse((m) => ({ ...m, [c.canvas_course_id]: v }))}
+                            disabled={disciplines.length === 0}
+                          >
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Discipline" /></SelectTrigger>
+                            <SelectContent>
+                              {disciplines.map((d) => (
+                                <SelectItem key={d.id} value={d.id} className="text-xs">
+                                  {d.subject} · {d.grade} · {d.state}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
           )}
         </div>
 
         <DialogFooter>
-          <div className="text-xs text-muted-foreground mr-auto">{selected.size} selected</div>
+          <div className="text-xs text-muted-foreground mr-auto">
+            {selected.size} selected
+            {isBackfill && selected.size > 0 && " · will sync students, assignments, submissions & quiz responses"}
+          </div>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={importing}>Cancel</Button>
           <Button onClick={importNow} disabled={importing || selected.size === 0}>
             {importing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Import {selected.size || ""}
+            {isBackfill ? "Back-fill" : "Import"} {selected.size || ""}
           </Button>
         </DialogFooter>
       </DialogContent>

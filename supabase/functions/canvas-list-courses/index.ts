@@ -72,21 +72,37 @@ Deno.serve(async (req) => {
       "/api/v1/courses?enrollment_type=teacher&include[]=term&include[]=total_students&state[]=available&state[]=completed&state[]=unpublished",
     );
 
+    // Compute school year label (July 1 → June 9 next year) from the best-available date
+    function schoolYearLabel(iso: string | null | undefined): string | null {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      return m >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+    }
+
     // Cross-reference with already imported
     const { data: existing } = await admin
       .from("courses").select("canvas_course_id, discipline_id").eq("teacher_id", teacherId);
     const importedSet = new Map((existing ?? []).map((r) => [Number(r.canvas_course_id), r.discipline_id]));
 
-    const items = courses.map((c) => ({
-      canvas_course_id: c.id,
-      name: c.name ?? `Course ${c.id}`,
-      course_code: c.course_code ?? null,
-      term: c.term?.name ?? null,
-      workflow_state: c.workflow_state ?? null,
-      total_students: c.total_students ?? null,
-      already_imported: importedSet.has(Number(c.id)),
-      current_discipline_id: importedSet.get(Number(c.id)) ?? null,
-    }));
+    const items = courses.map((c) => {
+      const dateForYear =
+        c.end_at ?? c.term?.end_at ?? c.term?.start_at ?? c.start_at ?? null;
+      return {
+        canvas_course_id: c.id,
+        name: c.name ?? `Course ${c.id}`,
+        course_code: c.course_code ?? null,
+        term: c.term?.name ?? null,
+        workflow_state: c.workflow_state ?? null,
+        total_students: c.total_students ?? null,
+        end_at: c.end_at ?? c.term?.end_at ?? null,
+        school_year: schoolYearLabel(dateForYear),
+        already_imported: importedSet.has(Number(c.id)),
+        current_discipline_id: importedSet.get(Number(c.id)) ?? null,
+      };
+    });
 
     return new Response(JSON.stringify({ success: true, courses: items }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
