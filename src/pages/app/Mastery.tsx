@@ -83,7 +83,7 @@ export default function Mastery() {
     }
     setLatestByKey(map);
   }
-  useEffect(() => { load(); reveal.hide(); /* eslint-disable-next-line */ }, [courseId]);
+  useEffect(() => { load(); reveal.hide(); /* eslint-disable-next-line */ }, [courseId, showHistorical]);
 
   async function recompute() {
     setRecomputing(true);
