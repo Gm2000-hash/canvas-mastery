@@ -284,6 +284,82 @@ Deno.serve(async (req) => {
         }
       }
 
+      // 3c) New Quizzes items (LTI-based New Quizzes — separate API surface)
+      // Failures are non-fatal; some Canvas instances disable the public API.
+      const newQuizAssignments = assignments.filter((a) => !!a.is_quiz_lti_assignment && !a.quiz_id);
+      if (newQuizAssignments.length) {
+        const { data: assignMapForNQ } = await admin
+          .from("assignments").select("id, canvas_assignment_id").eq("course_id", courseId);
+        const aIdByCanvasNQ = new Map((assignMapForNQ ?? []).map((r) => [Number(r.canvas_assignment_id), r.id as string]));
+
+        for (const nq of newQuizAssignments) {
+          const internalAid = aIdByCanvasNQ.get(Number(nq.id));
+          if (!internalAid) continue;
+          let items: any[] = [];
+          try {
+            items = await canvasFetchAll<any>(creds, `/api/quiz/v1/courses/${c.id}/quizzes/${nq.id}/items`);
+          } catch (e) {
+            console.warn(`new-quiz ${nq.id} items fetch failed`, (e as Error).message);
+            continue;
+          }
+          const qRows = items.map((it, i) => {
+            const entry = it.entry ?? it; // some shapes nest under "entry"
+            const interaction = entry?.interaction_type_slug ?? entry?.interaction_type ?? null;
+            const data = entry?.interaction_data ?? {};
+            // Normalize answer choices for the common interaction types
+            let answers: any[] | null = null;
+            if (interaction === "choice" || interaction === "multi-answer") {
+              if (Array.isArray(data?.choices)) {
+                answers = data.choices.slice(0, 12).map((ch: any) => ({
+                  text: typeof ch?.item_body === "string"
+                    ? String(ch.item_body).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600)
+                    : null,
+                  html: typeof ch?.item_body === "string" ? String(ch.item_body).slice(0, 800) : null,
+                  weight: null,
+                }));
+              }
+            } else if (interaction === "true-false") {
+              answers = [
+                { text: "True", html: "True", weight: null },
+                { text: "False", html: "False", weight: null },
+              ];
+            } else if (interaction === "matching" && Array.isArray(data?.questions)) {
+              answers = data.questions.slice(0, 12).map((q: any) => ({
+                text: typeof q?.item_body === "string" ? String(q.item_body).replace(/<[^>]*>/g, " ").trim().slice(0, 600) : null,
+                html: null, weight: null,
+              }));
+            } else if (interaction === "categorization" && Array.isArray(data?.categories)) {
+              answers = data.categories.slice(0, 12).map((cat: any) => ({
+                text: typeof cat?.item_body === "string" ? String(cat.item_body).replace(/<[^>]*>/g, " ").trim().slice(0, 600) : null,
+                html: null, weight: null,
+              }));
+            } else if (interaction === "ordering" && Array.isArray(data?.choices)) {
+              answers = data.choices.slice(0, 12).map((ch: any) => ({
+                text: typeof ch?.item_body === "string" ? String(ch.item_body).replace(/<[^>]*>/g, " ").trim().slice(0, 600) : null,
+                html: null, weight: null,
+              }));
+            }
+            return {
+              teacher_id: teacherId,
+              assignment_id: internalAid,
+              canvas_question_id: it.id ?? entry?.id,
+              position: it.position ?? i + 1,
+              question_text: entry?.item_body
+                ? String(entry.item_body).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000)
+                : (it.title ?? null),
+              points_possible: it.points_possible ?? entry?.points_possible ?? null,
+              answers,
+              item_type: interaction,
+            };
+          }).filter((r) => r.canvas_question_id != null);
+          if (qRows.length) {
+            const { error: nqErr } = await admin.from("quiz_questions")
+              .upsert(qRows, { onConflict: "assignment_id,canvas_question_id" });
+            if (nqErr) console.error("quiz_questions (new) upsert", nqErr);
+          }
+        }
+      }
+
       // Build student/assignment ID maps for submissions
       const { data: studentMap } = await admin.from("students").select("id, canvas_user_id").eq("course_id", courseId);
       const { data: assignMap } = await admin.from("assignments").select("id, canvas_assignment_id").eq("course_id", courseId);
