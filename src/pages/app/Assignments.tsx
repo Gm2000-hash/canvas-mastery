@@ -80,7 +80,7 @@ export default function Assignments() {
   async function loadAssignments(cid: string) {
     setAssignments(null);
     const { data: a } = await supabase
-      .from("assignments").select("id, name, kind, description, course_id, due_at, canvas_quiz_id")
+      .from("assignments").select("id, name, kind, description, course_id, due_at, canvas_quiz_id, quiz_engine")
       .eq("course_id", cid).order("due_at", { ascending: false, nullsFirst: false }).order("name");
     setAssignments(a ?? []);
     if (a?.length) {
