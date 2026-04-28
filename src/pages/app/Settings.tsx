@@ -545,6 +545,35 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* AUTO-ARCHIVE */}
+      <Card id="auto-archive">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Archive className="h-4 w-4" />
+            Auto-archive past school years
+          </CardTitle>
+          <CardDescription>
+            When Canvas marks a course completed <strong>and</strong> the school year that course belonged to has ended (June 9), the course and its students are automatically moved out of your default views. You'll still see every student you've taught this school year regardless of trimester. Archived data is never deleted — open it any time from the Student History page or by toggling "Show historical" on Mastery and Analytics.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3">
+            <Switch
+              id="auto-archive"
+              checked={autoArchive}
+              onCheckedChange={updateAutoArchive}
+              disabled={savingArchive}
+            />
+            <Label htmlFor="auto-archive" className="cursor-pointer">
+              {autoArchive ? "Auto-archive is on" : "Auto-archive is off"}
+            </Label>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* MERGE STUDENT RECORDS */}
+      <MergeStudentsCard />
+
       {/* INVITATIONS */}
       <InvitationsCard />
     </div>
