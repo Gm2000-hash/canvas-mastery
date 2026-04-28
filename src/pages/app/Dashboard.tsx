@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { GraduationCap, ListChecks, BookMarked, Sparkles, RefreshCw, AlertCircle, CalendarClock, CalendarCheck, ArrowRight } from "lucide-react";
 import { useSync } from "@/contexts/SyncContext";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 
 type AssignmentItem = {
   id: string;
