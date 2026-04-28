@@ -48,7 +48,7 @@ export default function AppLayout() {
           <div className="text-xs text-sidebar-foreground/60 mt-1 font-medium">Mastery for Canvas teachers</div>
         </Link>
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {nav.map((item) => (
+          {[...nav, ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Shield, end: false as const }] : [])].map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
