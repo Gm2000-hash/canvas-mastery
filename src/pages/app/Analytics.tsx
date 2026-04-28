@@ -16,6 +16,8 @@ import { getFramework, FRAMEWORKS } from "@/lib/frameworks";
 import { Link } from "react-router-dom";
 import { useRevealedNames } from "@/hooks/useRevealedNames";
 import { RevealNamesToggle } from "@/components/RevealNamesToggle";
+import { HistoricalToggle } from "@/components/HistoricalToggle";
+import { recentSchoolYears, currentSchoolYearLabel } from "@/lib/schoolYear";
 
 type Course = { id: string; name: string };
 type Trend = { bucket_label: string; bucket_ts: string | null; framework: string; subject: string; avg_mastery: number; sample_size: number };
