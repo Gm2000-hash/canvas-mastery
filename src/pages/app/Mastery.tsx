@@ -23,14 +23,19 @@ export default function Mastery() {
   const [standards, setStandards] = useState<Standard[]>([]);
   const [latestByKey, setLatestByKey] = useState<Record<string, Snap>>({});
   const [recomputing, setRecomputing] = useState(false);
+  const [showHistorical, setShowHistorical] = useState(false);
   const reveal = useRevealedNames(courseId);
 
   useEffect(() => {
-    supabase.from("courses").select("id, name").eq("hidden", false).order("name").then(({ data }) => {
-      setCourses(data ?? []);
-      if (data?.length) setCourseId(data[0].id);
+    let q = supabase.from("courses").select("id, name").eq("hidden", false).order("name");
+    if (!showHistorical) q = q.is("archived_at", null);
+    q.then(({ data }) => {
+      const list = (data ?? []) as Course[];
+      setCourses(list);
+      if (list.length && !list.find((c) => c.id === courseId)) setCourseId(list[0].id);
+      if (list.length === 0) setCourseId("");
     });
-  }, []);
+  }, [showHistorical]);
 
   async function load() {
     if (!courseId) return;
