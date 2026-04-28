@@ -249,7 +249,7 @@ export async function syncQuestionScoresForTeacher(opts: {
         continue;
       }
       for (const ans of answers) {
-        const qid = qIdByCanvas.get(Number(ans.quiz_question_id ?? ans.id));
+        const qid = qIdByCanvas.get(String(ans.quiz_question_id ?? ans.id));
         if (!qid) continue;
         const points = ans.points == null ? null : Number(ans.points);
         // Canvas returns `correct` as boolean | "partial" | "undefined" | null. Normalize.
