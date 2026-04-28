@@ -341,7 +341,7 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
             {isBackfill && selected.size > 0 && " · will sync students, assignments, submissions & quiz responses"}
           </div>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={importing}>Cancel</Button>
-          <Button onClick={importNow} disabled={importing || selected.size === 0}>
+          <Button onClick={handleImportClick} disabled={importing || selected.size === 0}>
             {importing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {isBackfill ? "Back-fill" : "Import"} {selected.size || ""}
           </Button>
