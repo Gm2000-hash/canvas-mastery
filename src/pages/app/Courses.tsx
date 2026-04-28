@@ -155,7 +155,7 @@ export default function Courses() {
             const disc = disciplines.find((d) => d.id === c.discipline_id) ?? null;
             const effective = disc ?? defaultDisc;
             return (
-              <Card key={c.id} className={c.hidden ? "opacity-60" : ""}>
+              <Card key={c.id} className={(c.hidden || c.archived_at) ? "opacity-60" : ""}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
