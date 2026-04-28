@@ -404,6 +404,8 @@ Use the tool provided.`;
         stored: aRows.length,
         candidate_count: standards.length,
         batches: batchesRun,
+        questions_processed: Math.min(totalQuestions, batchesRun * 10),
+        partial: totalQuestions > batchesRun * 10,
         // Mirror the legacy "suggestions" shape so existing UI can still show counts
         suggestions: Array.from(standardCounts.entries()).map(([sid, info]) => {
           const code = standards!.find((s) => s.id === sid)?.code ?? "";
