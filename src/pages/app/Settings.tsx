@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { Check, Loader2, Star, Trash2, Plus, Pencil, RefreshCw } from "lucide-react";
+import { Check, Loader2, Star, Trash2, Plus, Pencil, RefreshCw, FileUp } from "lucide-react";
+import ImportStandardsDialog from "@/components/ImportStandardsDialog";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
