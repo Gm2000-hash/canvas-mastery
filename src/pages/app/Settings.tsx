@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { FRAMEWORKS, getFramework, SUBJECTS, GRADES, STATES, type FrameworkId } from "@/lib/frameworks";
+import InvitationsCard from "@/components/InvitationsCard";
 
 export default function Settings() {
   const location = useLocation();
@@ -521,6 +522,9 @@ export default function Settings() {
           </form>
         </CardContent>
       </Card>
+
+      {/* INVITATIONS */}
+      <InvitationsCard />
     </div>
   );
 }

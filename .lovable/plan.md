@@ -1,61 +1,47 @@
-# Pseudonymize Student Identities + Reveal Toggle
+# Invite-Only Access
 
-Real student names and emails will move out of the main `students` table into a locked-down identity table. The app shows pseudonyms ("Student 014") everywhere by default; a per-page toggle reveals real names on demand and logs the access.
+Right now anyone who finds the app URL can sign up. We'll restrict signup so a new teacher can only create an account if they have a valid invitation code that you (or another existing teacher/admin) issued.
 
-## Database migration
+## How it will work for users
 
-**New table `student_identities`** (real PII, isolated):
-- `student_id` (PK, FK → students.id), `teacher_id`, `real_name`, `real_sortable_name`, `email`, `canvas_user_id`, timestamps
-- RLS: no direct SELECT/UPDATE/DELETE from clients. Only the `reveal_student_identities` RPC (security definer) can read it. Inserts allowed only via service role (edge function).
+1. **You** open a new "Invitations" page in Settings, click **"Create invite"**, optionally type a note ("Jane from math dept") and an expiration, and get back a one-time code like `KX4P-9MTR-LZ8A`.
+2. You share that code with the person you want to invite (email, Slack, etc.).
+3. They go to the signup page. There's now a required **"Invitation code"** field above email/password.
+4. If the code is valid, unused, and not expired → account is created and the code is marked as used. If not → signup is blocked with a clear error.
+5. Existing users sign in normally — nothing changes for them.
 
-**Modify `students` table**:
-- Add `pseudonym_seq int` (per-teacher sequence) and `pseudonym text` (e.g. "Student 014").
-- Backfill: copy current `name`/`email`/`canvas_user_id` into `student_identities`, then overwrite `students.name` and `students.sortable_name` with the pseudonym, null out `students.email`.
-- Keep `canvas_user_id` on `students` for sync matching (it's an opaque integer, not PII on its own — happy to also move it if you prefer; flagging as a small trade-off).
+You stay in control: only people you invite can join.
 
-**New table `identity_reveals`** (audit log):
-- `id`, `teacher_id`, `course_id`, `revealed_at`, `reason text`, `student_count int`
-- RLS: teacher can SELECT/INSERT their own rows.
+## What gets built
 
-**New RPC `reveal_student_identities(_course_id uuid, _reason text)`**:
-- Security definer, returns `(student_id, real_name, real_sortable_name, email)` for that course.
-- Inserts a row into `identity_reveals` on every call.
+**Database (new)**
+- `invitations` table: `code`, `created_by` (teacher who issued it), `note`, `expires_at`, `used_by`, `used_at`, `revoked`, timestamps.
+- RLS: teachers can see/create/revoke only their own invites. Nobody can read by `code` directly from the client.
+- `redeem_invitation(_code, _user_id)` SECURITY DEFINER RPC: validates the code (exists, not used, not revoked, not expired), marks it used, returns success/failure. Called server-side only.
+- `create_invitation(_note, _expires_at)` RPC: generates a random unique code and inserts the row for the calling teacher.
 
-**Add to `teacher_settings`**:
-- `pseudonym_style text default 'numeric'` ('numeric' | 'initials' | 'handle')
-- `reveal_default boolean default false` (if true, toggle starts on)
+**Edge function (new): `signup-with-invite`**
+- Accepts `{ code, email, password, displayName }`.
+- Validates the invite code first (using service role).
+- If valid, creates the auth user via admin API, then calls `redeem_invitation` to atomically mark the code used.
+- If user creation succeeds but redemption fails (race), deletes the user and returns an error.
+- Returns success → frontend then signs the user in.
+- Deployed with `verify_jwt = false` (public endpoint).
 
-## Edge function update
+**Frontend changes**
+- `src/pages/Auth.tsx`: add **Invitation code** field to the signup tab (required). Signup now calls the `signup-with-invite` edge function instead of `supabase.auth.signUp` directly. Sign-in tab unchanged.
+- `src/pages/app/Settings.tsx` (or new `Invitations.tsx` linked from Settings): new section listing your invitations with status (Unused / Used by X on date / Expired / Revoked), a "Create invite" button, copy-to-clipboard, and a "Revoke" action for unused codes.
+- Disable Google OAuth signup button on the auth page (or hide it) — since OAuth bypasses the invite check. We can re-enable it later with a different flow if you want.
 
-`supabase/functions/canvas-sync/index.ts`:
-- On upsert of a student, write real name/email/canvas_user_id to `student_identities` (service role).
-- For `students`, generate or reuse `pseudonym_seq` per teacher and store `pseudonym` as `name` and `sortable_name`.
-- New students get the next `pseudonym_seq` for that teacher.
+**Bootstrap**
+- Your existing account is already created, so it's automatically grandfathered in. No migration needed for current users.
+- We'll seed one starter invite for you so you can test the flow end-to-end immediately.
 
-## Frontend
+## Things worth knowing
 
-**Hook `src/hooks/useRevealedNames.ts`**:
-- `useRevealedNames(courseId)` → `{ revealed, names: Record<studentId, string>, toggle(reason?) }`
-- When toggled on, calls the RPC, caches result in memory for the page session, never persists to localStorage.
+- **Codes are single-use** by default. If you want multi-use codes (e.g. one shared link for a whole department), say so and I'll add a `max_uses` field.
+- **No expiration by default** unless you set one when creating the invite.
+- **Google sign-in will be disabled** for new accounts because it skips the invite gate. Existing Google users (if any) keep working. If you'd rather keep Google enabled, we'd need a slightly different flow (post-signup invite redemption + delete account if missing).
+- This does **not** add admin roles — every teacher can issue invites to grow the network. If you want only *you* to be able to invite, tell me and I'll lock invite creation to a specific user ID or add a proper admin role table.
 
-**Component `src/components/RevealNamesToggle.tsx`**:
-- Small switch + label "Show real names". On enable, opens a tiny dialog asking for an optional reason (e.g. "Parent meeting"), then calls the hook.
-
-**Pages updated**:
-- `Mastery.tsx`, `Analytics.tsx` (student/class breakdowns), `Review.tsx`, `Courses.tsx` (student lists)
-- Replace `student.name` rendering with `revealed ? names[id] ?? student.name : student.name` (the stored name is already the pseudonym).
-- Add `<RevealNamesToggle courseId={courseId} />` in each page header.
-
-**Settings → new "Roster Privacy" section**:
-- Pseudonym style selector (Numeric "Student 014" / Initials "J.D." / Handle "blue-otter-14")
-- "Default to revealed names" toggle (off by default)
-- Recent reveals log (last 20 rows from `identity_reveals`)
-
-## Trade-offs to confirm
-
-1. **Search/sort** in tables will use pseudonyms unless reveal is on. Sorting alphabetically by real last name requires reveal.
-2. **`canvas_user_id`** stays on `students` for sync matching. If you want stricter isolation, we can move it too — adds a join on every sync but possible.
-3. **Existing data is migrated in place** — current real names get moved to `student_identities` and replaced with pseudonyms during the migration. No data loss.
-4. Once enabled, **disabling pseudonymization later requires another migration** (we'd copy real names back into `students`).
-
-Ready to implement on approval.
+Want me to proceed as-is, or adjust any of those?
