@@ -79,7 +79,7 @@ export async function syncQuestionScoresForTeacher(opts: {
   // Find candidate quiz assignments
   let aQuery = admin
     .from("assignments")
-    .select("id, name, course_id, canvas_assignment_id, canvas_quiz_id, kind, courses!inner(canvas_course_id)")
+    .select("id, name, course_id, canvas_assignment_id, canvas_quiz_id, kind, quiz_engine, courses!inner(canvas_course_id)")
     .eq("teacher_id", opts.teacherId)
     .eq("kind", "quiz")
     .not("canvas_quiz_id", "is", null);
