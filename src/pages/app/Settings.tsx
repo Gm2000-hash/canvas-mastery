@@ -56,6 +56,9 @@ export default function Settings() {
   const [seedingDiscId, setSeedingDiscId] = useState<string | null>(null);
   // Edit dialog
   const [editing, setEditing] = useState<Discipline | null>(null);
+  // Import dialog
+  const [importOpen, setImportOpen] = useState(false);
+  const [importDefaults, setImportDefaults] = useState<{ framework?: any; state?: string; subject?: string; grade?: string } | undefined>(undefined);
 
   async function load() {
     const [{ data: profile }, { data: ccRows }, { data: settings }, { data: discs }] = await Promise.all([
