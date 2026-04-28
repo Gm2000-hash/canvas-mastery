@@ -13,6 +13,24 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
 
+// Pulls the real server-side error message out of a supabase.functions.invoke() error.
+// Without this, FunctionsHttpError just says "Edge Function returned a non-2xx status code".
+async function readEdgeError(error: unknown, fallback: string): Promise<string> {
+  try {
+    const ctx = (error as any)?.context;
+    if (ctx && typeof ctx.json === "function") {
+      const body = await ctx.json();
+      if (body?.error) return String(body.error);
+      if (body?.message) return String(body.message);
+    }
+    if (ctx && typeof ctx.text === "function") {
+      const text = await ctx.text();
+      if (text) return text.slice(0, 300);
+    }
+  } catch { /* ignore */ }
+  return (error as any)?.message || fallback;
+}
+
 type Discipline = { id: string; state: string | null; subject: string; grade: string; framework: string | null; is_default: boolean };
 
 type Assignment = {
