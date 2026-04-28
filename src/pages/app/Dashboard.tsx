@@ -13,7 +13,7 @@ type AssignmentItem = {
   kind: string;
   due_at: string | null;
   course_id: string;
-  course: { name: string; hidden: boolean } | null;
+  course: { name: string; hidden: boolean; archived_at: string | null } | null;
 };
 
 export default function Dashboard() {
@@ -27,14 +27,14 @@ export default function Dashboard() {
   async function load() {
     const nowIso = new Date().toISOString();
 
-    // Get visible (non-hidden) course ids first so all stats exclude hidden classes.
+    // Get visible (non-hidden, non-archived) course ids first so all stats reflect current rosters.
     const { data: visibleCourses } = await supabase
-      .from("courses").select("id").eq("hidden", false);
+      .from("courses").select("id").eq("hidden", false).is("archived_at", null);
     const visibleIds = (visibleCourses ?? []).map((c) => c.id);
     const hasVisible = visibleIds.length > 0;
 
     const studentsQ = hasVisible
-      ? supabase.from("students").select("id", { count: "exact", head: true }).in("course_id", visibleIds)
+      ? supabase.from("students").select("id", { count: "exact", head: true }).in("course_id", visibleIds).is("archived_at", null).is("merged_into", null)
       : Promise.resolve({ count: 0 } as any);
     const assignmentsQ = hasVisible
       ? supabase.from("assignments").select("id", { count: "exact", head: true }).in("course_id", visibleIds)
@@ -66,14 +66,14 @@ export default function Dashboard() {
       // Upcoming: due in the future, soonest first.
       supabase
         .from("assignments")
-        .select("id, name, kind, due_at, course_id, course:courses!inner(name, hidden)")
+        .select("id, name, kind, due_at, course_id, course:courses!inner(name, hidden, archived_at)")
         .gte("due_at", nowIso)
         .order("due_at", { ascending: true })
         .limit(20),
       // Recent: due in the past, most recent first.
       supabase
         .from("assignments")
-        .select("id, name, kind, due_at, course_id, course:courses!inner(name, hidden)")
+        .select("id, name, kind, due_at, course_id, course:courses!inner(name, hidden, archived_at)")
         .lt("due_at", nowIso)
         .order("due_at", { ascending: false })
         .limit(20),
@@ -90,7 +90,7 @@ export default function Dashboard() {
     setProfileReady(!!(profile?.state && profile?.default_subject && profile?.default_grade));
     // Drop assignments whose course has been hidden, then keep top 5 of each.
     const filterVisible = (rows: any[] | null) =>
-      ((rows ?? []) as AssignmentItem[]).filter((a) => a.course && !a.course.hidden).slice(0, 5);
+      ((rows ?? []) as AssignmentItem[]).filter((a) => a.course && !a.course.hidden && !a.course.archived_at).slice(0, 5);
     setUpcoming(filterVisible(up));
     setRecent(filterVisible(rc));
   }

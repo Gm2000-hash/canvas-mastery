@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { FRAMEWORKS, getFramework, SUBJECTS, GRADES, STATES, type FrameworkId } from "@/lib/frameworks";
 import InvitationsCard from "@/components/InvitationsCard";
+import MergeStudentsCard from "@/components/MergeStudentsCard";
+import { Switch } from "@/components/ui/switch";
+import { Archive } from "lucide-react";
 
 export default function Settings() {
   const location = useLocation();
@@ -34,7 +37,9 @@ export default function Settings() {
   // Mastery settings
   const [threshold, setThreshold] = useState(80);
   const [windowN, setWindowN] = useState(3);
+  const [autoArchive, setAutoArchive] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [savingArchive, setSavingArchive] = useState(false);
 
   // (legacy single seed kept for migration; new seeding lives per-discipline below)
 
@@ -72,6 +77,7 @@ export default function Settings() {
     if (settings) {
       setThreshold(Math.round((settings.mastery_threshold ?? 0.8) * 100));
       setWindowN(settings.attempt_window ?? 3);
+      setAutoArchive(settings.auto_archive_enabled ?? true);
     }
     setDisciplines((discs ?? []) as Discipline[]);
   }
@@ -136,7 +142,23 @@ export default function Settings() {
     if (error) toast.error(error.message); else toast.success("Settings saved");
   }
 
-  // ----- Disciplines (multi) -----
+  async function updateAutoArchive(next: boolean) {
+    setAutoArchive(next); // optimistic
+    setSavingArchive(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) { setSavingArchive(false); return; }
+    const { error } = await supabase.from("teacher_settings").upsert({
+      teacher_id: u.user.id,
+      auto_archive_enabled: next,
+    });
+    setSavingArchive(false);
+    if (error) {
+      setAutoArchive(!next);
+      toast.error(error.message);
+    } else {
+      toast.success(next ? "Auto-archive enabled" : "Auto-archive disabled");
+    }
+  }
   async function addDisciplines() {
     const fw = getFramework(newFramework);
     if (!fw.national && !newState) { toast.error("Pick a state"); return; }
@@ -522,6 +544,35 @@ export default function Settings() {
           </form>
         </CardContent>
       </Card>
+
+      {/* AUTO-ARCHIVE */}
+      <Card id="auto-archive">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Archive className="h-4 w-4" />
+            Auto-archive past school years
+          </CardTitle>
+          <CardDescription>
+            When Canvas marks a course completed <strong>and</strong> the school year that course belonged to has ended (June 9), the course and its students are automatically moved out of your default views. You'll still see every student you've taught this school year regardless of trimester. Archived data is never deleted — open it any time from the Student History page or by toggling "Show historical" on Mastery and Analytics.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3">
+            <Switch
+              id="auto-archive"
+              checked={autoArchive}
+              onCheckedChange={updateAutoArchive}
+              disabled={savingArchive}
+            />
+            <Label htmlFor="auto-archive" className="cursor-pointer">
+              {autoArchive ? "Auto-archive is on" : "Auto-archive is off"}
+            </Label>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* MERGE STUDENT RECORDS */}
+      <MergeStudentsCard />
 
       {/* INVITATIONS */}
       <InvitationsCard />

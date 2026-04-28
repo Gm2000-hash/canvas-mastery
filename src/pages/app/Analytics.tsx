@@ -16,6 +16,8 @@ import { getFramework, FRAMEWORKS } from "@/lib/frameworks";
 import { Link } from "react-router-dom";
 import { useRevealedNames } from "@/hooks/useRevealedNames";
 import { RevealNamesToggle } from "@/components/RevealNamesToggle";
+import { HistoricalToggle } from "@/components/HistoricalToggle";
+import { recentSchoolYears, currentSchoolYearLabel } from "@/lib/schoolYear";
 
 type Course = { id: string; name: string };
 type Trend = { bucket_label: string; bucket_ts: string | null; framework: string; subject: string; avg_mastery: number; sample_size: number };
@@ -50,22 +52,28 @@ function pctRaw(n: number | null | undefined) {
 export default function Analytics() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [hiddenCourseIds, setHiddenCourseIds] = useState<Set<string>>(new Set());
+  const [archivedCourseIds, setArchivedCourseIds] = useState<Set<string>>(new Set());
   const [courseId, setCourseId] = useState<string>("ALL");
   const [activeDims, setActiveDims] = useState<ActiveDim[]>([]);
+  const [schoolYear, setSchoolYear] = useState<string>(currentSchoolYearLabel());
+  const [showHistorical, setShowHistorical] = useState(false);
 
   useEffect(() => {
-    // Only show non-hidden classes in the picker. Hidden classes are also
-    // filtered out of the Classes tab below.
-    supabase.from("courses").select("id, name, hidden").order("name").then(({ data }) => {
-      const all = (data ?? []) as Array<Course & { hidden: boolean }>;
-      setCourses(all.filter((c) => !c.hidden).map(({ id, name }) => ({ id, name })));
+    // Show non-hidden, non-archived classes by default. When the historical
+    // toggle is on, archived classes appear in the picker too.
+    supabase.from("courses").select("id, name, hidden, archived_at").order("name").then(({ data }) => {
+      const all = (data ?? []) as Array<Course & { hidden: boolean; archived_at: string | null }>;
+      const visible = all.filter((c) => !c.hidden && (showHistorical || !c.archived_at));
+      setCourses(visible.map(({ id, name }) => ({ id, name })));
       setHiddenCourseIds(new Set(all.filter((c) => c.hidden).map((c) => c.id)));
+      setArchivedCourseIds(new Set(all.filter((c) => !!c.archived_at).map((c) => c.id)));
     });
     supabase.rpc("analytics_active_dimensions").then(({ data }) => setActiveDims((data as any) ?? []));
-  }, []);
+  }, [showHistorical]);
 
   const courseFilter = courseId === "ALL" ? null : courseId;
   const subjects = useMemo(() => Array.from(new Set(activeDims.map((d) => d.subject).filter(Boolean))), [activeDims]);
+  const years = useMemo(() => recentSchoolYears(6), []);
 
   return (
     <div className="space-y-6">
@@ -76,7 +84,17 @@ export default function Analytics() {
             Mastery trends and breakdowns by class, student, standard, assessment, mastery level, and question.
           </p>
         </div>
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-3 flex-wrap">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">School year</Label>
+            <Select value={schoolYear} onValueChange={setSchoolYear}>
+              <SelectTrigger className="w-[160px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All time</SelectItem>
+                {years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Course</Label>
             <Select value={courseId} onValueChange={setCourseId}>
@@ -86,6 +104,9 @@ export default function Analytics() {
                 {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div className="pb-1">
+            <HistoricalToggle value={showHistorical} onChange={setShowHistorical} reason="Analytics" />
           </div>
         </div>
       </div>
@@ -100,7 +121,7 @@ export default function Analytics() {
           <TabsTrigger value="questions"><HelpCircle className="h-4 w-4 mr-1.5" /> Questions</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="classes"><ClassesView courseFilter={courseFilter} hiddenCourseIds={hiddenCourseIds} /></TabsContent>
+        <TabsContent value="classes"><ClassesView courseFilter={courseFilter} hiddenCourseIds={hiddenCourseIds} archivedCourseIds={archivedCourseIds} schoolYear={schoolYear} includeArchived={showHistorical} /></TabsContent>
         <TabsContent value="trends"><TrendsView courseId={courseFilter} subjects={subjects} /></TabsContent>
         <TabsContent value="standards"><StandardsView courseId={courseFilter} subjects={subjects} /></TabsContent>
         <TabsContent value="assignments"><AssignmentsView courseId={courseFilter} /></TabsContent>
@@ -230,20 +251,26 @@ function TrendsView({ courseId, subjects }: { courseId: string | null; subjects:
 }
 
 // ───────────────────────── Classes (summary + auto matrices) ─────────────────────────
-function ClassesView({ courseFilter, hiddenCourseIds }: { courseFilter: string | null; hiddenCourseIds: Set<string> }) {
+function ClassesView({ courseFilter, hiddenCourseIds, archivedCourseIds, schoolYear, includeArchived }: { courseFilter: string | null; hiddenCourseIds: Set<string>; archivedCourseIds: Set<string>; schoolYear: string; includeArchived: boolean }) {
   const [rows, setRows] = useState<ClassRow[] | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    supabase.rpc("analytics_class_breakdown").then(({ data }) => {
+    supabase.rpc("analytics_class_breakdown", {
+      _school_year: schoolYear === "ALL" ? null : schoolYear,
+      _include_archived: includeArchived,
+    }).then(({ data }) => {
       const list = (data as any as ClassRow[]) ?? [];
-      // Drop classes the teacher has hidden on the Courses page.
-      const filtered = list.filter((r) => !hiddenCourseIds.has(r.course_id));
+      // Drop hidden classes; drop archived too unless the historical toggle is on.
+      const filtered = list.filter((r) =>
+        !hiddenCourseIds.has(r.course_id) &&
+        (includeArchived || !archivedCourseIds.has(r.course_id))
+      );
       setRows(filtered);
       // Default to collapsed: hide every class table until the user opens it.
       setCollapsed(new Set(filtered.map((r) => r.course_id)));
     });
-  }, [hiddenCourseIds]);
+  }, [hiddenCourseIds, archivedCourseIds, schoolYear, includeArchived]);
 
   // Honor the global course filter at the top of the page.
   const visibleRows = useMemo(() => {

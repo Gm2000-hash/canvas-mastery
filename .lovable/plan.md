@@ -1,47 +1,62 @@
-# Invite-Only Access
+## Finish the longitudinal + auto-archive build
 
-Right now anyone who finds the app URL can sign up. We'll restrict signup so a new teacher can only create an account if they have a valid invitation code that you (or another existing teacher/admin) issued.
+The schema, edge function, and standalone pages are already in. This plan wires them into the existing UI so teachers actually see (and benefit from) the new behavior.
 
-## How it will work for users
+---
 
-1. **You** open a new "Invitations" page in Settings, click **"Create invite"**, optionally type a note ("Jane from math dept") and an expiration, and get back a one-time code like `KX4P-9MTR-LZ8A`.
-2. You share that code with the person you want to invite (email, Slack, etc.).
-3. They go to the signup page. There's now a required **"Invitation code"** field above email/password.
-4. If the code is valid, unused, and not expired → account is created and the code is marked as used. If not → signup is blocked with a clear error.
-5. Existing users sign in normally — nothing changes for them.
+### 1. Settings page integration
 
-You stay in control: only people you invite can join.
+Add two things to `src/pages/app/Settings.tsx`:
 
-## What gets built
+- **Auto-archive card** — toggle bound to `teacher_settings.auto_archive_enabled` (already defaults to `true`). Copy explains: "Courses are automatically hidden from your default views after Canvas marks them completed *and* the school year (ending June 9) ends. You'll still see all current-school-year students regardless of trimester."
+- **Mount `<MergeStudentsCard />`** under a "Link student records" section, so a teacher can manually merge a 7th-grade roster entry to its 6th-grade counterpart.
 
-**Database (new)**
-- `invitations` table: `code`, `created_by` (teacher who issued it), `note`, `expires_at`, `used_by`, `used_at`, `revoked`, timestamps.
-- RLS: teachers can see/create/revoke only their own invites. Nobody can read by `code` directly from the client.
-- `redeem_invitation(_code, _user_id)` SECURITY DEFINER RPC: validates the code (exists, not used, not revoked, not expired), marks it used, returns success/failure. Called server-side only.
-- `create_invitation(_note, _expires_at)` RPC: generates a random unique code and inserts the row for the calling teacher.
+### 2. Default-view filtering (hide archived by default)
 
-**Edge function (new): `signup-with-invite`**
-- Accepts `{ code, email, password, displayName }`.
-- Validates the invite code first (using service role).
-- If valid, creates the auth user via admin API, then calls `redeem_invitation` to atomically mark the code used.
-- If user creation succeeds but redemption fails (race), deletes the user and returns an error.
-- Returns success → frontend then signs the user in.
-- Deployed with `verify_jwt = false` (public endpoint).
+Apply `archived_at IS NULL` to the queries powering:
 
-**Frontend changes**
-- `src/pages/Auth.tsx`: add **Invitation code** field to the signup tab (required). Signup now calls the `signup-with-invite` edge function instead of `supabase.auth.signUp` directly. Sign-in tab unchanged.
-- `src/pages/app/Settings.tsx` (or new `Invitations.tsx` linked from Settings): new section listing your invitations with status (Unused / Used by X on date / Expired / Revoked), a "Create invite" button, copy-to-clipboard, and a "Revoke" action for unused codes.
-- Disable Google OAuth signup button on the auth page (or hide it) — since OAuth bypasses the invite check. We can re-enable it later with a different flow if you want.
+- `src/pages/app/Mastery.tsx` — students list + course filter
+- `src/pages/app/Dashboard.tsx` — recent activity and counts
+- `src/pages/app/QuestionBank.tsx` — assignment/course filters
+- `src/pages/app/Courses.tsx` — show archived courses in a collapsed "Archived (N)" section instead of the main list
 
-**Bootstrap**
-- Your existing account is already created, so it's automatically grandfathered in. No migration needed for current users.
-- We'll seed one starter invite for you so you can test the flow end-to-end immediately.
+The data is preserved — it's just not in the default scope. The Historical page and the toggle (below) are how it gets surfaced.
 
-## Things worth knowing
+### 3. Analytics: school-year filter + historical toggle
 
-- **Codes are single-use** by default. If you want multi-use codes (e.g. one shared link for a whole department), say so and I'll add a `max_uses` field.
-- **No expiration by default** unless you set one when creating the invite.
-- **Google sign-in will be disabled** for new accounts because it skips the invite gate. Existing Google users (if any) keep working. If you'd rather keep Google enabled, we'd need a slightly different flow (post-signup invite redemption + delete account if missing).
-- This does **not** add admin roles — every teacher can issue invites to grow the network. If you want only *you* to be able to invite, tell me and I'll lock invite creation to a specific user ID or add a proper admin role table.
+In `src/pages/app/Analytics.tsx`:
 
-Want me to proceed as-is, or adjust any of those?
+- Add a school-year `<Select>` (options derived from distinct school years across the teacher's courses, default = current school year per `school_year_end_for(now())`).
+- Pass the chosen year to the Analytics RPCs via the new `_school_year` param.
+- Add `<HistoricalToggle />` in the header. When on, the queries drop the `archived_at IS NULL` filter and write a row to `historical_access_log` (course_id null, reason "analytics view").
+
+### 4. Mastery: historical toggle
+
+In `src/pages/app/Mastery.tsx`, add `<HistoricalToggle />` next to the course filter. Same behavior — flipping it on includes archived students/courses and logs the access with the current course_id and reason "mastery view".
+
+### 5. Sidebar + nav polish
+
+`src/layouts/AppLayout.tsx` already has the Student History entry from the previous step. Verify it's grouped sensibly (under "Records" or directly under Mastery) and that the icon matches the rest of the nav.
+
+### 6. Small correctness items
+
+- **Dashboard "Active students" count**: switch to `archived_at IS NULL` so the number reflects current rosters, not lifetime.
+- **Course list**: show a small "Archived {date}" badge on archived rows when expanded.
+- **HistoricalToggle**: confirm it requires a non-empty reason before flipping on (FERPA audit hygiene).
+
+---
+
+### Technical notes
+
+- All filtering is client-side query changes (`.is('archived_at', null)`) — no new migrations needed; the columns already exist.
+- The Analytics RPCs already accept `_school_year` from the prior migration; this plan just exposes the control.
+- `historical_access_log` writes go through the existing RLS policy (`teacher_id = auth.uid()` on insert).
+- No changes to the canvas-sync function; auto-archive already runs at the end of each sync.
+
+### Out of scope (still)
+
+- `/admin` UI, audit log viewer, role management — next plan.
+- Cross-teacher access requests — separate plan after admin lands.
+- Auto-un-archive logic — admin override only.
+
+Approve and I'll ship it.

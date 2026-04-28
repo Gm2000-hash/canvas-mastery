@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRevealedNames } from "@/hooks/useRevealedNames";
 import { RevealNamesToggle } from "@/components/RevealNamesToggle";
+import { HistoricalToggle } from "@/components/HistoricalToggle";
 
 type Course = { id: string; name: string };
 type Student = { id: string; name: string; sortable_name: string | null };
@@ -22,20 +23,27 @@ export default function Mastery() {
   const [standards, setStandards] = useState<Standard[]>([]);
   const [latestByKey, setLatestByKey] = useState<Record<string, Snap>>({});
   const [recomputing, setRecomputing] = useState(false);
+  const [showHistorical, setShowHistorical] = useState(false);
   const reveal = useRevealedNames(courseId);
 
   useEffect(() => {
-    supabase.from("courses").select("id, name").eq("hidden", false).order("name").then(({ data }) => {
-      setCourses(data ?? []);
-      if (data?.length) setCourseId(data[0].id);
+    let q = supabase.from("courses").select("id, name").eq("hidden", false).order("name");
+    if (!showHistorical) q = q.is("archived_at", null);
+    q.then(({ data }) => {
+      const list = (data ?? []) as Course[];
+      setCourses(list);
+      if (list.length && !list.find((c) => c.id === courseId)) setCourseId(list[0].id);
+      if (list.length === 0) setCourseId("");
     });
-  }, []);
+  }, [showHistorical]);
 
   async function load() {
     if (!courseId) return;
     setStudents(null);
-    const { data: studs } = await supabase
-      .from("students").select("id, name, sortable_name").eq("course_id", courseId).order("sortable_name", { nullsFirst: false });
+    let sq = supabase
+      .from("students").select("id, name, sortable_name").eq("course_id", courseId).is("merged_into", null).order("sortable_name", { nullsFirst: false });
+    if (!showHistorical) sq = sq.is("archived_at", null);
+    const { data: studs } = await sq;
     setStudents(studs ?? []);
 
     // Standards that are tagged on assignments in this course, plus any
@@ -75,7 +83,7 @@ export default function Mastery() {
     }
     setLatestByKey(map);
   }
-  useEffect(() => { load(); reveal.hide(); /* eslint-disable-next-line */ }, [courseId]);
+  useEffect(() => { load(); reveal.hide(); /* eslint-disable-next-line */ }, [courseId, showHistorical]);
 
   async function recompute() {
     setRecomputing(true);
@@ -111,7 +119,8 @@ export default function Mastery() {
           <h1 className="font-display text-4xl font-semibold mb-2">Mastery</h1>
           <p className="text-muted-foreground">Per-student mastery on each standard tagged in this course.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <HistoricalToggle value={showHistorical} onChange={setShowHistorical} reason="Mastery" />
           <Button asChild variant="ghost">
             <Link to="/app/mastery/debug"><Bug className="h-4 w-4 mr-2" /> Debug</Link>
           </Button>
