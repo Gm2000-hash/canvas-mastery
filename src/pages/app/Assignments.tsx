@@ -62,7 +62,8 @@ export default function Assignments() {
 
   async function loadCourses() {
     // Hidden classes are excluded everywhere except the Courses page itself.
-    const { data } = await supabase.from("courses").select("id, name, discipline_id").eq("hidden", false).order("name");
+    // Archived courses (past school year + Canvas-completed) are also hidden by default.
+    const { data } = await supabase.from("courses").select("id, name, discipline_id").eq("hidden", false).is("archived_at", null).order("name");
     setCourses((data as Course[]) ?? []);
     if (!courseId && data?.length) setCourseId(data[0].id);
   }
@@ -180,11 +181,32 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
   const [tagging, setTagging] = useState(false);
   const [importing, setImporting] = useState(false);
 
-  async function aiSuggest() {
+  async function aiSuggest(autoSeeded = false) {
     setTagging(true);
     const { data, error } = await supabase.functions.invoke("tag-standards", { body: { assignment_id: assignment.id } });
     setTagging(false);
-    if (error) { toast.error(await readEdgeError(error, "AI suggest failed")); return; }
+    if (error) {
+      const msg = await readEdgeError(error, "AI suggest failed");
+      // If the failure was "no standards found", offer to seed the library on the spot.
+      const m = msg.match(/No standards found for ([A-Z_0-9]+).*?subject ([\w \/]+).*?grade (\w+)/i)
+        ?? msg.match(/No standards found for ([A-Z_0-9]+)/i);
+      if (m && !autoSeeded) {
+        const framework = m[1];
+        const subject = m[2];
+        const grade = m[3];
+        if (subject && grade && confirm(`We don't have ${framework} ${subject} grade ${grade} standards yet. Add them now? (~10 sec)`)) {
+          toast.message("Seeding standards…");
+          const { error: seedErr } = await supabase.functions.invoke("seed-standards", {
+            body: { framework, subject, grade, state: "" },
+          });
+          if (seedErr) { toast.error(await readEdgeError(seedErr, "Seed failed")); return; }
+          toast.success("Standards seeded — retrying AI suggest");
+          return aiSuggest(true);
+        }
+      }
+      toast.error(msg);
+      return;
+    }
     if ((data as any)?.error) { toast.error((data as any).error); return; }
     const d = data as any;
     const n = d.suggestions?.length ?? 0;
@@ -252,7 +274,7 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
             )}
           </div>
           <div className="flex gap-2 shrink-0">
-            <Button size="sm" variant="outline" onClick={aiSuggest} disabled={tagging}>
+            <Button size="sm" variant="outline" onClick={() => aiSuggest()} disabled={tagging}>
               {tagging ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
               AI suggest
             </Button>
