@@ -346,6 +346,7 @@ export type Database = {
           default_subject: string | null
           display_name: string | null
           id: string
+          onboarding_dismissed_at: string | null
           state: string | null
           updated_at: string
         }
@@ -355,6 +356,7 @@ export type Database = {
           default_subject?: string | null
           display_name?: string | null
           id: string
+          onboarding_dismissed_at?: string | null
           state?: string | null
           updated_at?: string
         }
@@ -364,6 +366,7 @@ export type Database = {
           default_subject?: string | null
           display_name?: string | null
           id?: string
+          onboarding_dismissed_at?: string | null
           state?: string | null
           updated_at?: string
         }
