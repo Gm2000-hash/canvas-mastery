@@ -176,6 +176,23 @@ export default function Dashboard() {
           mode="recent"
         />
       </div>
+
+      <div className="pt-2 text-center">
+        <button
+          type="button"
+          className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+          onClick={async () => {
+            const { data: u } = await supabase.auth.getUser();
+            if (!u.user) return;
+            await supabase.from("profiles")
+              .update({ onboarding_dismissed_at: null })
+              .eq("id", u.user.id);
+            window.dispatchEvent(new Event("onboarding:refresh"));
+          }}
+        >
+          Show getting started checklist
+        </button>
+      </div>
     </div>
   );
 }
