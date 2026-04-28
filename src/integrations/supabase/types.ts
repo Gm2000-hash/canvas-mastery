@@ -813,6 +813,26 @@ export type Database = {
           submission_count: number
         }[]
       }
+      analytics_backfill_report: {
+        Args: { _course_ids: string[] }
+        Returns: {
+          assignment_count: number
+          course_id: string
+          course_name: string
+          district_standard_count: number
+          district_standards_missing: number
+          district_standards_with_mastery: number
+          framework: string
+          grade: string
+          mastery_record_count: number
+          missing_standard_codes: string[]
+          question_response_count: number
+          school_year: string
+          student_count: number
+          subject: string
+          submission_count: number
+        }[]
+      }
       analytics_class_breakdown:
         | {
             Args: never
