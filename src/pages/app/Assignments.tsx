@@ -82,7 +82,7 @@ export default function Assignments() {
     setRecomputing(true);
     const { data, error } = await supabase.functions.invoke("recompute-mastery");
     setRecomputing(false);
-    if (error) { toast.error((error as any).message); return; }
+    if (error) { toast.error(await readEdgeError(error, "Failed to recompute mastery")); return; }
     toast.success(`Mastery recomputed (${(data as any).snapshots} entries)`);
   }
 
