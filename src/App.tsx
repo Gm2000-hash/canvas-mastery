@@ -17,6 +17,7 @@ import MasteryDebug from "./pages/app/MasteryDebug";
 import Review from "./pages/app/Review";
 import Analytics from "./pages/app/Analytics";
 import QuestionBank from "./pages/app/QuestionBank";
+import StudentHistory from "./pages/app/StudentHistory";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="mastery" element={<Mastery />} />
             <Route path="mastery/debug" element={<MasteryDebug />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="student-history" element={<StudentHistory />} />
             <Route path="settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />
