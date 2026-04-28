@@ -4,15 +4,20 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Download, History as HistoryIcon, Loader2, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, Download, History as HistoryIcon, Loader2, RefreshCw, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useSync } from "@/contexts/SyncContext";
 import { currentSchoolYearLabel } from "@/lib/schoolYear";
+import { BackfillReportDialog } from "@/components/BackfillReportDialog";
 
 type CanvasCourse = {
   canvas_course_id: number;
