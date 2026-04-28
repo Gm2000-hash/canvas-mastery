@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
-import { BarChart3, BookMarked, CheckCheck, GraduationCap, History, LayoutDashboard, Library, ListChecks, Settings as SettingsIcon, Sparkles } from "lucide-react";
+import { BarChart3, BookMarked, CheckCheck, GraduationCap, History, LayoutDashboard, Library, ListChecks, Settings as SettingsIcon, Shield, Sparkles } from "lucide-react";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
 
@@ -22,6 +23,7 @@ const nav = [
 
 export default function AppLayout() {
   const { user, loading } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
 
   useEffect(() => {

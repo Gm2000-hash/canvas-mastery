@@ -18,6 +18,7 @@ import Review from "./pages/app/Review";
 import Analytics from "./pages/app/Analytics";
 import QuestionBank from "./pages/app/QuestionBank";
 import StudentHistory from "./pages/app/StudentHistory";
+import Admin from "./pages/app/Admin";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="analytics" element={<Analytics />} />
             <Route path="student-history" element={<StudentHistory />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="admin" element={<Admin />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
