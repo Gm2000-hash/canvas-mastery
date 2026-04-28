@@ -15,10 +15,10 @@ type AdminUser = {
   display_name: string | null;
   email: string | null;
   created_at: string;
-  roles: ("admin" | "moderator" | "user")[];
+  roles: AppRole[];
 };
 
-type AppRole = "admin" | "moderator" | "user";
+type AppRole = "admin" | "teacher";
 
 export default function Admin() {
   const { isAdmin, loading: roleLoading } = useIsAdmin();
@@ -52,7 +52,7 @@ export default function Admin() {
     setBusy(userId + ":" + role);
     const { error } = await supabase
       .from("user_roles")
-      .insert({ user_id: userId, role });
+      .insert([{ user_id: userId, role }]);
     if (error && !error.message.includes("duplicate")) {
       toast.error(error.message);
     } else {
@@ -167,7 +167,7 @@ export default function Admin() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {u.roles.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">teacher (default)</span>
+                            <span className="text-xs text-muted-foreground">no role</span>
                           ) : (
                             u.roles.map((r) => (
                               <Badge key={r} variant={r === "admin" ? "default" : "secondary"}>
@@ -187,7 +187,7 @@ export default function Admin() {
                               <SelectValue placeholder="Grant role…" />
                             </SelectTrigger>
                             <SelectContent>
-                              {(["admin", "moderator", "user"] as AppRole[])
+                              {(["admin", "teacher"] as AppRole[])
                                 .filter((r) => !u.roles.includes(r))
                                 .map((r) => (
                                   <SelectItem key={r} value={r}>
