@@ -37,7 +37,9 @@ export default function Settings() {
   // Mastery settings
   const [threshold, setThreshold] = useState(80);
   const [windowN, setWindowN] = useState(3);
+  const [autoArchive, setAutoArchive] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [savingArchive, setSavingArchive] = useState(false);
 
   // (legacy single seed kept for migration; new seeding lives per-discipline below)
 
@@ -75,6 +77,7 @@ export default function Settings() {
     if (settings) {
       setThreshold(Math.round((settings.mastery_threshold ?? 0.8) * 100));
       setWindowN(settings.attempt_window ?? 3);
+      setAutoArchive(settings.auto_archive_enabled ?? true);
     }
     setDisciplines((discs ?? []) as Discipline[]);
   }
