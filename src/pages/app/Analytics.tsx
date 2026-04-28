@@ -251,20 +251,26 @@ function TrendsView({ courseId, subjects }: { courseId: string | null; subjects:
 }
 
 // ───────────────────────── Classes (summary + auto matrices) ─────────────────────────
-function ClassesView({ courseFilter, hiddenCourseIds }: { courseFilter: string | null; hiddenCourseIds: Set<string> }) {
+function ClassesView({ courseFilter, hiddenCourseIds, archivedCourseIds, schoolYear, includeArchived }: { courseFilter: string | null; hiddenCourseIds: Set<string>; archivedCourseIds: Set<string>; schoolYear: string; includeArchived: boolean }) {
   const [rows, setRows] = useState<ClassRow[] | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    supabase.rpc("analytics_class_breakdown").then(({ data }) => {
+    supabase.rpc("analytics_class_breakdown", {
+      _school_year: schoolYear === "ALL" ? null : schoolYear,
+      _include_archived: includeArchived,
+    }).then(({ data }) => {
       const list = (data as any as ClassRow[]) ?? [];
-      // Drop classes the teacher has hidden on the Courses page.
-      const filtered = list.filter((r) => !hiddenCourseIds.has(r.course_id));
+      // Drop hidden classes; drop archived too unless the historical toggle is on.
+      const filtered = list.filter((r) =>
+        !hiddenCourseIds.has(r.course_id) &&
+        (includeArchived || !archivedCourseIds.has(r.course_id))
+      );
       setRows(filtered);
       // Default to collapsed: hide every class table until the user opens it.
       setCollapsed(new Set(filtered.map((r) => r.course_id)));
     });
-  }, [hiddenCourseIds]);
+  }, [hiddenCourseIds, archivedCourseIds, schoolYear, includeArchived]);
 
   // Honor the global course filter at the top of the page.
   const visibleRows = useMemo(() => {
