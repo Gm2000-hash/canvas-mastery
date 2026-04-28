@@ -119,7 +119,8 @@ export default function Mastery() {
           <h1 className="font-display text-4xl font-semibold mb-2">Mastery</h1>
           <p className="text-muted-foreground">Per-student mastery on each standard tagged in this course.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <HistoricalToggle value={showHistorical} onChange={setShowHistorical} reason="Mastery" />
           <Button asChild variant="ghost">
             <Link to="/app/mastery/debug"><Bug className="h-4 w-4 mr-2" /> Debug</Link>
           </Button>
