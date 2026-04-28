@@ -40,8 +40,10 @@ export default function Mastery() {
   async function load() {
     if (!courseId) return;
     setStudents(null);
-    const { data: studs } = await supabase
-      .from("students").select("id, name, sortable_name").eq("course_id", courseId).order("sortable_name", { nullsFirst: false });
+    let sq = supabase
+      .from("students").select("id, name, sortable_name").eq("course_id", courseId).is("merged_into", null).order("sortable_name", { nullsFirst: false });
+    if (!showHistorical) sq = sq.is("archived_at", null);
+    const { data: studs } = await sq;
     setStudents(studs ?? []);
 
     // Standards that are tagged on assignments in this course, plus any
