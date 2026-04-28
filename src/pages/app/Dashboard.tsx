@@ -27,9 +27,9 @@ export default function Dashboard() {
   async function load() {
     const nowIso = new Date().toISOString();
 
-    // Get visible (non-hidden) course ids first so all stats exclude hidden classes.
+    // Get visible (non-hidden, non-archived) course ids first so all stats reflect current rosters.
     const { data: visibleCourses } = await supabase
-      .from("courses").select("id").eq("hidden", false);
+      .from("courses").select("id").eq("hidden", false).is("archived_at", null);
     const visibleIds = (visibleCourses ?? []).map((c) => c.id);
     const hasVisible = visibleIds.length > 0;
 
