@@ -162,6 +162,11 @@ export default function Courses() {
                       <CardTitle className="font-display text-xl flex items-center gap-2">
                         <span className="truncate">{c.name}</span>
                         {c.hidden && <Badge variant="outline" className="text-[9px]">hidden</Badge>}
+                        {c.archived_at && (
+                          <Badge variant="outline" className="text-[9px]" title={`Archived ${new Date(c.archived_at).toLocaleDateString()}`}>
+                            archived
+                          </Badge>
+                        )}
                       </CardTitle>
                       <CardDescription>{c.course_code ?? "—"} {c.term ? `· ${c.term}` : ""}</CardDescription>
                     </div>
