@@ -216,6 +216,42 @@ export type Database = {
         }
         Relationships: []
       }
+      invitations: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          note: string | null
+          revoked: boolean
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          note?: string | null
+          revoked?: boolean
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          note?: string | null
+          revoked?: boolean
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
       mastery_snapshots: {
         Row: {
           attempts: number
@@ -812,6 +848,16 @@ export type Database = {
           student_name: string
         }[]
       }
+      create_invitation: {
+        Args: { _expires_at?: string; _note?: string }
+        Returns: {
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          note: string
+        }[]
+      }
       get_canvas_connection_status: {
         Args: never
         Returns: {
@@ -851,6 +897,13 @@ export type Database = {
           question_text: string
           source: string
           weight: number
+        }[]
+      }
+      redeem_invitation: {
+        Args: { _code: string; _user_id: string }
+        Returns: {
+          error: string
+          ok: boolean
         }[]
       }
       repseudonymize_course: {
