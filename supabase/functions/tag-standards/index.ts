@@ -220,11 +220,27 @@ RULES:
 Use the tool provided.`;
 
       const BATCH_SIZE = 10;
+      // Cap how much we attempt per invocation so we never blow the edge function
+      // CPU/wall-clock budget on big quizzes (which surfaces as an opaque
+      // "non-2xx" error with no body on the client). Anything beyond this
+      // gets handled by the user clicking "AI suggest" again.
+      const MAX_BATCHES_PER_CALL = 6; // up to 60 questions per click
+      // Run batches in parallel to cut wall-clock time roughly 3x.
+      const PARALLELISM = 3;
+
       const allResults: { question_id: string; tags: Tag[] }[] = [];
       let batchesRun = 0;
+      let aiHardError: { status: number; body: string } | null = null;
 
-      for (let i = 0; i < questions.length; i += BATCH_SIZE) {
-        const slice = questions.slice(i, i + BATCH_SIZE);
+      const totalSlices = Math.min(
+        Math.ceil(questions.length / BATCH_SIZE),
+        MAX_BATCHES_PER_CALL,
+      );
+      const slices = Array.from({ length: totalSlices }, (_, i) =>
+        questions.slice(i * BATCH_SIZE, i * BATCH_SIZE + BATCH_SIZE)
+      );
+
+      async function runBatch(slice: typeof questions) {
         const questionListText = slice.map((q, idx) =>
           `Question ${idx}: "${buildTaggerText(q)}"`
         ).join("\n\n");
@@ -285,23 +301,15 @@ Use the tool provided.`;
         });
 
         if (!aiRes.ok) {
-          if (aiRes.status === 429) {
-            return new Response(JSON.stringify({ error: "AI rate limit reached. Try again in a moment." }), {
-              status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+          const t = await aiRes.text().catch(() => "");
+          if (aiRes.status === 429 || aiRes.status === 402) {
+            aiHardError = { status: aiRes.status, body: t };
+          } else {
+            console.error(`AI gateway ${aiRes.status}: ${t.slice(0, 200)}`);
           }
-          if (aiRes.status === 402) {
-            return new Response(JSON.stringify({ error: "AI credits exhausted. Add credits in Workspace Settings." }), {
-              status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-          const t = await aiRes.text();
-          console.error(`AI gateway ${aiRes.status} on batch ${batchesRun}: ${t.slice(0, 200)}`);
-          batchesRun++;
-          continue;
+          return;
         }
 
-        batchesRun++;
         const aiJson = await aiRes.json();
         const toolCall = aiJson.choices?.[0]?.message?.tool_calls?.[0];
         let batchTags: BatchResult[] = [];
@@ -315,6 +323,23 @@ Use the tool provided.`;
           const tags = tagsByIdx.get(k) ?? [];
           if (tags.length > 0) allResults.push({ question_id: slice[k].id, tags });
         }
+      }
+
+      // Execute batches with bounded concurrency
+      for (let i = 0; i < slices.length; i += PARALLELISM) {
+        if (aiHardError) break;
+        const group = slices.slice(i, i + PARALLELISM);
+        await Promise.all(group.map((s) => runBatch(s)));
+        batchesRun += group.length;
+      }
+
+      if (aiHardError) {
+        const msg = aiHardError.status === 429
+          ? "AI rate limit reached. Try again in a moment."
+          : "AI credits exhausted. Add credits in Workspace Settings.";
+        return new Response(JSON.stringify({ error: msg }), {
+          status: aiHardError.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       // Persist question_standards
@@ -379,6 +404,8 @@ Use the tool provided.`;
         stored: aRows.length,
         candidate_count: standards.length,
         batches: batchesRun,
+        questions_processed: Math.min(totalQuestions, batchesRun * 10),
+        partial: totalQuestions > batchesRun * 10,
         // Mirror the legacy "suggestions" shape so existing UI can still show counts
         suggestions: Array.from(standardCounts.entries()).map(([sid, info]) => {
           const code = standards!.find((s) => s.id === sid)?.code ?? "";
