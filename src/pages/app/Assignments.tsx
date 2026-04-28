@@ -13,6 +13,24 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
 
+// Pulls the real server-side error message out of a supabase.functions.invoke() error.
+// Without this, FunctionsHttpError just says "Edge Function returned a non-2xx status code".
+async function readEdgeError(error: unknown, fallback: string): Promise<string> {
+  try {
+    const ctx = (error as any)?.context;
+    if (ctx && typeof ctx.json === "function") {
+      const body = await ctx.json();
+      if (body?.error) return String(body.error);
+      if (body?.message) return String(body.message);
+    }
+    if (ctx && typeof ctx.text === "function") {
+      const text = await ctx.text();
+      if (text) return text.slice(0, 300);
+    }
+  } catch { /* ignore */ }
+  return (error as any)?.message || fallback;
+}
+
 type Discipline = { id: string; state: string | null; subject: string; grade: string; framework: string | null; is_default: boolean };
 
 type Assignment = {
@@ -82,7 +100,7 @@ export default function Assignments() {
     setRecomputing(true);
     const { data, error } = await supabase.functions.invoke("recompute-mastery");
     setRecomputing(false);
-    if (error) { toast.error((error as any).message); return; }
+    if (error) { toast.error(await readEdgeError(error, "Failed to recompute mastery")); return; }
     toast.success(`Mastery recomputed (${(data as any).snapshots} entries)`);
   }
 
@@ -166,7 +184,7 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
     setTagging(true);
     const { data, error } = await supabase.functions.invoke("tag-standards", { body: { assignment_id: assignment.id } });
     setTagging(false);
-    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if (error) { toast.error(await readEdgeError(error, "AI suggest failed")); return; }
     if ((data as any)?.error) { toast.error((data as any).error); return; }
     const d = data as any;
     const n = d.suggestions?.length ?? 0;
@@ -191,7 +209,7 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
       body: { assignment_ids: [assignment.id] },
     });
     setImporting(false);
-    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if (error) { toast.error(await readEdgeError(error, "Import failed")); return; }
     if ((data as any)?.error) { toast.error((data as any).error); return; }
     const stats = (data as any).stats ?? {};
     const recompute = (data as any).recompute;
