@@ -184,7 +184,7 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
     setTagging(true);
     const { data, error } = await supabase.functions.invoke("tag-standards", { body: { assignment_id: assignment.id } });
     setTagging(false);
-    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if (error) { toast.error(await readEdgeError(error, "AI suggest failed")); return; }
     if ((data as any)?.error) { toast.error((data as any).error); return; }
     const d = data as any;
     const n = d.suggestions?.length ?? 0;
@@ -209,7 +209,7 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
       body: { assignment_ids: [assignment.id] },
     });
     setImporting(false);
-    if (error) { toast.error((error as any).message ?? "Failed"); return; }
+    if (error) { toast.error(await readEdgeError(error, "Import failed")); return; }
     if ((data as any)?.error) { toast.error((data as any).error); return; }
     const stats = (data as any).stats ?? {};
     const recompute = (data as any).recompute;
