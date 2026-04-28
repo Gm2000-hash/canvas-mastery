@@ -22,6 +22,7 @@ type CourseRow = {
   id: string; name: string; course_code: string | null; term: string | null; last_synced_at: string | null;
   discipline_id: string | null;
   hidden: boolean;
+  archived_at: string | null;
   studentCount: number; assignmentCount: number;
 };
 
@@ -29,6 +30,7 @@ export default function Courses() {
   const [rows, setRows] = useState<CourseRow[] | null>(null);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [showHidden, setShowHidden] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [reshufflingId, setReshufflingId] = useState<string | null>(null);
 
   async function repseudonymize(courseId: string) {
@@ -42,7 +44,7 @@ export default function Courses() {
 
   async function load() {
     const [{ data: courses }, { data: ds }] = await Promise.all([
-      supabase.from("courses").select("id, name, course_code, term, last_synced_at, discipline_id, hidden").order("name"),
+      supabase.from("courses").select("id, name, course_code, term, last_synced_at, discipline_id, hidden, archived_at").order("name"),
       supabase.from("teacher_disciplines").select("id, state, subject, grade, is_default").order("created_at"),
     ]);
     setDisciplines((ds ?? []) as Discipline[]);
@@ -86,10 +88,15 @@ export default function Courses() {
 
   const defaultDisc = disciplines.find((d) => d.is_default) ?? null;
   const hiddenCount = useMemo(() => (rows ?? []).filter((r) => r.hidden).length, [rows]);
+  const archivedCount = useMemo(() => (rows ?? []).filter((r) => r.archived_at && !r.hidden).length, [rows]);
   const displayRows = useMemo(() => {
     if (!rows) return rows;
-    return showHidden ? rows : rows.filter((r) => !r.hidden);
-  }, [rows, showHidden]);
+    return rows.filter((r) => {
+      if (!showHidden && r.hidden) return false;
+      if (!showArchived && r.archived_at && !r.hidden) return false;
+      return true;
+    });
+  }, [rows, showHidden, showArchived]);
 
   return (
     <div className="space-y-8">
@@ -99,6 +106,14 @@ export default function Courses() {
           <p className="text-muted-foreground">Pick which Canvas courses to track and tag each with a discipline.</p>
         </div>
         <div className="flex items-center gap-4">
+          {archivedCount > 0 && (
+            <div className="flex items-center gap-2">
+              <Switch id="show-archived" checked={showArchived} onCheckedChange={setShowArchived} />
+              <Label htmlFor="show-archived" className="text-sm text-muted-foreground cursor-pointer">
+                Show archived ({archivedCount})
+              </Label>
+            </div>
+          )}
           {hiddenCount > 0 && (
             <div className="flex items-center gap-2">
               <Switch id="show-hidden" checked={showHidden} onCheckedChange={setShowHidden} />
