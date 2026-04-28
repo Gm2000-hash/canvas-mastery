@@ -347,6 +347,71 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Duplicate-detection confirmation */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-mastery-low" />
+              {pendingDuplicates.length} of your selected course{pendingDuplicates.length === 1 ? " was" : "s were"} already imported
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Re-importing pulls fresh data from Canvas and overwrites existing records for those courses.
+                  Skipping leaves the previously imported data untouched.
+                </p>
+                <div className="rounded-md border bg-muted/30 p-2 max-h-40 overflow-y-auto text-xs space-y-1">
+                  {pendingDuplicates.map((c) => (
+                    <div key={c.canvas_course_id} className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[9px]">already imported</Badge>
+                      <span className="truncate">{c.name}</span>
+                      {c.school_year && <span className="text-muted-foreground">· {c.school_year}</span>}
+                    </div>
+                  ))}
+                </div>
+                {pendingFresh.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {pendingFresh.length} new course{pendingFresh.length === 1 ? "" : "s"} will import either way.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              variant="outline"
+              disabled={pendingFresh.length === 0}
+              onClick={() => {
+                setConfirmOpen(false);
+                void performImport(pendingFresh);
+              }}
+            >
+              Skip duplicates ({pendingFresh.length} new)
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmOpen(false);
+                void performImport([
+                  ...pendingFresh,
+                  ...pendingDuplicates.map((c) => c.canvas_course_id),
+                ]);
+              }}
+            >
+              Re-import all ({pendingFresh.length + pendingDuplicates.length})
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Post-backfill report */}
+      <BackfillReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        courseIds={reportCourseIds}
+      />
     </Dialog>
   );
 }
