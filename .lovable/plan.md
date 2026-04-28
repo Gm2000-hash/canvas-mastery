@@ -1,62 +1,67 @@
-## Finish the longitudinal + auto-archive build
+# Add Canvas New Quizzes support to sync
 
-The schema, edge function, and standalone pages are already in. This plan wires them into the existing UI so teachers actually see (and benefit from) the new behavior.
+Today the sync only collects question text, answer choices, and per-item correctness for **Classic Quizzes**. New Quizzes (the LTI-based replacement that most Canvas instances are migrating to) live behind a different API and are silently skipped. This plan closes that gap so item-level mastery works for both quiz engines.
 
----
+## What changes for the user
 
-### 1. Settings page integration
+- After connecting Canvas and running a sync, **New Quizzes assignments** will populate the Question Bank just like Classic Quizzes do today.
+- Per-question correctness for New Quiz submissions flows into `question_responses`, so item-level mastery, AI tagging, and analytics all work for New Quizzes.
+- Quizzes the API can't reach (e.g., a Canvas instance that hasn't enabled the New Quizzes API for the teacher's token) are reported as **skipped** in the back-fill report rather than failing the whole sync.
 
-Add two things to `src/pages/app/Settings.tsx`:
+## Technical approach
 
-- **Auto-archive card** — toggle bound to `teacher_settings.auto_archive_enabled` (already defaults to `true`). Copy explains: "Courses are automatically hidden from your default views after Canvas marks them completed *and* the school year (ending June 9) ends. You'll still see all current-school-year students regardless of trimester."
-- **Mount `<MergeStudentsCard />`** under a "Link student records" section, so a teacher can manually merge a 7th-grade roster entry to its 6th-grade counterpart.
+### 1. Detect New Quizzes during the assignments pass
+Canvas marks New Quiz assignments with `is_quiz_lti_assignment: true` (no `quiz_id`). Update `canvas-sync/index.ts` to:
+- Tag those rows as `kind = "quiz"` (already covered if we extend the conditional).
+- Store `canvas_quiz_id = a.id` (New Quizzes use the **assignment id** as the quiz id) and add a new column to distinguish engines.
 
-### 2. Default-view filtering (hide archived by default)
+### 2. Schema migration
+Add to `assignments`:
+- `quiz_engine text` — `'classic' | 'new' | null`. Lets us route per-question fetches to the right endpoint and lets the UI badge them.
 
-Apply `archived_at IS NULL` to the queries powering:
+Add to `quiz_questions`:
+- `item_type text` — New Quizzes expose richer types (`choice`, `multi-answer`, `true-false`, `matching`, `categorization`, `ordering`, `essay`, `file-upload`, `numeric`, `formula`, `hot-spot`, `stimulus`). We store the raw type so the AI tagger and UI can reason about format.
 
-- `src/pages/app/Mastery.tsx` — students list + course filter
-- `src/pages/app/Dashboard.tsx` — recent activity and counts
-- `src/pages/app/QuestionBank.tsx` — assignment/course filters
-- `src/pages/app/Courses.tsx` — show archived courses in a collapsed "Archived (N)" section instead of the main list
+### 3. Fetch New Quiz items
+In `canvas-sync/index.ts`, after the existing Classic block, add a New Quizzes block:
+- Endpoint: `GET /api/quiz/v1/courses/:course_id/quizzes/:assignment_id/items` (paginated).
+- Map each item to a `quiz_questions` row:
+  - `canvas_question_id = item.id`
+  - `question_text` = stripped/trimmed `entry.item_body`
+  - `points_possible = item.points_possible`
+  - `answers` = normalized choices pulled from `entry.interaction_data` (shape varies by `interaction_type`; we'll handle `choice`, `multi-answer`, `true-false`, `matching`, `categorization`, `ordering` — others store `null`).
+  - `item_type = entry.interaction_type`
 
-The data is preserved — it's just not in the default scope. The Historical page and the toggle (below) are how it gets surfaced.
+Failures (404, 401, instance with API disabled) are caught per-quiz and reported, never fatal.
 
-### 3. Analytics: school-year filter + historical toggle
+### 4. Per-question scores for New Quizzes
+Extend `canvas-sync-question-scores/index.ts`:
+- For assignments where `quiz_engine = 'new'`, call `GET /api/quiz/v1/courses/:course_id/quizzes/:assignment_id/submissions` to list submissions, then `GET /api/quiz/v1/courses/:course_id/quizzes/:assignment_id/submissions/:submission_id/results` to get per-item scoring (`scored_items[]` with `item_id`, `score`, `score_given`, `score_maximum`).
+- Map `item_id` → internal `quiz_questions.id` and upsert into `question_responses` (same shape used today: `correct` derived from `score_given >= score_maximum`, `points`, `points_possible`).
+- Reuse existing student-id resolution by `canvas_user_id`.
 
-In `src/pages/app/Analytics.tsx`:
+### 5. Surface results
+- `BackfillReportDialog` already shows `question_scores.quizzes` and `responses` counts. Extend the report to break those down by engine (`classic` vs `new`) and list any quizzes skipped because the New Quizzes API was unavailable on the teacher's instance.
 
-- Add a school-year `<Select>` (options derived from distinct school years across the teacher's courses, default = current school year per `school_year_end_for(now())`).
-- Pass the chosen year to the Analytics RPCs via the new `_school_year` param.
-- Add `<HistoricalToggle />` in the header. When on, the queries drop the `archived_at IS NULL` filter and write a row to `historical_access_log` (course_id null, reason "analytics view").
+### 6. UI touch-ups
+- `QuestionBank.tsx`: small badge next to each question/quiz showing engine (`Classic` / `New`).
+- `Assignments.tsx`: same badge on quiz rows.
+No behavior changes beyond labeling.
 
-### 4. Mastery: historical toggle
+## Files to add / edit
 
-In `src/pages/app/Mastery.tsx`, add `<HistoricalToggle />` next to the course filter. Same behavior — flipping it on includes archived students/courses and logs the access with the current course_id and reason "mastery view".
+```text
+supabase/migrations/<new>_new_quizzes_support.sql      (new)  – add quiz_engine, item_type
+supabase/functions/canvas-sync/index.ts                 (edit) – new-quiz items pass + engine tag
+supabase/functions/canvas-sync-question-scores/index.ts (edit) – new-quiz results pass
+src/components/BackfillReportDialog.tsx                 (edit) – engine breakdown + skipped list
+src/pages/app/QuestionBank.tsx                          (edit) – engine badge
+src/pages/app/Assignments.tsx                           (edit) – engine badge
+src/integrations/supabase/types.ts                      (auto) – regenerated by migration
+```
 
-### 5. Sidebar + nav polish
+## Caveats worth flagging
 
-`src/layouts/AppLayout.tsx` already has the Student History entry from the previous step. Verify it's grouped sensibly (under "Records" or directly under Mastery) and that the icon matches the rest of the nav.
-
-### 6. Small correctness items
-
-- **Dashboard "Active students" count**: switch to `archived_at IS NULL` so the number reflects current rosters, not lifetime.
-- **Course list**: show a small "Archived {date}" badge on archived rows when expanded.
-- **HistoricalToggle**: confirm it requires a non-empty reason before flipping on (FERPA audit hygiene).
-
----
-
-### Technical notes
-
-- All filtering is client-side query changes (`.is('archived_at', null)`) — no new migrations needed; the columns already exist.
-- The Analytics RPCs already accept `_school_year` from the prior migration; this plan just exposes the control.
-- `historical_access_log` writes go through the existing RLS policy (`teacher_id = auth.uid()` on insert).
-- No changes to the canvas-sync function; auto-archive already runs at the end of each sync.
-
-### Out of scope (still)
-
-- `/admin` UI, audit log viewer, role management — next plan.
-- Cross-teacher access requests — separate plan after admin lands.
-- Auto-un-archive logic — admin override only.
-
-Approve and I'll ship it.
+- **API availability**: Some Canvas instances disable the New Quizzes public API for non-admin tokens. We surface this clearly in the back-fill report; the user may need to ask their Canvas admin to enable it.
+- **Essay / file-upload / hot-spot items**: We store the prompt and point value but cannot store a meaningful "answer choices" payload — `answers` will be `null`. Item-level correctness still works because Canvas returns the score either way.
+- **Rate limits**: New Quizzes endpoints are per-quiz and per-submission, so a course with many New Quizzes will add HTTP calls. We keep the existing per-call try/catch so a single slow quiz never blocks the rest.

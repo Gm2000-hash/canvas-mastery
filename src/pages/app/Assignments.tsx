@@ -36,6 +36,7 @@ type Discipline = { id: string; state: string | null; subject: string; grade: st
 type Assignment = {
   id: string; name: string; kind: "assignment" | "quiz"; description: string | null;
   course_id: string; due_at: string | null; canvas_quiz_id: number | null;
+  quiz_engine: string | null;
 };
 type Course = { id: string; name: string; discipline_id: string | null };
 type StandardTag = {
@@ -79,7 +80,7 @@ export default function Assignments() {
   async function loadAssignments(cid: string) {
     setAssignments(null);
     const { data: a } = await supabase
-      .from("assignments").select("id, name, kind, description, course_id, due_at, canvas_quiz_id")
+      .from("assignments").select("id, name, kind, description, course_id, due_at, canvas_quiz_id, quiz_engine")
       .eq("course_id", cid).order("due_at", { ascending: false, nullsFirst: false }).order("name");
     setAssignments(a ?? []);
     if (a?.length) {
@@ -268,6 +269,11 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
             <CardTitle className="text-base font-medium flex items-center gap-2">
               {assignment.name}
               <Badge variant="outline" className="text-[10px] uppercase tracking-wide">{assignment.kind}</Badge>
+              {assignment.kind === "quiz" && assignment.quiz_engine && (
+                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                  {assignment.quiz_engine === "new" ? "New Quiz" : "Classic"}
+                </Badge>
+              )}
             </CardTitle>
             {assignment.description && (
               <CardDescription className="line-clamp-2 mt-1">{assignment.description}</CardDescription>

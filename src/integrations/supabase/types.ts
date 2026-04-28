@@ -77,6 +77,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["assignment_kind"]
           name: string
           points_possible: number | null
+          quiz_engine: string | null
           teacher_id: string
         }
         Insert: {
@@ -90,6 +91,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["assignment_kind"]
           name: string
           points_possible?: number | null
+          quiz_engine?: string | null
           teacher_id: string
         }
         Update: {
@@ -103,6 +105,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["assignment_kind"]
           name?: string
           points_possible?: number | null
+          quiz_engine?: string | null
           teacher_id?: string
         }
         Relationships: [
@@ -472,6 +475,7 @@ export type Database = {
           canvas_question_id: number
           created_at: string
           id: string
+          item_type: string | null
           points_possible: number | null
           position: number | null
           question_text: string | null
@@ -483,6 +487,7 @@ export type Database = {
           canvas_question_id: number
           created_at?: string
           id?: string
+          item_type?: string | null
           points_possible?: number | null
           position?: number | null
           question_text?: string | null
@@ -494,6 +499,7 @@ export type Database = {
           canvas_question_id?: number
           created_at?: string
           id?: string
+          item_type?: string | null
           points_possible?: number | null
           position?: number | null
           question_text?: string | null

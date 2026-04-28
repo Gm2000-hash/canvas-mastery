@@ -217,17 +217,24 @@ Deno.serve(async (req) => {
 
       // 3) Assignments
       const assignments = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/assignments`).catch(() => []);
-      const aRows = assignments.map((a) => ({
+      const aRows = assignments.map((a) => {
+        const isClassicQuiz = !!a.quiz_id;
+        const isNewQuiz = !!a.is_quiz_lti_assignment && !isClassicQuiz;
+        const isQuiz = isClassicQuiz || isNewQuiz || !!a.is_quiz_assignment;
+        return {
         teacher_id: teacherId,
         course_id: courseId,
         canvas_assignment_id: a.id,
-        canvas_quiz_id: a.quiz_id ?? null,
-        kind: (a.is_quiz_assignment || a.quiz_id) ? "quiz" : "assignment",
+        // For New Quizzes, Canvas uses the assignment id as the quiz id in /api/quiz/v1
+        canvas_quiz_id: isClassicQuiz ? a.quiz_id : (isNewQuiz ? a.id : null),
+        kind: isQuiz ? "quiz" : "assignment",
+        quiz_engine: isClassicQuiz ? "classic" : (isNewQuiz ? "new" : null),
         name: a.name ?? `Assignment ${a.id}`,
         description: a.description ? String(a.description).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000) : null,
         points_possible: a.points_possible ?? null,
         due_at: a.due_at ?? null,
-      }));
+        };
+      });
       if (aRows.length) {
         const { error: aErr } = await admin.from("assignments").upsert(aRows, { onConflict: "course_id,canvas_assignment_id" });
         if (aErr) console.error("assignments upsert", aErr); else stats.assignments += aRows.length;
@@ -273,6 +280,82 @@ Deno.serve(async (req) => {
             const { error: qErr } = await admin.from("quiz_questions")
               .upsert(qRows, { onConflict: "assignment_id,canvas_question_id" });
             if (qErr) console.error("quiz_questions upsert", qErr);
+          }
+        }
+      }
+
+      // 3c) New Quizzes items (LTI-based New Quizzes — separate API surface)
+      // Failures are non-fatal; some Canvas instances disable the public API.
+      const newQuizAssignments = assignments.filter((a) => !!a.is_quiz_lti_assignment && !a.quiz_id);
+      if (newQuizAssignments.length) {
+        const { data: assignMapForNQ } = await admin
+          .from("assignments").select("id, canvas_assignment_id").eq("course_id", courseId);
+        const aIdByCanvasNQ = new Map((assignMapForNQ ?? []).map((r) => [Number(r.canvas_assignment_id), r.id as string]));
+
+        for (const nq of newQuizAssignments) {
+          const internalAid = aIdByCanvasNQ.get(Number(nq.id));
+          if (!internalAid) continue;
+          let items: any[] = [];
+          try {
+            items = await canvasFetchAll<any>(creds, `/api/quiz/v1/courses/${c.id}/quizzes/${nq.id}/items`);
+          } catch (e) {
+            console.warn(`new-quiz ${nq.id} items fetch failed`, (e as Error).message);
+            continue;
+          }
+          const qRows = items.map((it, i) => {
+            const entry = it.entry ?? it; // some shapes nest under "entry"
+            const interaction = entry?.interaction_type_slug ?? entry?.interaction_type ?? null;
+            const data = entry?.interaction_data ?? {};
+            // Normalize answer choices for the common interaction types
+            let answers: any[] | null = null;
+            if (interaction === "choice" || interaction === "multi-answer") {
+              if (Array.isArray(data?.choices)) {
+                answers = data.choices.slice(0, 12).map((ch: any) => ({
+                  text: typeof ch?.item_body === "string"
+                    ? String(ch.item_body).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600)
+                    : null,
+                  html: typeof ch?.item_body === "string" ? String(ch.item_body).slice(0, 800) : null,
+                  weight: null,
+                }));
+              }
+            } else if (interaction === "true-false") {
+              answers = [
+                { text: "True", html: "True", weight: null },
+                { text: "False", html: "False", weight: null },
+              ];
+            } else if (interaction === "matching" && Array.isArray(data?.questions)) {
+              answers = data.questions.slice(0, 12).map((q: any) => ({
+                text: typeof q?.item_body === "string" ? String(q.item_body).replace(/<[^>]*>/g, " ").trim().slice(0, 600) : null,
+                html: null, weight: null,
+              }));
+            } else if (interaction === "categorization" && Array.isArray(data?.categories)) {
+              answers = data.categories.slice(0, 12).map((cat: any) => ({
+                text: typeof cat?.item_body === "string" ? String(cat.item_body).replace(/<[^>]*>/g, " ").trim().slice(0, 600) : null,
+                html: null, weight: null,
+              }));
+            } else if (interaction === "ordering" && Array.isArray(data?.choices)) {
+              answers = data.choices.slice(0, 12).map((ch: any) => ({
+                text: typeof ch?.item_body === "string" ? String(ch.item_body).replace(/<[^>]*>/g, " ").trim().slice(0, 600) : null,
+                html: null, weight: null,
+              }));
+            }
+            return {
+              teacher_id: teacherId,
+              assignment_id: internalAid,
+              canvas_question_id: it.id ?? entry?.id,
+              position: it.position ?? i + 1,
+              question_text: entry?.item_body
+                ? String(entry.item_body).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000)
+                : (it.title ?? null),
+              points_possible: it.points_possible ?? entry?.points_possible ?? null,
+              answers,
+              item_type: interaction,
+            };
+          }).filter((r) => r.canvas_question_id != null);
+          if (qRows.length) {
+            const { error: nqErr } = await admin.from("quiz_questions")
+              .upsert(qRows, { onConflict: "assignment_id,canvas_question_id" });
+            if (nqErr) console.error("quiz_questions (new) upsert", nqErr);
           }
         }
       }
