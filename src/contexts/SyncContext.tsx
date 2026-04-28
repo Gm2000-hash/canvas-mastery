@@ -7,11 +7,19 @@ type CanvasSyncBody = {
   discipline_assignments?: Array<{ canvas_course_id: number; discipline_id: string | null }>;
 };
 
+export type CanvasSyncResult = {
+  ok: boolean;
+  error?: string;
+  stats?: { courses?: number; students?: number; assignments?: number; submissions?: number };
+  question_scores?: { quizzes?: number; responses?: number };
+  archived?: { courses_archived?: number; students_archived?: number };
+};
+
 type SyncState = {
   syncing: boolean;
   startedAt: Date | null;
   label: string;
-  runCanvasSync: (body?: CanvasSyncBody) => Promise<void>;
+  runCanvasSync: (body?: CanvasSyncBody) => Promise<CanvasSyncResult>;
 };
 
 const SyncContext = createContext<SyncState | null>(null);
@@ -56,10 +64,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     if (emit) window.dispatchEvent(new CustomEvent("canvas-sync:done"));
   }, []);
 
-  const runCanvasSync = useCallback(async (body?: CanvasSyncBody) => {
+  const runCanvasSync = useCallback(async (body?: CanvasSyncBody): Promise<CanvasSyncResult> => {
     if (inflightRef.current) {
       toast.info("A Canvas sync is already running");
-      return;
+      return { ok: false, error: "already-running" };
     }
     inflightRef.current = true;
     const started = new Date();
@@ -81,12 +89,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     if (error) {
       toast.error((error as any).message ?? "Canvas sync failed");
       finish();
-      return;
+      return { ok: false, error: (error as any).message ?? "Canvas sync failed" };
     }
     if ((data as any)?.error) {
       toast.error((data as any).error);
       finish();
-      return;
+      return { ok: false, error: (data as any).error };
     }
     const s = (data as any)?.stats;
     if (s) {
@@ -97,6 +105,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       toast.success("Canvas sync complete");
     }
     finish();
+    return {
+      ok: true,
+      stats: (data as any)?.stats,
+      question_scores: (data as any)?.question_scores,
+      archived: (data as any)?.archived,
+    };
   }, [finish]);
 
   // On mount: if a sync was started recently and we lost the result (full reload),

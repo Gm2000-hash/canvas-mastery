@@ -4,15 +4,20 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Download, History as HistoryIcon, Loader2, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, Download, History as HistoryIcon, Loader2, RefreshCw, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useSync } from "@/contexts/SyncContext";
 import { currentSchoolYearLabel } from "@/lib/schoolYear";
+import { BackfillReportDialog } from "@/components/BackfillReportDialog";
 
 type CanvasCourse = {
   canvas_course_id: number;
@@ -51,6 +56,13 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
   const [hideAlreadyImported, setHideAlreadyImported] = useState(mode === "backfill");
   const [pastOnly, setPastOnly] = useState(mode === "backfill");
   const { syncing: importing, runCanvasSync } = useSync();
+
+  // Confirmation + report state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDuplicates, setPendingDuplicates] = useState<CanvasCourse[]>([]);
+  const [pendingFresh, setPendingFresh] = useState<number[]>([]);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportCourseIds, setReportCourseIds] = useState<string[]>([]);
 
   const isBackfill = mode === "backfill";
   const currentYear = useMemo(() => currentSchoolYearLabel(), []);
@@ -92,19 +104,54 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
   }
   function clearSelection() { setSelected(new Set()); }
 
-  async function importNow() {
-    if (selected.size === 0) { toast.error("Pick at least one course"); return; }
-    const assignments = Array.from(selected).map((cid) => ({
+  async function performImport(canvasIds: number[]) {
+    if (canvasIds.length === 0) {
+      toast.info("Nothing to import after skipping duplicates.");
+      return;
+    }
+    const assignments = canvasIds.map((cid) => ({
       canvas_course_id: cid,
       discipline_id: disciplineByCourse[cid] || null,
     }));
     setOpen(false);
     onImported?.();
-    await runCanvasSync({
-      course_ids: Array.from(selected),
+    const result = await runCanvasSync({
+      course_ids: canvasIds,
       discipline_assignments: assignments,
     });
     onImported?.();
+
+    // Post-backfill report — only for the back-fill flow and only on success
+    if (isBackfill && result.ok) {
+      const { data: rows } = await supabase
+        .from("courses")
+        .select("id, canvas_course_id")
+        .in("canvas_course_id", canvasIds);
+      const internalIds = (rows ?? []).map((r) => r.id as string);
+      if (internalIds.length > 0) {
+        setReportCourseIds(internalIds);
+        setReportOpen(true);
+      }
+    }
+  }
+
+  function handleImportClick() {
+    if (selected.size === 0) { toast.error("Pick at least one course"); return; }
+    const list = Array.from(selected);
+    const dupes = (courses ?? []).filter(
+      (c) => c.already_imported && selected.has(c.canvas_course_id),
+    );
+    const fresh = list.filter(
+      (cid) => !(courses ?? []).find((c) => c.canvas_course_id === cid)?.already_imported,
+    );
+
+    if (dupes.length > 0) {
+      setPendingDuplicates(dupes);
+      setPendingFresh(fresh);
+      setConfirmOpen(true);
+      return;
+    }
+    void performImport(list);
   }
 
   // Available school years across all courses, newest first
@@ -294,12 +341,77 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
             {isBackfill && selected.size > 0 && " · will sync students, assignments, submissions & quiz responses"}
           </div>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={importing}>Cancel</Button>
-          <Button onClick={importNow} disabled={importing || selected.size === 0}>
+          <Button onClick={handleImportClick} disabled={importing || selected.size === 0}>
             {importing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {isBackfill ? "Back-fill" : "Import"} {selected.size || ""}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Duplicate-detection confirmation */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-mastery-low" />
+              {pendingDuplicates.length} of your selected course{pendingDuplicates.length === 1 ? " was" : "s were"} already imported
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Re-importing pulls fresh data from Canvas and overwrites existing records for those courses.
+                  Skipping leaves the previously imported data untouched.
+                </p>
+                <div className="rounded-md border bg-muted/30 p-2 max-h-40 overflow-y-auto text-xs space-y-1">
+                  {pendingDuplicates.map((c) => (
+                    <div key={c.canvas_course_id} className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[9px]">already imported</Badge>
+                      <span className="truncate">{c.name}</span>
+                      {c.school_year && <span className="text-muted-foreground">· {c.school_year}</span>}
+                    </div>
+                  ))}
+                </div>
+                {pendingFresh.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {pendingFresh.length} new course{pendingFresh.length === 1 ? "" : "s"} will import either way.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              variant="outline"
+              disabled={pendingFresh.length === 0}
+              onClick={() => {
+                setConfirmOpen(false);
+                void performImport(pendingFresh);
+              }}
+            >
+              Skip duplicates ({pendingFresh.length} new)
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmOpen(false);
+                void performImport([
+                  ...pendingFresh,
+                  ...pendingDuplicates.map((c) => c.canvas_course_id),
+                ]);
+              }}
+            >
+              Re-import all ({pendingFresh.length + pendingDuplicates.length})
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Post-backfill report */}
+      <BackfillReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        courseIds={reportCourseIds}
+      />
     </Dialog>
   );
 }
