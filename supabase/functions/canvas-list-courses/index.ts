@@ -87,16 +87,22 @@ Deno.serve(async (req) => {
       .from("courses").select("canvas_course_id, discipline_id").eq("teacher_id", teacherId);
     const importedSet = new Map((existing ?? []).map((r) => [Number(r.canvas_course_id), r.discipline_id]));
 
-    const items = courses.map((c) => ({
-      canvas_course_id: c.id,
-      name: c.name ?? `Course ${c.id}`,
-      course_code: c.course_code ?? null,
-      term: c.term?.name ?? null,
-      workflow_state: c.workflow_state ?? null,
-      total_students: c.total_students ?? null,
-      already_imported: importedSet.has(Number(c.id)),
-      current_discipline_id: importedSet.get(Number(c.id)) ?? null,
-    }));
+    const items = courses.map((c) => {
+      const dateForYear =
+        c.end_at ?? c.term?.end_at ?? c.term?.start_at ?? c.start_at ?? null;
+      return {
+        canvas_course_id: c.id,
+        name: c.name ?? `Course ${c.id}`,
+        course_code: c.course_code ?? null,
+        term: c.term?.name ?? null,
+        workflow_state: c.workflow_state ?? null,
+        total_students: c.total_students ?? null,
+        end_at: c.end_at ?? c.term?.end_at ?? null,
+        school_year: schoolYearLabel(dateForYear),
+        already_imported: importedSet.has(Number(c.id)),
+        current_discipline_id: importedSet.get(Number(c.id)) ?? null,
+      };
+    });
 
     return new Response(JSON.stringify({ success: true, courses: items }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
