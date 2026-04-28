@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { FRAMEWORKS, getFramework, SUBJECTS, GRADES, STATES, type FrameworkId } from "@/lib/frameworks";
 import InvitationsCard from "@/components/InvitationsCard";
+import MergeStudentsCard from "@/components/MergeStudentsCard";
+import { Switch } from "@/components/ui/switch";
+import { Archive } from "lucide-react";
 
 export default function Settings() {
   const location = useLocation();
