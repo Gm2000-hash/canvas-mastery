@@ -269,6 +269,11 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
             <CardTitle className="text-base font-medium flex items-center gap-2">
               {assignment.name}
               <Badge variant="outline" className="text-[10px] uppercase tracking-wide">{assignment.kind}</Badge>
+              {assignment.kind === "quiz" && assignment.quiz_engine && (
+                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                  {assignment.quiz_engine === "new" ? "New Quiz" : "Classic"}
+                </Badge>
+              )}
             </CardTitle>
             {assignment.description && (
               <CardDescription className="line-clamp-2 mt-1">{assignment.description}</CardDescription>
