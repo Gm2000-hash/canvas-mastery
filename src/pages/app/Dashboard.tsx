@@ -34,7 +34,7 @@ export default function Dashboard() {
     const hasVisible = visibleIds.length > 0;
 
     const studentsQ = hasVisible
-      ? supabase.from("students").select("id", { count: "exact", head: true }).in("course_id", visibleIds)
+      ? supabase.from("students").select("id", { count: "exact", head: true }).in("course_id", visibleIds).is("archived_at", null).is("merged_into", null)
       : Promise.resolve({ count: 0 } as any);
     const assignmentsQ = hasVisible
       ? supabase.from("assignments").select("id", { count: "exact", head: true }).in("course_id", visibleIds)
