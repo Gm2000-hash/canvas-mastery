@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
-import { BarChart3, BookMarked, CheckCheck, GraduationCap, History, LayoutDashboard, Library, ListChecks, Settings as SettingsIcon, Sparkles } from "lucide-react";
+import { BarChart3, BookMarked, CheckCheck, GraduationCap, History, LayoutDashboard, Library, ListChecks, Settings as SettingsIcon, Shield, Sparkles } from "lucide-react";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
 
@@ -22,6 +23,7 @@ const nav = [
 
 export default function AppLayout() {
   const { user, loading } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export default function AppLayout() {
           <div className="text-xs text-sidebar-foreground/60 mt-1 font-medium">Mastery for Canvas teachers</div>
         </Link>
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {nav.map((item) => (
+          {[...nav, ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Shield, end: false as const }] : [])].map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
