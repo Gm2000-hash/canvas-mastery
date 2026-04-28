@@ -144,10 +144,13 @@ export type Database = {
       }
       courses: {
         Row: {
+          archived_at: string | null
           canvas_course_id: number
+          canvas_workflow_state: string | null
           course_code: string | null
           created_at: string
           discipline_id: string | null
+          end_at: string | null
           hidden: boolean
           id: string
           last_synced_at: string | null
@@ -156,10 +159,13 @@ export type Database = {
           term: string | null
         }
         Insert: {
+          archived_at?: string | null
           canvas_course_id: number
+          canvas_workflow_state?: string | null
           course_code?: string | null
           created_at?: string
           discipline_id?: string | null
+          end_at?: string | null
           hidden?: boolean
           id?: string
           last_synced_at?: string | null
@@ -168,10 +174,13 @@ export type Database = {
           term?: string | null
         }
         Update: {
+          archived_at?: string | null
           canvas_course_id?: number
+          canvas_workflow_state?: string | null
           course_code?: string | null
           created_at?: string
           discipline_id?: string | null
+          end_at?: string | null
           hidden?: boolean
           id?: string
           last_synced_at?: string | null
@@ -188,6 +197,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      historical_access_log: {
+        Row: {
+          accessed_at: string
+          course_id: string | null
+          id: string
+          reason: string | null
+          student_ids: string[]
+          teacher_id: string
+        }
+        Insert: {
+          accessed_at?: string
+          course_id?: string | null
+          id?: string
+          reason?: string | null
+          student_ids?: string[]
+          teacher_id: string
+        }
+        Update: {
+          accessed_at?: string
+          course_id?: string | null
+          id?: string
+          reason?: string | null
+          student_ids?: string[]
+          teacher_id?: string
+        }
+        Relationships: []
       }
       identity_reveals: {
         Row: {
@@ -544,11 +580,14 @@ export type Database = {
       }
       students: {
         Row: {
+          archived_at: string | null
           canvas_user_id: number
           course_id: string
           created_at: string
           email: string | null
+          enrollment_state: string | null
           id: string
+          merged_into: string | null
           name: string
           pseudonym: string | null
           pseudonym_seq: number | null
@@ -556,11 +595,14 @@ export type Database = {
           teacher_id: string
         }
         Insert: {
+          archived_at?: string | null
           canvas_user_id: number
           course_id: string
           created_at?: string
           email?: string | null
+          enrollment_state?: string | null
           id?: string
+          merged_into?: string | null
           name: string
           pseudonym?: string | null
           pseudonym_seq?: number | null
@@ -568,11 +610,14 @@ export type Database = {
           teacher_id: string
         }
         Update: {
+          archived_at?: string | null
           canvas_user_id?: number
           course_id?: string
           created_at?: string
           email?: string | null
+          enrollment_state?: string | null
           id?: string
+          merged_into?: string | null
           name?: string
           pseudonym?: string | null
           pseudonym_seq?: number | null
@@ -585,6 +630,13 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -685,6 +737,7 @@ export type Database = {
       teacher_settings: {
         Row: {
           attempt_window: number
+          auto_archive_enabled: boolean
           mastery_threshold: number
           pseudonym_style: string
           reveal_default: boolean
@@ -693,6 +746,7 @@ export type Database = {
         }
         Insert: {
           attempt_window?: number
+          auto_archive_enabled?: boolean
           mastery_threshold?: number
           pseudonym_style?: string
           reveal_default?: boolean
@@ -701,11 +755,33 @@ export type Database = {
         }
         Update: {
           attempt_window?: number
+          auto_archive_enabled?: boolean
           mastery_threshold?: number
           pseudonym_style?: string
           reveal_default?: boolean
           teacher_id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -737,19 +813,33 @@ export type Database = {
           submission_count: number
         }[]
       }
-      analytics_class_breakdown: {
-        Args: never
-        Returns: {
-          assessment_count: number
-          avg_mastery: number
-          course_id: string
-          course_name: string
-          framework: string
-          pct_mastered: number
-          student_count: number
-          subject: string
-        }[]
-      }
+      analytics_class_breakdown:
+        | {
+            Args: never
+            Returns: {
+              assessment_count: number
+              avg_mastery: number
+              course_id: string
+              course_name: string
+              framework: string
+              pct_mastered: number
+              student_count: number
+              subject: string
+            }[]
+          }
+        | {
+            Args: { _include_archived?: boolean; _school_year?: string }
+            Returns: {
+              assessment_count: number
+              avg_mastery: number
+              course_id: string
+              course_name: string
+              framework: string
+              pct_mastered: number
+              student_count: number
+              subject: string
+            }[]
+          }
       analytics_class_matrix: {
         Args: { _course_id: string }
         Returns: {
@@ -835,17 +925,54 @@ export type Database = {
           subject: string
         }[]
       }
-      analytics_student_breakdown: {
-        Args: { _course_id?: string }
+      analytics_student_breakdown:
+        | {
+            Args: { _course_id?: string }
+            Returns: {
+              avg_mastery: number
+              course_id: string
+              course_name: string
+              last_activity: string
+              standards_assessed: number
+              standards_mastered: number
+              student_id: string
+              student_name: string
+            }[]
+          }
+        | {
+            Args: {
+              _course_id?: string
+              _include_archived?: boolean
+              _school_year?: string
+            }
+            Returns: {
+              avg_mastery: number
+              course_id: string
+              course_name: string
+              last_activity: string
+              standards_assessed: number
+              standards_mastered: number
+              student_id: string
+              student_name: string
+            }[]
+          }
+      analytics_student_history: {
+        Args: { _student_id: string }
         Returns: {
-          avg_mastery: number
+          attempts: number
+          course_archived: boolean
           course_id: string
           course_name: string
-          last_activity: string
-          standards_assessed: number
-          standards_mastered: number
-          student_id: string
-          student_name: string
+          framework: string
+          grade: string
+          last_assessed: string
+          mastered: boolean
+          mastery_score: number
+          school_year: string
+          standard_code: string
+          standard_description: string
+          standard_id: string
+          subject: string
         }[]
       }
       create_invitation: {
@@ -857,6 +984,10 @@ export type Database = {
           id: string
           note: string
         }[]
+      }
+      force_archive_state: {
+        Args: { _archive: boolean; _course_id: string }
+        Returns: boolean
       }
       get_canvas_connection_status: {
         Args: never
@@ -879,6 +1010,18 @@ export type Database = {
           teacher_id: string
         }[]
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_course_active: { Args: { _course_id: string }; Returns: boolean }
+      is_within_active_school_year: {
+        Args: { _course_id: string }
+        Returns: boolean
+      }
       mastery_debug: {
         Args: { _standard_id: string; _student_id: string }
         Returns: {
@@ -897,6 +1040,14 @@ export type Database = {
           question_text: string
           source: string
           weight: number
+        }[]
+      }
+      merge_student_records: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          reassigned_responses: number
+          reassigned_snapshots: number
+          reassigned_submissions: number
         }[]
       }
       redeem_invitation: {
@@ -923,8 +1074,31 @@ export type Database = {
           student_id: string
         }[]
       }
+      run_auto_archive: {
+        Args: { _teacher_id: string }
+        Returns: {
+          courses_archived: number
+          students_archived: number
+        }[]
+      }
+      school_year_end_for: { Args: { _anchor: string }; Returns: string }
+      school_year_label: { Args: { _anchor: string }; Returns: string }
+      search_students_history: {
+        Args: { _query: string }
+        Returns: {
+          course_archived: boolean
+          course_id: string
+          course_name: string
+          display_name: string
+          last_activity: string
+          real_name: string
+          school_year: string
+          student_id: string
+        }[]
+      }
     }
     Enums: {
+      app_role: "admin" | "teacher"
       assignment_kind: "assignment" | "quiz"
     }
     CompositeTypes: {
@@ -1053,6 +1227,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "teacher"],
       assignment_kind: ["assignment", "quiz"],
     },
   },
