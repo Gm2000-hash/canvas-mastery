@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { Check, Loader2, Star, Trash2, Plus, Pencil, RefreshCw } from "lucide-react";
+import { Check, Loader2, Star, Trash2, Plus, Pencil, RefreshCw, FileUp } from "lucide-react";
+import ImportStandardsDialog from "@/components/ImportStandardsDialog";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
@@ -55,6 +56,9 @@ export default function Settings() {
   const [seedingDiscId, setSeedingDiscId] = useState<string | null>(null);
   // Edit dialog
   const [editing, setEditing] = useState<Discipline | null>(null);
+  // Import dialog
+  const [importOpen, setImportOpen] = useState(false);
+  const [importDefaults, setImportDefaults] = useState<{ framework?: any; state?: string; subject?: string; grade?: string } | undefined>(undefined);
 
   async function load() {
     const [{ data: profile }, { data: ccRows }, { data: settings }, { data: discs }] = await Promise.all([
@@ -425,6 +429,17 @@ export default function Settings() {
                           <RefreshCw className="h-3.5 w-3.5" />
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setImportDefaults({ framework: (d.framework ?? "CUSTOM") as any, state: d.state, subject: d.subject, grade: d.grade });
+                          setImportOpen(true);
+                        }}
+                        title="Import standards from URL or PDF"
+                      >
+                        <FileUp className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="sm" variant="ghost" onClick={() => removeDiscipline(d.id)} title="Remove">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -507,6 +522,35 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* IMPORT STANDARDS (standalone) */}
+      <Card id="import-standards">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileUp className="h-4 w-4" /> Import standards from a website or PDF
+          </CardTitle>
+          <CardDescription>
+            Don't see your framework in the list? Paste a URL to your state's standards page, or upload an official PDF (e.g. an Idaho SDE Essential Standards guide). The AI will pull every standard out, you'll review the list, and they'll be saved to your private library.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={() => {
+              setImportDefaults(undefined);
+              setImportOpen(true);
+            }}
+          >
+            <FileUp className="h-4 w-4 mr-2" /> Open importer
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* IMPORT DIALOG */}
+      <ImportStandardsDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        defaults={importDefaults}
+        onImported={() => load()}
+      />
       {/* EDIT DIALOG */}
       {editing && (
         <EditDisciplineDialog
