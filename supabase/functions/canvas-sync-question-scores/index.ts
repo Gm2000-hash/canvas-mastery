@@ -95,6 +95,7 @@ export async function syncQuestionScoresForTeacher(opts: {
     const result: QuizResult = { assignment_id: qa.id as string, name: qa.name as string, status: "ok", responses: 0 };
     const courseCanvasId = (qa as any).courses?.canvas_course_id as number | undefined;
     const quizId = qa.canvas_quiz_id as number | null;
+    const engine = ((qa as any).quiz_engine as string | null) ?? "classic";
     if (!courseCanvasId || !quizId) {
       result.status = "skipped"; result.reason = "Missing Canvas IDs";
       results.push(result); continue;
@@ -104,7 +105,7 @@ export async function syncQuestionScoresForTeacher(opts: {
     const { data: qRows } = await admin
       .from("quiz_questions").select("id, canvas_question_id")
       .eq("assignment_id", qa.id);
-    const qIdByCanvas = new Map((qRows ?? []).map((r) => [Number(r.canvas_question_id), r.id as string]));
+    const qIdByCanvas = new Map((qRows ?? []).map((r) => [String(r.canvas_question_id), r.id as string]));
     if (qIdByCanvas.size === 0) {
       result.status = "skipped"; result.reason = "No synced questions";
       results.push(result); continue;
@@ -115,6 +116,96 @@ export async function syncQuestionScoresForTeacher(opts: {
       .from("students").select("id, canvas_user_id")
       .eq("course_id", qa.course_id);
     const sIdByCanvas = new Map((sRows ?? []).map((r) => [Number(r.canvas_user_id), r.id as string]));
+
+    // ---------- New Quizzes branch ----------
+    if (engine === "new") {
+      let nqSubs: any[] = [];
+      try {
+        nqSubs = await canvasFetchAll<any>(
+          creds,
+          `/api/quiz/v1/courses/${courseCanvasId}/quizzes/${quizId}/submissions`,
+        );
+      } catch (e) {
+        result.status = "error";
+        result.reason = `New Quizzes API: ${(e as Error).message.slice(0, 180)}`;
+        results.push(result); continue;
+      }
+      if (nqSubs.length === 0) {
+        result.status = "ok"; result.reason = "No submissions yet";
+        results.push(result); continue;
+      }
+      // Pick latest attempt per student
+      const latestNQ = new Map<number, any>();
+      for (const s of nqSubs) {
+        const uid = Number(s.user_id);
+        const cur = latestNQ.get(uid);
+        if (!cur || Number(s.attempt ?? 1) > Number(cur.attempt ?? 1)) latestNQ.set(uid, s);
+      }
+
+      const nqRows: any[] = [];
+      for (const [uid, sub] of latestNQ) {
+        const studentId = sIdByCanvas.get(uid);
+        if (!studentId) continue;
+        const subId = sub.id;
+        if (!subId) continue;
+        let resultPayload: any = null;
+        try {
+          // Returns a single object with scored_items (or items) array
+          const url = `${creds.base_url}/api/quiz/v1/courses/${courseCanvasId}/quizzes/${quizId}/submissions/${subId}/results`;
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${creds.api_token}` } });
+          if (!res.ok) {
+            await res.text().catch(() => "");
+            continue;
+          }
+          resultPayload = await res.json();
+        } catch (e) {
+          console.warn(`new-quiz submission ${subId} results failed:`, (e as Error).message);
+          continue;
+        }
+        const scored: any[] = Array.isArray(resultPayload?.scored_items)
+          ? resultPayload.scored_items
+          : Array.isArray(resultPayload?.items) ? resultPayload.items : [];
+        for (const item of scored) {
+          const itemId = item.item_id ?? item.id;
+          const qid = qIdByCanvas.get(String(itemId));
+          if (!qid) continue;
+          const points = item.score_given == null
+            ? (item.score == null ? null : Number(item.score))
+            : Number(item.score_given);
+          const max = item.score_maximum == null ? null : Number(item.score_maximum);
+          let correct: boolean | null = null;
+          if (points != null && max != null && max > 0) correct = points >= max * 0.999;
+          nqRows.push({
+            teacher_id: opts.teacherId,
+            question_id: qid,
+            student_id: studentId,
+            points,
+            points_possible: max,
+            correct,
+          });
+        }
+      }
+      if (nqRows.length) {
+        for (let i = 0; i < nqRows.length; i += 500) {
+          const chunk = nqRows.slice(i, i + 500);
+          const { error: upErr } = await admin
+            .from("question_responses")
+            .upsert(chunk, { onConflict: "question_id,student_id" });
+          if (upErr) {
+            result.status = "error"; result.reason = upErr.message.slice(0, 200); break;
+          }
+          result.responses += chunk.length;
+        }
+      }
+      if (result.status === "ok") {
+        stats.quizzes++;
+        stats.responses += result.responses;
+      }
+      results.push(result);
+      continue;
+    }
+
+    // ---------- Classic Quizzes branch (existing logic) ----------
 
     // 1) List quiz submissions (one per student attempt). Use submission attempts to pick latest per student.
     let quizSubs: any[] = [];
