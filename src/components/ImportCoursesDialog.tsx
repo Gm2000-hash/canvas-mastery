@@ -104,19 +104,54 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
   }
   function clearSelection() { setSelected(new Set()); }
 
-  async function importNow() {
-    if (selected.size === 0) { toast.error("Pick at least one course"); return; }
-    const assignments = Array.from(selected).map((cid) => ({
+  async function performImport(canvasIds: number[]) {
+    if (canvasIds.length === 0) {
+      toast.info("Nothing to import after skipping duplicates.");
+      return;
+    }
+    const assignments = canvasIds.map((cid) => ({
       canvas_course_id: cid,
       discipline_id: disciplineByCourse[cid] || null,
     }));
     setOpen(false);
     onImported?.();
-    await runCanvasSync({
-      course_ids: Array.from(selected),
+    const result = await runCanvasSync({
+      course_ids: canvasIds,
       discipline_assignments: assignments,
     });
     onImported?.();
+
+    // Post-backfill report — only for the back-fill flow and only on success
+    if (isBackfill && result.ok) {
+      const { data: rows } = await supabase
+        .from("courses")
+        .select("id, canvas_course_id")
+        .in("canvas_course_id", canvasIds);
+      const internalIds = (rows ?? []).map((r) => r.id as string);
+      if (internalIds.length > 0) {
+        setReportCourseIds(internalIds);
+        setReportOpen(true);
+      }
+    }
+  }
+
+  function handleImportClick() {
+    if (selected.size === 0) { toast.error("Pick at least one course"); return; }
+    const list = Array.from(selected);
+    const dupes = (courses ?? []).filter(
+      (c) => c.already_imported && selected.has(c.canvas_course_id),
+    );
+    const fresh = list.filter(
+      (cid) => !(courses ?? []).find((c) => c.canvas_course_id === cid)?.already_imported,
+    );
+
+    if (dupes.length > 0) {
+      setPendingDuplicates(dupes);
+      setPendingFresh(fresh);
+      setConfirmOpen(true);
+      return;
+    }
+    void performImport(list);
   }
 
   // Available school years across all courses, newest first
