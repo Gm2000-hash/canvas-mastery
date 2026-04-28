@@ -122,6 +122,7 @@ export default function Courses() {
               </Label>
             </div>
           )}
+          <ImportCoursesDialog onImported={load} mode="backfill" />
           <ImportCoursesDialog onImported={load} />
         </div>
       </div>
