@@ -57,6 +57,13 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
   const [pastOnly, setPastOnly] = useState(mode === "backfill");
   const { syncing: importing, runCanvasSync } = useSync();
 
+  // Confirmation + report state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDuplicates, setPendingDuplicates] = useState<CanvasCourse[]>([]);
+  const [pendingFresh, setPendingFresh] = useState<number[]>([]);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportCourseIds, setReportCourseIds] = useState<string[]>([]);
+
   const isBackfill = mode === "backfill";
   const currentYear = useMemo(() => currentSchoolYearLabel(), []);
 
