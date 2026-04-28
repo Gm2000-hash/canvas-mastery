@@ -233,7 +233,8 @@ Deno.serve(async (req) => {
         description: a.description ? String(a.description).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000) : null,
         points_possible: a.points_possible ?? null,
         due_at: a.due_at ?? null,
-      }));
+        };
+      });
       if (aRows.length) {
         const { error: aErr } = await admin.from("assignments").upsert(aRows, { onConflict: "course_id,canvas_assignment_id" });
         if (aErr) console.error("assignments upsert", aErr); else stats.assignments += aRows.length;
