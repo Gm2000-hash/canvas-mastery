@@ -1083,19 +1083,42 @@ export type Database = {
       }
       school_year_end_for: { Args: { _anchor: string }; Returns: string }
       school_year_label: { Args: { _anchor: string }; Returns: string }
-      search_students_history: {
-        Args: { _query: string }
-        Returns: {
-          course_archived: boolean
-          course_id: string
-          course_name: string
-          display_name: string
-          last_activity: string
-          real_name: string
-          school_year: string
-          student_id: string
-        }[]
-      }
+      search_students_history:
+        | {
+            Args: { _query: string }
+            Returns: {
+              course_archived: boolean
+              course_id: string
+              course_name: string
+              display_name: string
+              last_activity: string
+              real_name: string
+              school_year: string
+              student_id: string
+            }[]
+          }
+        | {
+            Args: {
+              _grade?: string
+              _query: string
+              _school_year?: string
+              _subject?: string
+              _trimester?: string
+            }
+            Returns: {
+              course_archived: boolean
+              course_id: string
+              course_name: string
+              display_name: string
+              grade: string
+              last_activity: string
+              real_name: string
+              school_year: string
+              student_id: string
+              subject: string
+              term: string
+            }[]
+          }
     }
     Enums: {
       app_role: "admin" | "teacher"
