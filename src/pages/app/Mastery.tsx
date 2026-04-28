@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRevealedNames } from "@/hooks/useRevealedNames";
 import { RevealNamesToggle } from "@/components/RevealNamesToggle";
+import { HistoricalToggle } from "@/components/HistoricalToggle";
 
 type Course = { id: string; name: string };
 type Student = { id: string; name: string; sortable_name: string | null };
