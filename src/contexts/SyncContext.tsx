@@ -7,11 +7,19 @@ type CanvasSyncBody = {
   discipline_assignments?: Array<{ canvas_course_id: number; discipline_id: string | null }>;
 };
 
+export type CanvasSyncResult = {
+  ok: boolean;
+  error?: string;
+  stats?: { courses?: number; students?: number; assignments?: number; submissions?: number };
+  question_scores?: { quizzes?: number; responses?: number };
+  archived?: { courses_archived?: number; students_archived?: number };
+};
+
 type SyncState = {
   syncing: boolean;
   startedAt: Date | null;
   label: string;
-  runCanvasSync: (body?: CanvasSyncBody) => Promise<void>;
+  runCanvasSync: (body?: CanvasSyncBody) => Promise<CanvasSyncResult>;
 };
 
 const SyncContext = createContext<SyncState | null>(null);
