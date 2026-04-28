@@ -36,6 +36,7 @@ type Discipline = { id: string; state: string | null; subject: string; grade: st
 type Assignment = {
   id: string; name: string; kind: "assignment" | "quiz"; description: string | null;
   course_id: string; due_at: string | null; canvas_quiz_id: number | null;
+  quiz_engine: string | null;
 };
 type Course = { id: string; name: string; discipline_id: string | null };
 type StandardTag = {
