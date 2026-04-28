@@ -429,6 +429,17 @@ export default function Settings() {
                           <RefreshCw className="h-3.5 w-3.5" />
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setImportDefaults({ framework: (d.framework ?? "CUSTOM") as any, state: d.state, subject: d.subject, grade: d.grade });
+                          setImportOpen(true);
+                        }}
+                        title="Import standards from URL or PDF"
+                      >
+                        <FileUp className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="sm" variant="ghost" onClick={() => removeDiscipline(d.id)} title="Remove">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
