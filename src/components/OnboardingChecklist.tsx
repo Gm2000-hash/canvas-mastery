@@ -80,7 +80,7 @@ export function OnboardingChecklist({ onChange }: Props) {
         title: "Import your courses",
         subtitle: "Pick which Canvas courses to track — students, assignments, and scores follow.",
         cta: "Go to courses",
-        to: "/app/courses",
+        to: "/app/classes",
         done: coursesDone,
       },
     ];

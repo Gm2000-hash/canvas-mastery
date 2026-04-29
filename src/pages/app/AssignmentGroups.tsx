@@ -215,7 +215,7 @@ export default function AssignmentGroups() {
       </Tabs>
 
       <div className="text-xs text-muted-foreground">
-        Tip: open the <Link to="/app/analytics" className="underline">Compare classes</Link> tab on Analytics to chart a confirmed group across all its sections.
+        Tip: open the <Link to="/app/classes" className="underline">Compare classes</Link> tab on Analytics to chart a confirmed group across all its sections.
       </div>
     </div>
   );
