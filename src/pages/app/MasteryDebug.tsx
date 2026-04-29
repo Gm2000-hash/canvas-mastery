@@ -189,7 +189,7 @@ export default function MasteryDebug() {
               <SelectContent>
                 {standards.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    <span className="font-mono text-xs mr-2">{s.code}</span>
+                    <span className="font-code text-xs mr-2">{s.code}</span>
                     <span className="text-muted-foreground">{s.description.slice(0, 60)}</span>
                   </SelectItem>
                 ))}
@@ -211,7 +211,7 @@ export default function MasteryDebug() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
                 {studentName} <span className="text-muted-foreground">on</span>{" "}
-                <span className="font-mono">{standard?.code}</span>
+                <span className="font-code">{standard?.code}</span>
               </CardTitle>
               <CardDescription>{standard?.description}</CardDescription>
             </CardHeader>

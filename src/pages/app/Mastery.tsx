@@ -166,7 +166,7 @@ export default function Mastery() {
                 const v = classAvg[s.id] ?? 0;
                 return (
                   <div key={s.id} className="flex items-center gap-3 text-sm">
-                    <div className="font-mono text-xs text-muted-foreground w-28 shrink-0">{s.code}</div>
+                    <div className="font-code text-xs text-muted-foreground w-28 shrink-0">{s.code}</div>
                     <div className="flex-1 truncate text-foreground/80">{s.description}</div>
                     <div className="w-44 h-2 rounded-full bg-mastery-bg overflow-hidden">
                       <div className="h-full rounded-full" style={{ width: `${v * 100}%`, background: bandColor(v) }} />
@@ -190,7 +190,7 @@ export default function Mastery() {
                   <tr>
                     <th className="text-left pl-2 sticky left-0 bg-card z-10">Student</th>
                     {standards.map((s) => (
-                      <th key={s.id} className="px-1 font-mono text-[10px] text-muted-foreground rotate-[-30deg] origin-bottom-left h-16 whitespace-nowrap">{s.code}</th>
+                      <th key={s.id} className="px-1 font-code text-[10px] text-muted-foreground rotate-[-30deg] origin-bottom-left h-16 whitespace-nowrap">{s.code}</th>
                     ))}
                   </tr>
                 </thead>

@@ -406,7 +406,7 @@ export default function StudentHistory() {
                               >
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-mono text-xs">{r.standard_code}</span>
+                                    <span className="font-code text-xs">{r.standard_code}</span>
                                     {r.mastered && (
                                       <Badge variant="outline" className="text-[9px] bg-mastery-high/10 text-mastery-high border-mastery-high/30">
                                         mastered

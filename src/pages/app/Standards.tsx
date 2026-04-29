@@ -245,7 +245,7 @@ export default function Standards() {
                 >
                   {fw.shortLabel}
                 </Badge>
-                <div className="font-mono text-xs text-muted-foreground w-36 shrink-0 pt-0.5 break-all">{s.code}</div>
+                <div className="font-code text-xs text-muted-foreground w-36 shrink-0 pt-0.5 break-all">{s.code}</div>
                 <div className="flex-1 min-w-0 text-sm">{s.description}</div>
                 <div className="text-xs text-muted-foreground shrink-0 flex items-center gap-1.5">
                   <span className={fw.national ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>

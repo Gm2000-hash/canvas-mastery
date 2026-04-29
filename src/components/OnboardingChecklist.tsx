@@ -161,7 +161,7 @@ export function OnboardingChecklist({ onChange }: Props) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                <span className="text-xs font-code text-muted-foreground tabular-nums">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span className={`font-medium ${step.done ? "line-through text-muted-foreground" : ""}`}>

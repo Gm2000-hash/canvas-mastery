@@ -523,7 +523,7 @@ export default function QuestionBank() {
                         <span className="text-[10px] text-muted-foreground">{q.points_possible} pts</span>
                       )}
                       {(q.standards ?? []).slice(0, 4).map((s, i) => (
-                        <Badge key={i} variant="outline" className="text-[10px] font-mono bg-accent/5 border-accent/30">{s.code}</Badge>
+                        <Badge key={i} variant="outline" className="text-[10px] font-code bg-accent/5 border-accent/30">{s.code}</Badge>
                       ))}
                       {(q.standards?.length ?? 0) > 4 && (
                         <span className="text-[10px] text-muted-foreground">+{q.standards!.length - 4}</span>
@@ -666,13 +666,13 @@ function TreeView({
                 disabled={!child.row}
                 title={child.row?.description}
               >
-                <span className="font-mono shrink-0">{child.code}</span>
+                <span className="font-code shrink-0">{child.code}</span>
                 {child.row?.description && (
                   <span className="truncate text-muted-foreground">{child.row.description}</span>
                 )}
               </button>
               <div className="shrink-0 flex items-center gap-1.5">
-                <Badge variant="outline" className="text-[9px] h-4 px-1 font-mono">
+                <Badge variant="outline" className="text-[9px] h-4 px-1 font-code">
                   {child.totals.questions}q
                 </Badge>
                 {avg != null && (
@@ -738,7 +738,7 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
               <div className="space-y-2">
                 {question.standards!.map((s, i) => (
                   <div key={i} className="rounded-md border p-2 text-sm">
-                    <div className="font-mono text-xs text-accent">{s.code}</div>
+                    <div className="font-code text-xs text-accent">{s.code}</div>
                     <div className="text-muted-foreground text-xs mt-0.5">{s.description}</div>
                   </div>
                 ))}

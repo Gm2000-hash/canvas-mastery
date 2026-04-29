@@ -417,7 +417,7 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
                     checked={selected.has(t.id)}
                     onCheckedChange={(c) => toggleOne(t.id, c === true)}
                   />
-                  <span className="font-mono shrink-0">{t.standards.code}</span>
+                  <span className="font-code shrink-0">{t.standards.code}</span>
                   {t.confidence != null && (
                     <span className="text-muted-foreground shrink-0">({Math.round(t.confidence * 100)}%)</span>
                   )}
@@ -477,7 +477,7 @@ function AddStandardDialog({ assignmentId, onAdded }: { assignmentId: string; on
             <CommandGroup>
               {standards.map((s) => (
                 <CommandItem key={s.id} value={`${s.code} ${s.description}`} onSelect={() => add(s.id)}>
-                  <span className="font-mono text-xs mr-2 text-muted-foreground">{s.code}</span>
+                  <span className="font-code text-xs mr-2 text-muted-foreground">{s.code}</span>
                   <span className="truncate">{s.description}</span>
                 </CommandItem>
               ))}

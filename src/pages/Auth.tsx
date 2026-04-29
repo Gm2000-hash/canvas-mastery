@@ -115,7 +115,7 @@ export default function Auth() {
                       onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                       placeholder="XXXX-XXXX-XXXX"
                       autoComplete="off"
-                      className="font-mono tracking-wider"
+                      className="font-code tracking-wider"
                     />
                     <p className="text-xs text-muted-foreground">
                       StandardsTrack is invite-only. Ask a current user for a code.

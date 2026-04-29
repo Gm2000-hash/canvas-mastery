@@ -170,7 +170,7 @@ export function BackfillReportDialog({ open, onOpenChange, courseIds }: Props) {
                         {r.missing_standard_codes.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-1">
                             {r.missing_standard_codes.map((code) => (
-                              <span key={code} className="font-mono text-[10px] rounded bg-muted px-1.5 py-0.5">
+                              <span key={code} className="font-code text-[10px] rounded bg-muted px-1.5 py-0.5">
                                 {code}
                               </span>
                             ))}

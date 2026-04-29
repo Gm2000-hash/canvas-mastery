@@ -718,7 +718,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
                   {leafColumns.map((c) => {
                     if (c.kind === "child") {
                       return (
-                        <th key={c.key} className="border-b border-r p-2 font-mono font-normal text-[10px] whitespace-nowrap bg-muted/30"
+                        <th key={c.key} className="border-b border-r p-2 font-code font-normal text-[10px] whitespace-nowrap bg-muted/30"
                             title={c.childDescription ? `${c.childCode} — ${c.childDescription}` : c.childCode}>
                           <div className="text-muted-foreground">{c.childCode}</div>
                           <div className="text-[9px] font-sans text-muted-foreground/80">substandard</div>
@@ -728,7 +728,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
                     const isOpen = expanded.has(c.group.key);
                     const canExpand = c.group.children.length > 1;
                     return (
-                      <th key={c.key} className="border-b border-r p-2 font-mono font-normal text-[10px] whitespace-nowrap">
+                      <th key={c.key} className="border-b border-r p-2 font-code font-normal text-[10px] whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => canExpand && toggleParent(c.group.key)}
@@ -918,7 +918,7 @@ function StandardsView({ courseId, subjects, courses }: { courseId: string | nul
                 const p = (r.pct_mastered ?? 0) * 100;
                 return (
                   <TableRow key={r.standard_id}>
-                    <TableCell className="font-mono text-xs whitespace-nowrap">{r.code}</TableCell>
+                    <TableCell className="font-code text-xs whitespace-nowrap">{r.code}</TableCell>
                     <TableCell className="text-sm max-w-md truncate" title={r.description}>{r.description}</TableCell>
                     <TableCell><Badge variant="outline" style={{ borderColor: FRAMEWORK_COLOR[r.framework], color: FRAMEWORK_COLOR[r.framework] }}>{fw.shortLabel}</Badge></TableCell>
                     <TableCell className="text-right tabular-nums">{r.students_assessed}</TableCell>
@@ -1408,7 +1408,7 @@ function CompareView({ courses }: { courses: Course[] }) {
                   {standardOptions.length === 0 && <SelectItem value="__none" disabled>No standards</SelectItem>}
                   {standardOptions.slice(0, 500).map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      <span className="font-mono mr-1.5">{s.code}</span>
+                      <span className="font-code mr-1.5">{s.code}</span>
                       <span className="text-muted-foreground">{s.description.slice(0, 60)}</span>
                     </SelectItem>
                   ))}

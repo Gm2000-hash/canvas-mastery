@@ -487,7 +487,7 @@ export default function Review() {
                               <TooltipTrigger asChild>
                                 <div className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/5 px-2 py-0.5 text-xs">
                                   <Sparkles className="h-3 w-3 text-accent" />
-                                  <span className="font-mono">{t.standards?.code}</span>
+                                  <span className="font-code">{t.standards?.code}</span>
                                   {t.confidence != null && (
                                     <span className="text-muted-foreground">{Math.round(t.confidence * 100)}%</span>
                                   )}
@@ -595,7 +595,7 @@ export default function Review() {
                             return (
                               <div key={q.id} className="text-xs border rounded-md p-2" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-start gap-2">
-                                  <span className="font-mono text-muted-foreground shrink-0">Q{q.position ?? "?"}</span>
+                                  <span className="font-code text-muted-foreground shrink-0">Q{q.position ?? "?"}</span>
                                   <span className="line-clamp-2 flex-1">{q.question_text ?? <em className="text-muted-foreground">(no text)</em>}</span>
                                   {q.points_possible != null && (
                                     <span className="shrink-0 text-muted-foreground">{q.points_possible} pts</span>
@@ -616,7 +616,7 @@ export default function Review() {
                                         <TooltipTrigger asChild>
                                           <div className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/5 px-1.5 py-0.5 text-[10px]">
                                             <Sparkles className="h-2.5 w-2.5 text-accent" />
-                                            <span className="font-mono">{t.standards?.code}</span>
+                                            <span className="font-code">{t.standards?.code}</span>
                                             {t.confidence != null && <span className="text-muted-foreground">{Math.round(t.confidence * 100)}%</span>}
                                             <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={() => confirmQTag(t, a.id)} title="Confirm">
                                               <Check className="h-2.5 w-2.5 text-mastery-high" />
@@ -723,7 +723,7 @@ function OverrideButton({
             <CommandGroup>
               {standards.map((s) => (
                 <CommandItem key={s.id} value={`${s.code} ${s.description}`} onSelect={() => { onPick(s.id); setOpen(false); }}>
-                  <span className="font-mono text-xs mr-2 text-muted-foreground">{s.code}</span>
+                  <span className="font-code text-xs mr-2 text-muted-foreground">{s.code}</span>
                   <span className="truncate">{s.description}</span>
                 </CommandItem>
               ))}
@@ -769,7 +769,7 @@ function AddStandardInline({
             <CommandGroup>
               {standards.map((s) => (
                 <CommandItem key={s.id} value={`${s.code} ${s.description}`} onSelect={() => add(s.id)}>
-                  <span className="font-mono text-xs mr-2 text-muted-foreground">{s.code}</span>
+                  <span className="font-code text-xs mr-2 text-muted-foreground">{s.code}</span>
                   <span className="truncate">{s.description}</span>
                 </CommandItem>
               ))}
