@@ -388,6 +388,180 @@ export type Database = {
           },
         ]
       }
+      mc_assessment_mappings: {
+        Row: {
+          assignment_group_id: string | null
+          assignment_id: string | null
+          created_at: string
+          id: string
+          mc_assessment_id: string
+          mc_assessment_name: string | null
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_group_id?: string | null
+          assignment_id?: string | null
+          created_at?: string
+          id?: string
+          mc_assessment_id: string
+          mc_assessment_name?: string | null
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_group_id?: string | null
+          assignment_id?: string | null
+          created_at?: string
+          id?: string
+          mc_assessment_id?: string
+          mc_assessment_name?: string | null
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mc_course_mappings: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          mc_tracker_id: string
+          mc_tracker_name: string | null
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          mc_tracker_id: string
+          mc_tracker_name?: string | null
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          mc_tracker_id?: string
+          mc_tracker_name?: string | null
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mc_export_log: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          export_type: string
+          id: string
+          row_count: number
+          teacher_id: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          export_type: string
+          id?: string
+          row_count?: number
+          teacher_id: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          export_type?: string
+          id?: string
+          row_count?: number
+          teacher_id?: string
+        }
+        Relationships: []
+      }
+      mc_settings: {
+        Row: {
+          created_at: string
+          default_mc_org_id: string | null
+          last_export_at: string | null
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_mc_org_id?: string | null
+          last_export_at?: string | null
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_mc_org_id?: string | null
+          last_export_at?: string | null
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mc_standard_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          mc_code: string
+          mc_name: string | null
+          standard_id: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mc_code: string
+          mc_name?: string | null
+          standard_id: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mc_code?: string
+          mc_name?: string | null
+          standard_id?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mc_student_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          mc_sis_id: string | null
+          mc_student_id: string | null
+          student_id: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mc_sis_id?: string | null
+          mc_student_id?: string | null
+          student_id: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mc_sis_id?: string | null
+          mc_student_id?: string | null
+          student_id?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
