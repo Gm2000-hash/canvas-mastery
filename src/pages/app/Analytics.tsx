@@ -1400,7 +1400,7 @@ function CompareView({ courses }: { courses: Course[] }) {
         </div>
 
         {!canQuery ? (
-          <EmptyState message="Pick at least one class and a target to compare." />
+          <EmptyState message={!subject ? "Pick a content area to begin." : "Pick at least one class and a target to compare."} />
         ) : loading ? (
           <Skeleton className="h-72 w-full" />
         ) : perCourse.length === 0 ? (
