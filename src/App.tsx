@@ -19,6 +19,7 @@ import QuestionBank from "./pages/app/QuestionBank";
 import StudentHistory from "./pages/app/StudentHistory";
 import Admin from "./pages/app/Admin";
 import AssignmentGroups from "./pages/app/AssignmentGroups";
+import MasteryConnect from "./pages/app/MasteryConnect";
 
 const queryClient = new QueryClient();
 
