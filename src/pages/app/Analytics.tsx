@@ -13,7 +13,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, Responsive
 import { ArrowLeft, ArrowRight, BarChart3, BarChartHorizontal, TrendingUp, GraduationCap, BookMarked, ListChecks, Layers, HelpCircle, Download, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getFramework, FRAMEWORKS } from "@/lib/frameworks";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useRevealedNames } from "@/hooks/useRevealedNames";
 import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 import { HistoricalToggle } from "@/components/HistoricalToggle";
