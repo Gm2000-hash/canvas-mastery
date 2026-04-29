@@ -331,7 +331,7 @@ export default function QuestionBank() {
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-4xl font-semibold mb-2">Question Bank</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Question Bank</h1>
           <p className="text-muted-foreground">
             Every imported quiz question, organized by the standards (and substandards) it assesses.
           </p>

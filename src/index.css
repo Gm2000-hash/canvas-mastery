@@ -98,7 +98,11 @@
 
 @layer base {
   * { @apply border-border; }
-  html { font-size: 16.5px; }
+  /* Stable 16px on mobile to avoid layout shift; gentle bump on larger screens. */
+  html { font-size: 16px; }
+  @media (min-width: 640px) {
+    html { font-size: 16.5px; }
+  }
   body {
     @apply bg-background text-foreground;
     font-family: 'Nunito Sans', system-ui, sans-serif;

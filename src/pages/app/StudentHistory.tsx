@@ -199,7 +199,7 @@ export default function StudentHistory() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-4xl font-semibold mb-2 flex items-center gap-3">
+        <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2 flex items-center gap-3">
           <History className="h-8 w-8" /> Student history
         </h1>
         <p className="text-muted-foreground">

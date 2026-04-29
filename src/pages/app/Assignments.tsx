@@ -118,7 +118,7 @@ export default function Assignments() {
     <div className="space-y-8">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-4xl font-semibold mb-2">Assignments</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Assignments</h1>
           <p className="text-muted-foreground">Tag each assignment with one or more standards.</p>
         </div>
         <div className="flex gap-2">

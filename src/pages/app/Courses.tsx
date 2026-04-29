@@ -102,7 +102,7 @@ export default function Courses() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-4xl font-semibold mb-2">Courses</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Courses</h1>
           <p className="text-muted-foreground">Pick which Canvas courses to track and tag each with a discipline.</p>
         </div>
         <div className="flex items-center gap-4">
