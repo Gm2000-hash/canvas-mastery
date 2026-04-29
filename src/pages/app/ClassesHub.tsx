@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, ExternalLink, Tag, Eye, EyeOff, Shuffle, Loader2 } from "lucide-react";
+import { ArrowRight, BarChartHorizontal, ExternalLink, Eye, EyeOff, GraduationCap, Loader2, Shuffle, Tag } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -13,8 +13,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ImportCoursesDialog } from "@/components/ImportCoursesDialog";
 import { toast } from "sonner";
+import { getFramework, FRAMEWORKS } from "@/lib/frameworks";
+import { recentSchoolYears, currentSchoolYearLabel } from "@/lib/schoolYear";
+import { CompareView } from "./Analytics";
 
 type Discipline = { id: string; state: string; subject: string; grade: string; is_default: boolean };
 
@@ -26,12 +31,40 @@ type CourseRow = {
   studentCount: number; assignmentCount: number;
 };
 
-export default function Courses() {
+type ClassStats = {
+  course_id: string;
+  subject: string | null;
+  framework: string | null;
+  student_count: number;
+  assessment_count: number;
+  avg_mastery: number | null;
+  pct_mastered: number | null;
+};
+
+const FRAMEWORK_COLOR: Record<string, string> = {
+  STATE: "hsl(38 92% 50%)",
+  NGSS: "hsl(160 84% 39%)",
+  CCSS_MATH: "hsl(217 91% 60%)",
+  CCSS_ELA: "hsl(262 83% 58%)",
+  C3_SS: "hsl(346 84% 54%)",
+  AP: "hsl(239 84% 67%)",
+  IB: "hsl(173 80% 40%)",
+  CUSTOM: "hsl(0 0% 60%)",
+};
+
+function pct(n: number | null | undefined) {
+  if (n == null) return "—";
+  return `${(n * 100).toFixed(0)}%`;
+}
+
+export default function ClassesHub() {
   const [rows, setRows] = useState<CourseRow[] | null>(null);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [stats, setStats] = useState<Record<string, ClassStats>>({});
   const [showHidden, setShowHidden] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [reshufflingId, setReshufflingId] = useState<string | null>(null);
+  const [schoolYear, setSchoolYear] = useState<string>(currentSchoolYearLabel());
 
   async function repseudonymize(courseId: string) {
     setReshufflingId(courseId);
@@ -40,6 +73,26 @@ export default function Courses() {
     if (error) { toast.error(error.message); return; }
     const n = (data as any[])?.length ?? 0;
     toast.success(`Reassigned ${n} pseudonym${n === 1 ? "" : "s"} for this class`);
+  }
+
+  async function loadStats() {
+    const { data } = await supabase.rpc("analytics_class_breakdown", {
+      _school_year: schoolYear === "ALL" ? null : schoolYear,
+      _include_archived: true,
+    });
+    const map: Record<string, ClassStats> = {};
+    ((data as any[]) ?? []).forEach((r: any) => {
+      map[r.course_id] = {
+        course_id: r.course_id,
+        subject: r.subject,
+        framework: r.framework,
+        student_count: r.student_count,
+        assessment_count: r.assessment_count,
+        avg_mastery: r.avg_mastery,
+        pct_mastered: r.pct_mastered,
+      };
+    });
+    setStats(map);
   }
 
   async function load() {
@@ -60,30 +113,20 @@ export default function Courses() {
   }
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { loadStats(); }, [schoolYear]);
 
   async function setCourseDiscipline(courseId: string, disciplineId: string | null) {
-    // Optimistic
     setRows((prev) => prev?.map((r) => (r.id === courseId ? { ...r, discipline_id: disciplineId } : r)) ?? prev);
     const { error } = await supabase.from("courses").update({ discipline_id: disciplineId }).eq("id", courseId);
-    if (error) {
-      toast.error(error.message);
-      load();
-    } else {
-      toast.success("Discipline updated");
-    }
+    if (error) { toast.error(error.message); load(); }
+    else { toast.success("Discipline updated"); }
   }
 
   async function toggleHidden(courseId: string, hidden: boolean) {
-    // Optimistic flip; teachers can hide a class to remove it from the
-    // Courses grid and the Analytics scope without losing data.
     setRows((prev) => prev?.map((r) => (r.id === courseId ? { ...r, hidden } : r)) ?? prev);
     const { error } = await supabase.from("courses").update({ hidden }).eq("id", courseId);
-    if (error) {
-      toast.error(error.message);
-      load();
-    } else {
-      toast.success(hidden ? "Class hidden" : "Class restored");
-    }
+    if (error) { toast.error(error.message); load(); }
+    else { toast.success(hidden ? "Class hidden" : "Class restored"); }
   }
 
   const defaultDisc = disciplines.find((d) => d.is_default) ?? null;
@@ -98,16 +141,32 @@ export default function Courses() {
     });
   }, [rows, showHidden, showArchived]);
 
+  const years = useMemo(() => recentSchoolYears(6), []);
+  const compareCourses = useMemo(
+    () => (rows ?? []).filter((r) => !r.hidden && !r.archived_at).map((r) => ({ id: r.id, name: r.name })),
+    [rows],
+  );
+
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Courses</h1>
-          <p className="text-muted-foreground">Pick which Canvas courses to track and tag each with a discipline.</p>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Classes</h1>
+          <p className="text-muted-foreground">Manage your classes and open per-class analytics. Tag each class with a discipline so standards line up.</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">School year</Label>
+            <Select value={schoolYear} onValueChange={setSchoolYear}>
+              <SelectTrigger className="w-[150px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All time</SelectItem>
+                {years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           {archivedCount > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pb-1">
               <Switch id="show-archived" checked={showArchived} onCheckedChange={setShowArchived} />
               <Label htmlFor="show-archived" className="text-sm text-muted-foreground cursor-pointer">
                 Show archived ({archivedCount})
@@ -115,27 +174,42 @@ export default function Courses() {
             </div>
           )}
           {hiddenCount > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pb-1">
               <Switch id="show-hidden" checked={showHidden} onCheckedChange={setShowHidden} />
               <Label htmlFor="show-hidden" className="text-sm text-muted-foreground cursor-pointer">
                 Show hidden ({hiddenCount})
               </Label>
             </div>
           )}
-          <ImportCoursesDialog onImported={load} mode="backfill" />
-          <ImportCoursesDialog onImported={load} />
+          <div className="pb-1 flex items-center gap-2">
+            <ImportCoursesDialog onImported={load} mode="backfill" />
+            <ImportCoursesDialog onImported={load} />
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <BarChartHorizontal className="h-4 w-4 mr-1.5" /> Compare classes
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Compare classes</DialogTitle>
+                </DialogHeader>
+                <CompareView courses={compareCourses} />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
       {rows === null ? (
         <div className="grid gap-4 sm:grid-cols-2">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28" />)}
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40" />)}
         </div>
       ) : rows.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <GraduationCap className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-            <CardTitle className="font-display text-xl mb-2">No courses yet</CardTitle>
+            <CardTitle className="font-display text-xl mb-2">No classes yet</CardTitle>
             <CardDescription className="mb-4">
               Connect Canvas and use <span className="font-medium">Import courses</span> above to pull in your classes.
             </CardDescription>
@@ -155,12 +229,14 @@ export default function Courses() {
           {displayRows!.map((c) => {
             const disc = disciplines.find((d) => d.id === c.discipline_id) ?? null;
             const effective = disc ?? defaultDisc;
+            const s = stats[c.id];
+            const fw = s?.framework ? getFramework(s.framework) : null;
             return (
               <Card key={c.id} className={(c.hidden || c.archived_at) ? "opacity-60" : ""}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <CardTitle className="font-display text-xl flex items-center gap-2">
+                      <CardTitle className="font-display text-xl flex items-center gap-2 flex-wrap">
                         <span className="truncate">{c.name}</span>
                         {c.hidden && <Badge variant="outline" className="text-[11px]">hidden</Badge>}
                         {c.archived_at && (
@@ -193,7 +269,6 @@ export default function Courses() {
                             <AlertDialogDescription>
                               Every student in this class will get a new "Student NNN" label. Mastery scores,
                               submissions, and tags are unaffected — only the displayed pseudonym changes.
-                              Real names in the identity vault are not touched. This action is logged.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -216,7 +291,9 @@ export default function Courses() {
                       </Button>
                     </div>
                   </div>
-                  <div className="pt-2">
+                  <div className="pt-2 flex items-center gap-2 flex-wrap">
+                    {s?.subject && <Badge variant="outline" className="text-[11px]">{s.subject}</Badge>}
+                    {fw && <Badge variant="outline" className="text-[11px]" style={{ borderColor: FRAMEWORK_COLOR[s!.framework ?? "STATE"], color: FRAMEWORK_COLOR[s!.framework ?? "STATE"] }}>{fw.shortLabel}</Badge>}
                     <Popover>
                       <PopoverTrigger asChild>
                         <button
@@ -228,7 +305,7 @@ export default function Courses() {
                             <span>{disc.subject} · {disc.grade} · {disc.state}</span>
                           ) : effective ? (
                             <span className="text-muted-foreground">
-                              Using default: {effective.subject} · {effective.grade} · {effective.state}
+                              Default: {effective.subject} · {effective.grade} · {effective.state}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">Set discipline</span>
@@ -268,20 +345,38 @@ export default function Courses() {
                     </Popover>
                   </div>
                 </CardHeader>
-                <CardContent className="flex items-center justify-between text-sm">
-                  <div className="flex gap-6">
-                    <div><div className="text-2xl font-display font-semibold tabular-nums">{c.studentCount}</div><div className="text-xs text-muted-foreground">students</div></div>
-                    <div><div className="text-2xl font-display font-semibold tabular-nums">{c.assignmentCount}</div><div className="text-xs text-muted-foreground">assignments</div></div>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-4 gap-3 text-center">
+                    <Stat label="Students" value={s?.student_count ?? c.studentCount} />
+                    <Stat label="Assessments" value={s?.assessment_count ?? c.assignmentCount} />
+                    <Stat label="Avg" value={pct(s?.avg_mastery)} />
+                    <Stat label="Mastered" value={pct(s?.pct_mastered)} />
                   </div>
-                  <Link to={`/app/assignments?course=${c.id}`}>
-                    <Button variant="ghost" size="sm">Assignments <ExternalLink className="h-3 w-3 ml-1" /></Button>
-                  </Link>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <Link to={`/app/assignments?course=${c.id}`}>
+                      <Button variant="ghost" size="sm">Assignments <ExternalLink className="h-3 w-3 ml-1" /></Button>
+                    </Link>
+                    <Link to={`/app/classes/${c.id}`}>
+                      <Button size="sm">
+                        Open analytics <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
             );
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div>
+      <div className="text-xl font-display font-semibold tabular-nums">{value}</div>
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
     </div>
   );
 }

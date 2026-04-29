@@ -1,62 +1,80 @@
-# Unify typography on Nunito Sans + improve readability
+# Class-first Analytics + merge Courses into the hub
 
-## What's happening today
+## New navigation
 
-- Tailwind is already wired so `font-sans` and `font-display` both resolve to **Nunito Sans** (`tailwind.config.ts`), and only Nunito Sans is loaded in `index.html`.
-- The "different fonts" feel comes from two places:
-  1. **`font-mono`** is used in ~50 spots — all standard codes (e.g. `8.RP.A.2`), keyboard hints (`<kbd>J</kbd>`), and OTP-style inputs. This is the second visible typeface.
-  2. **Tiny text**: lots of `text-[9px]`, `text-[10px]`, and `text-xs` (264 occurrences) for badges, table headers, helper text — which reads as "cramped" rather than "different font," but contributes to the inconsistent feel.
-- Body text inherits the browser default (16px) with no explicit size or line-height set in `index.css`.
+- **Sidebar:** rename "Analytics" → **"Classes"** and remove the standalone "Courses" entry. The icon becomes `GraduationCap` (matches the concept).
+- **Routes:**
+  - `/app/classes` → hub page (class list + management)
+  - `/app/classes/:courseId` → per-class analytics detail (the old Analytics tabs)
+  - `/app/courses` and `/app/analytics` → redirect to `/app/classes` so existing links and bookmarks still work.
 
-## Goal
+## Hub page (`/app/classes`)
 
-1. One typeface across the app: **Nunito Sans**. Standard codes keep a tabular look but in Nunito Sans, not a monospace font.
-2. A small, consistent readability bump on dense UI (tables, badges, helper text) without blowing up the layout.
+A single class-management surface that combines today's Courses page + a stats overlay from Analytics.
 
-## Changes
+Header row:
+- Title "Classes" + short description.
+- Right-side controls: **School year** select, **Show hidden** toggle, **Show archived (historical)** toggle, **Import from Canvas** button, **Backfill from Canvas** button (the existing `ImportCoursesDialog` in `mode="backfill"`).
 
-### 1. Replace `font-mono` with a Nunito Sans tabular treatment
-Standard codes (`8.RP.A.2`) still need to align in tables. Instead of swapping to a mono typeface, use Nunito Sans with `tabular-nums` + slight letter-spacing.
+Class cards (grid, one per class), each showing:
+- Course name + code/term
+- Subject / framework / grade badge
+- **Mastery stats** from `analytics_class_breakdown`: students, assessments, avg mastery, % mastered
+- Inline actions kept from today's Courses page:
+  - **Discipline popover** — assign state/subject/grade (unchanged behavior)
+  - **Hide / Unhide**
+  - **Re-pseudonymize** (with the existing alert dialog)
+- Primary CTA: **"Open analytics →"** navigates to `/app/classes/:courseId`
+- Secondary link: **"Assignments"** → existing `/app/assignments?course=:id`
 
-- Add a `.font-code` utility in `src/index.css`:
-  ```css
-  .font-code {
-    font-family: 'Nunito Sans', system-ui, sans-serif;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
-    letter-spacing: 0.01em;
-  }
-  ```
-- Find/replace `font-mono` → `font-code` across `src/pages/**` and `src/components/**` (codes, kbd hints, OTP input).
-- Leave Tailwind's `font-mono` utility itself alone (no config change) so any third-party UI bits keep working.
+Empty / hidden / archived states and the Canvas-not-set-up empty state are preserved from `Courses.tsx`.
 
-### 2. Bump base readability
-In `src/index.css` `@layer base`:
-- Set `html { font-size: 16.5px; }` (a ~3% bump — feels noticeably more readable, doesn't break layouts).
-- Set `body { line-height: 1.55; }` for body copy.
-- Keep heading styles as-is (already Nunito Sans 700/900).
+The hub does **not** have tabs — that's the whole point of the redesign.
 
-### 3. Raise the floor on tiny text
-The `text-[9px]` and `text-[10px]` literals are too small. Replace with Tailwind's standard scale:
-- `text-[9px]` → `text-[10px]` (badges that need to stay micro) **or** `text-xs` where space allows.
-- `text-[10px]` → `text-xs` (12px) in body/table cells; keep `text-[10px]` only on tightly-packed badges.
-- Sweep these files: `Analytics.tsx`, `Assignments.tsx`, `Review.tsx`, `Standards.tsx`, `StudentHistory.tsx`, `Courses.tsx`, `Settings.tsx`, `Dashboard.tsx`, `QuestionBank.tsx`, `MasteryDebug.tsx`, `Mastery.tsx`.
+## Per-class detail page (`/app/classes/:courseId`)
 
-### 4. Tables & helper text
-- In Analytics tables (rotated standard-code headers, breakdown tables), bump `text-[10px]` headers to `text-xs` and remove `font-mono` (now `font-code`).
-- Helper/description paragraphs: ensure they're at least `text-sm` (already true in most pages — fix the few `text-xs` description lines on Review/Dashboard).
+Reads `courseId` from the route. Removes the top-of-page Course `<Select>`. Tabs at the top, scoped to this single class:
+
+1. **Students** (default) — the student × standard mastery matrix that today is hidden inside the Classes-tab accordion. Promoted to its own tab. (`ClassMatrixView`, always expanded, no collapse logic.)
+2. **Mastery by subject** (Trends)
+3. **Standards**
+4. **Assessments**
+5. **Mastery levels**
+6. **Questions**
+
+Above the tabs:
+- Back link "← All classes" → `/app/classes`
+- Course name + framework/subject badge
+- **School year** select and **Show historical** toggle (kept here, since these scope the analytics views)
+
+The multi-class **Compare** tab moves to the hub as a separate "Compare classes" card or a small CTA at the top of the hub (it's inherently multi-class). When opened, it uses the existing `CompareView` which already accepts a list of courses.
+
+## Redirects + cleanup
+
+- `/app/courses` → `<Navigate to="/app/classes" replace />`
+- `/app/analytics` → `<Navigate to="/app/classes" replace />`
+- Remove the Courses sidebar entry. Keep Assignments, Assignment Groups, Tag Review, Standards, Question Bank, Student History, Settings, Admin.
+- Update any in-app links that point to `/app/courses` (Dashboard onboarding, settings empty states) to point to `/app/classes` — quick `rg` sweep.
+
+## Implementation outline
+
+- **New file** `src/pages/app/ClassesHub.tsx` — built from `Courses.tsx` (kept as-is for discipline/hide/import/repseudonymize), augmented with stats from `analytics_class_breakdown`, plus an "Open analytics" button per card, plus a "Compare classes" CTA that opens a dialog wrapping the existing `CompareView`.
+- **Refactor `src/pages/app/Analytics.tsx` → ClassDetail page**:
+  - Read `useParams<{ courseId: string }>()`.
+  - Drop `<CourseMultiSelect>`-style top filter and the Classes tab.
+  - Promote the per-class matrix into a "Students" tab that is the default.
+  - Pass the route's `courseId` into every existing sub-view (`TrendsView`, `StandardsView`, `AssignmentsView`, `LevelsView`, `QuestionsView`).
+- **`src/App.tsx`** — add `/app/classes` and `/app/classes/:courseId` routes; add redirects from `/app/courses` and `/app/analytics`.
+- **`src/layouts/AppLayout.tsx`** — replace the Courses + Analytics nav items with a single **"Classes"** entry pointing at `/app/classes`.
+- **Delete** `src/pages/app/Courses.tsx` once its logic has been moved into the hub (or keep it as a thin re-export during transition — simpler to just delete and reuse the JSX inside the hub).
+
+## What stays the same
+
+- All RPCs (`analytics_class_breakdown`, `analytics_class_matrix`, `analytics_mastery_trends`, `analytics_compare_classes`, etc.) — no DB changes.
+- `ImportCoursesDialog`, discipline assignment, repseudonymize, historical toggle behavior.
+- All other tab views' internals (Standards, Assessments, Levels, Questions).
 
 ## Out of scope
 
-- No font-loading changes — Nunito Sans is already the only Google Font loaded.
-- No color, spacing, or component-shape changes.
-- `font-mono` Tailwind utility is left in the config (safer; we just stop using it).
-
-## Files touched
-
-- `src/index.css` — add `.font-code`, bump base size + line-height.
-- `src/pages/app/*.tsx` (Analytics, Assignments, Review, Standards, StudentHistory, Courses, Settings, Dashboard, QuestionBank, Mastery, MasteryDebug, Admin, AssignmentGroups) — `font-mono` → `font-code`, raise `text-[9px]`/`text-[10px]` where appropriate.
-- `src/components/*.tsx` (BackfillReportDialog, InvitationsCard, others using `font-mono`) — same swap.
-- `src/pages/Auth.tsx`, `src/pages/Landing.tsx` — same swap.
-
-No DB, no edge function, no config changes.
+- Visual redesign of the per-class tabs themselves.
+- Changes to Compare logic — only its placement (hub instead of detail page).
