@@ -910,18 +910,38 @@ function StandardsView({ courseId, subjects }: { courseId: string | null; subjec
 }
 
 // ───────────────────────── Assignments ─────────────────────────
-function AssignmentsView({ courseId }: { courseId: string | null }) {
+function AssignmentsView({ courseId, courses }: { courseId: string | null; courses: Course[] }) {
   const [rows, setRows] = useState<AssignmentRow[] | null>(null);
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   useEffect(() => {
     setRows(null);
     supabase.rpc("analytics_assignment_breakdown", { _course_id: courseId }).then(({ data }) => setRows((data as any) ?? []));
   }, [courseId]);
+  const visible = useMemo(() => {
+    if (!rows) return rows;
+    if (selectedCourses.length === 0) return rows;
+    const set = new Set(selectedCourses);
+    return rows.filter((r) => set.has(r.course_id));
+  }, [rows, selectedCourses]);
   return (
     <Card>
-      <CardHeader><CardTitle>Assessment breakdown</CardTitle><CardDescription>Performance per assignment with submission counts and tagged standards.</CardDescription></CardHeader>
+      <CardHeader>
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <CardTitle>Assessment breakdown</CardTitle>
+            <CardDescription>Performance per assignment with submission counts and tagged standards.</CardDescription>
+          </div>
+          <CourseMultiSelect
+            courses={courses}
+            selected={selectedCourses}
+            onChange={setSelectedCourses}
+            placeholder="All classes"
+          />
+        </div>
+      </CardHeader>
       <CardContent>
         {rows === null ? <Skeleton className="h-40 w-full" /> :
-         rows.length === 0 ? <EmptyState message="No assessments yet for this course." /> : (
+         (visible ?? []).length === 0 ? <EmptyState message="No assessments yet for this filter." /> : (
           <Table>
             <TableHeader><TableRow>
               <TableHead>Assessment</TableHead><TableHead>Course</TableHead><TableHead>Type</TableHead>
@@ -929,7 +949,7 @@ function AssignmentsView({ courseId }: { courseId: string | null }) {
               <TableHead className="text-right">Avg %</TableHead><TableHead className="text-right">Standards</TableHead>
             </TableRow></TableHeader>
             <TableBody>
-              {rows.map((r) => (
+              {(visible ?? []).map((r) => (
                 <TableRow key={r.assignment_id}>
                   <TableCell className="font-medium max-w-sm truncate" title={r.name}>{r.name}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{r.course_name}</TableCell>
