@@ -17,7 +17,7 @@ const nav = [
   { to: "/app/review", label: "Tag Review", icon: CheckCheck },
   { to: "/app/standards", label: "Standards", icon: BookMarked },
   { to: "/app/question-bank", label: "Question Bank", icon: Library },
-  { to: "/app/mastery", label: "Mastery", icon: Sparkles },
+  
   { to: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/app/student-history", label: "Student History", icon: History },
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },
