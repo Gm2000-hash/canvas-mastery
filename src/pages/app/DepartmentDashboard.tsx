@@ -197,6 +197,7 @@ export default function DepartmentDashboard() {
           <TabsTrigger value="classes">Classes</TabsTrigger>
           <TabsTrigger value="students">Students</TabsTrigger>
           <TabsTrigger value="assessments">Common Assessments</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
         {/* OVERVIEW */}
