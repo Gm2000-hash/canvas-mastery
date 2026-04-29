@@ -1183,11 +1183,36 @@ function CompareView({ courses }: { courses: Course[] }) {
   // Load pickers (assessments / standards). Standards list is global; assessments
   // list is filtered to the selected classes when any are picked.
   useEffect(() => {
-    let q = supabase.from("assignments").select("id, name, course_id, courses(name)").order("name").limit(500);
+    let q = supabase.from("assignments").select("id, name, name_normalized, course_id, courses(name)").order("name").limit(1000);
     if (selected.length > 0) q = q.in("course_id", selected);
     q.then(({ data }) => {
       const list = (data as any[] | null) ?? [];
-      setAssignmentOptions(list.map((a) => ({ id: a.id, name: a.name, course_name: a.courses?.name ?? "" })));
+      // Deduplicate by name_normalized so equivalent assignments across sections
+      // appear once. Keep the first id as the "representative"; the backend
+      // automatically expands to siblings by name_normalized.
+      const byNorm = new Map<string, { id: string; name: string; course_name: string; courses: Set<string> }>();
+      for (const a of list) {
+        const key = a.name_normalized || a.name || a.id;
+        const cur = byNorm.get(key);
+        if (cur) {
+          if (a.courses?.name) cur.courses.add(a.courses.name);
+        } else {
+          byNorm.set(key, {
+            id: a.id,
+            name: a.name,
+            course_name: a.courses?.name ?? "",
+            courses: new Set(a.courses?.name ? [a.courses.name] : []),
+          });
+        }
+      }
+      setAssignmentOptions(
+        Array.from(byNorm.values()).map((v) => ({
+          id: v.id,
+          name: v.name,
+          course_name: v.course_name,
+          class_count: v.courses.size,
+        }))
+      );
     });
     // Also load assignment groups (teacher-wide).
     supabase.rpc("list_assignment_groups" as any).then(({ data }) => {
