@@ -239,7 +239,7 @@ export default function QuestionBank() {
     // Pull tags honoring the status filter (default: all — confirmed AND ai-suggested)
     let qsQuery = supabase
       .from("question_standards")
-      .select("question_id, standard_id, ai_suggested, confirmed, standards(code, description), quiz_questions!inner(id, position, question_text, points_possible, assignment_id, assignments!inner(id, name, course_id))")
+      .select("question_id, standard_id, ai_suggested, confirmed, standards(code, description), quiz_questions!inner(id, position, question_text, points_possible, assignment_id, answers, item_type, assignments!inner(id, name, course_id))")
       .in("standard_id", stdIds);
     if (statusFilter === "CONFIRMED") qsQuery = qsQuery.eq("confirmed", true);
     if (statusFilter === "SUGGESTED") qsQuery = qsQuery.eq("confirmed", false).eq("ai_suggested", true);
@@ -259,6 +259,8 @@ export default function QuestionBank() {
           points_possible: q.points_possible,
           assignment_id: q.assignment_id,
           assignments: q.assignments,
+          answers: q.answers ?? null,
+          item_type: q.item_type ?? null,
           standards: [],
           _anyConfirmed: false,
         });
