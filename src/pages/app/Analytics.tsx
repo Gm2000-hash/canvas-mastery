@@ -829,15 +829,51 @@ function StandardsView({ courseId, subjects, courses }: { courseId: string | nul
   const [framework, setFramework] = useState<string>("ALL");
   const [rows, setRows] = useState<StandardRow[] | null>(null);
   const [filter, setFilter] = useState("");
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
 
   useEffect(() => {
     setRows(null);
-    supabase.rpc("analytics_standard_breakdown", {
-      _course_id: courseId,
-      _subject: subject === "ALL" ? null : subject,
-      _framework: framework === "ALL" ? null : framework,
-    }).then(({ data }) => setRows((data as any) ?? []));
-  }, [courseId, subject, framework]);
+    const subj = subject === "ALL" ? null : subject;
+    const fw = framework === "ALL" ? null : framework;
+    // No multi-class selection → use the global single-course filter as before.
+    if (selectedCourses.length === 0) {
+      supabase.rpc("analytics_standard_breakdown", {
+        _course_id: courseId, _subject: subj, _framework: fw,
+      }).then(({ data }) => setRows((data as any) ?? []));
+      return;
+    }
+    // Multi-class: query each course, merge by standard_id (sum counts, weighted avg).
+    Promise.all(selectedCourses.map((cid) =>
+      supabase.rpc("analytics_standard_breakdown", { _course_id: cid, _subject: subj, _framework: fw })
+        .then(({ data }) => (data as any as StandardRow[]) ?? [])
+    )).then((arrays) => {
+      const merged = new Map<string, StandardRow>();
+      for (const arr of arrays) {
+        for (const r of arr) {
+          const prev = merged.get(r.standard_id);
+          if (!prev) {
+            merged.set(r.standard_id, { ...r });
+          } else {
+            const sa = prev.students_assessed + r.students_assessed;
+            const sm = prev.students_mastered + r.students_mastered;
+            const avg = sa > 0
+              ? ((Number(prev.avg_mastery ?? 0) * prev.students_assessed) +
+                 (Number(r.avg_mastery ?? 0) * r.students_assessed)) / sa
+              : null;
+            merged.set(r.standard_id, {
+              ...prev,
+              students_assessed: sa,
+              students_mastered: sm,
+              avg_mastery: avg,
+              pct_mastered: sa > 0 ? sm / sa : null,
+            });
+          }
+        }
+      }
+      const list = Array.from(merged.values()).sort((a, b) => (a.pct_mastered ?? 0) - (b.pct_mastered ?? 0));
+      setRows(list);
+    });
+  }, [courseId, subject, framework, selectedCourses]);
 
   const visible = (rows ?? []).filter((r) => !filter || r.code.toLowerCase().includes(filter.toLowerCase()) || r.description.toLowerCase().includes(filter.toLowerCase()));
 
@@ -848,6 +884,7 @@ function StandardsView({ courseId, subjects, courses }: { courseId: string | nul
           <div><CardTitle>Standards heatmap</CardTitle><CardDescription>Cohort performance per standard. Sorted by weakest first.</CardDescription></div>
           <div className="flex items-end gap-2 flex-wrap">
             <Input placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} className="max-w-[200px]" />
+            <CourseMultiSelect courses={courses} selected={selectedCourses} onChange={setSelectedCourses} placeholder="All classes" />
             <Select value={subject} onValueChange={setSubject}>
               <SelectTrigger className="w-[140px] h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
