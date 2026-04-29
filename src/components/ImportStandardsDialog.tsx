@@ -227,7 +227,7 @@ export default function ImportStandardsDialog({
                 <div key={i} className="flex items-start gap-2 p-2">
                   <Checkbox checked={row.selected} onCheckedChange={(v) => updateRow(i, { selected: !!v })} className="mt-2" />
                   <Input
-                    className="w-40 font-mono text-xs"
+                    className="w-40 font-code text-xs"
                     value={row.code}
                     onChange={(e) => updateRow(i, { code: e.target.value })}
                   />

@@ -435,15 +435,15 @@ export default function QuestionBank() {
                   <span className="truncate">{r.name}</span>
                   <span className="shrink-0 flex items-center gap-2">
                     {r.status === "ok" ? (
-                      <Badge variant="outline" className="text-[10px] bg-mastery-high/10 border-mastery-high/30 text-mastery-high">
+                      <Badge variant="outline" className="text-[11px] bg-mastery-high/10 border-mastery-high/30 text-mastery-high">
                         {r.responses} response{r.responses === 1 ? "" : "s"}
                       </Badge>
                     ) : r.status === "skipped" ? (
-                      <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                      <Badge variant="outline" className="text-[11px] text-muted-foreground">
                         skipped{r.reason ? ` — ${r.reason}` : ""}
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px] bg-mastery-low/10 border-mastery-low/30 text-mastery-low">
+                      <Badge variant="outline" className="text-[11px] bg-mastery-low/10 border-mastery-low/30 text-mastery-low">
                         error{r.reason ? ` — ${r.reason}` : ""}
                       </Badge>
                     )}
@@ -512,21 +512,21 @@ export default function QuestionBank() {
                     <div className="text-sm line-clamp-2">{q.question_text || <span className="italic text-muted-foreground">(no text)</span>}</div>
                     <div className="mt-1.5 flex items-center gap-2 flex-wrap">
                       {q.assignments?.name && (
-                        <Badge variant="outline" className="text-[10px]">{q.assignments.name}</Badge>
+                        <Badge variant="outline" className="text-[11px]">{q.assignments.name}</Badge>
                       )}
                       {q.is_suggested_only && (
-                        <Badge className="text-[10px] bg-accent/15 text-accent border-accent/30 hover:bg-accent/15">
+                        <Badge className="text-[11px] bg-accent/15 text-accent border-accent/30 hover:bg-accent/15">
                           <Sparkles className="h-2.5 w-2.5 mr-0.5" /> AI
                         </Badge>
                       )}
                       {q.points_possible != null && (
-                        <span className="text-[10px] text-muted-foreground">{q.points_possible} pts</span>
+                        <span className="text-[11px] text-muted-foreground">{q.points_possible} pts</span>
                       )}
                       {(q.standards ?? []).slice(0, 4).map((s, i) => (
-                        <Badge key={i} variant="outline" className="text-[10px] font-mono bg-accent/5 border-accent/30">{s.code}</Badge>
+                        <Badge key={i} variant="outline" className="text-[11px] font-code bg-accent/5 border-accent/30">{s.code}</Badge>
                       ))}
                       {(q.standards?.length ?? 0) > 4 && (
-                        <span className="text-[10px] text-muted-foreground">+{q.standards!.length - 4}</span>
+                        <span className="text-[11px] text-muted-foreground">+{q.standards!.length - 4}</span>
                       )}
                     </div>
                   </div>
@@ -536,10 +536,10 @@ export default function QuestionBank() {
                         <div className="text-base font-semibold tabular-nums" style={{ color: bandColor(q.avg_pct) }}>
                           {Math.round(q.avg_pct * 100)}%
                         </div>
-                        <div className="text-[10px] text-muted-foreground">{q.response_count ?? 0} responses</div>
+                        <div className="text-[11px] text-muted-foreground">{q.response_count ?? 0} responses</div>
                       </>
                     ) : (
-                      <div className="text-[10px] text-muted-foreground italic">No scores</div>
+                      <div className="text-[11px] text-muted-foreground italic">No scores</div>
                     )}
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
@@ -666,17 +666,17 @@ function TreeView({
                 disabled={!child.row}
                 title={child.row?.description}
               >
-                <span className="font-mono shrink-0">{child.code}</span>
+                <span className="font-code shrink-0">{child.code}</span>
                 {child.row?.description && (
                   <span className="truncate text-muted-foreground">{child.row.description}</span>
                 )}
               </button>
               <div className="shrink-0 flex items-center gap-1.5">
-                <Badge variant="outline" className="text-[9px] h-4 px-1 font-mono">
+                <Badge variant="outline" className="text-[11px] h-4 px-1 font-code">
                   {child.totals.questions}q
                 </Badge>
                 {avg != null && (
-                  <span className="text-[10px] tabular-nums" style={{ color: bandColor(avg) }}>
+                  <span className="text-[11px] tabular-nums" style={{ color: bandColor(avg) }}>
                     {Math.round(avg * 100)}%
                   </span>
                 )}
@@ -714,7 +714,7 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
           <SheetTitle className="flex items-center gap-2">
             Question {question.position ?? "?"}
             {question.points_possible != null && (
-              <Badge variant="outline" className="text-[10px]">{question.points_possible} pts</Badge>
+              <Badge variant="outline" className="text-[11px]">{question.points_possible} pts</Badge>
             )}
           </SheetTitle>
           {question.assignments && (
@@ -738,7 +738,7 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
               <div className="space-y-2">
                 {question.standards!.map((s, i) => (
                   <div key={i} className="rounded-md border p-2 text-sm">
-                    <div className="font-mono text-xs text-accent">{s.code}</div>
+                    <div className="font-code text-xs text-accent">{s.code}</div>
                     <div className="text-muted-foreground text-xs mt-0.5">{s.description}</div>
                   </div>
                 ))}
@@ -747,13 +747,13 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-md border p-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Class average</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Class average</div>
               <div className="text-2xl font-semibold tabular-nums mt-1" style={{ color: question.avg_pct != null ? bandColor(question.avg_pct) : undefined }}>
                 {question.avg_pct != null ? `${Math.round(question.avg_pct * 100)}%` : "—"}
               </div>
             </div>
             <div className="rounded-md border p-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Responses</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Responses</div>
               <div className="text-2xl font-semibold tabular-nums mt-1">{question.response_count ?? 0}</div>
             </div>
           </div>

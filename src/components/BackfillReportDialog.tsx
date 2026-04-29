@@ -137,10 +137,10 @@ export function BackfillReportDialog({ open, onOpenChange, courseIds }: Props) {
                       <div className="min-w-0">
                         <div className="font-medium truncate">{r.course_name}</div>
                         <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap mt-0.5">
-                          {r.school_year && <Badge variant="outline" className="text-[9px]">{r.school_year}</Badge>}
+                          {r.school_year && <Badge variant="outline" className="text-[11px]">{r.school_year}</Badge>}
                           {r.subject && <span>{r.subject}</span>}
                           {r.grade && <><span>·</span><span>Grade {r.grade}</span></>}
-                          {r.framework && <Badge variant="outline" className="text-[9px]">{r.framework}</Badge>}
+                          {r.framework && <Badge variant="outline" className="text-[11px]">{r.framework}</Badge>}
                         </div>
                       </div>
                     </div>
@@ -161,7 +161,7 @@ export function BackfillReportDialog({ open, onOpenChange, courseIds }: Props) {
                             {r.district_standards_with_mastery} / {r.district_standard_count}
                           </span>
                           {r.district_standards_missing > 0 && (
-                            <Badge variant="outline" className="text-[9px] gap-1 bg-mastery-low/10 text-mastery-low border-mastery-low/30">
+                            <Badge variant="outline" className="text-[11px] gap-1 bg-mastery-low/10 text-mastery-low border-mastery-low/30">
                               <AlertTriangle className="h-2.5 w-2.5" />
                               {r.district_standards_missing} gap{r.district_standards_missing === 1 ? "" : "s"}
                             </Badge>
@@ -170,12 +170,12 @@ export function BackfillReportDialog({ open, onOpenChange, courseIds }: Props) {
                         {r.missing_standard_codes.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-1">
                             {r.missing_standard_codes.map((code) => (
-                              <span key={code} className="font-mono text-[10px] rounded bg-muted px-1.5 py-0.5">
+                              <span key={code} className="font-code text-[11px] rounded bg-muted px-1.5 py-0.5">
                                 {code}
                               </span>
                             ))}
                             {r.district_standards_missing > r.missing_standard_codes.length && (
-                              <span className="text-[10px] text-muted-foreground self-center">
+                              <span className="text-[11px] text-muted-foreground self-center">
                                 +{r.district_standards_missing - r.missing_standard_codes.length} more
                               </span>
                             )}
@@ -202,7 +202,7 @@ function SummaryStat({ label, value, highlight }: { label: string; value: number
   return (
     <div className={`rounded-md border p-2 text-center ${highlight ? "bg-accent/5 border-accent/30" : ""}`}>
       <div className="text-xl font-display font-semibold tabular-nums">{value}</div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
     </div>
   );
 }
@@ -211,7 +211,7 @@ function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <div className="font-semibold tabular-nums">{value}</div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
     </div>
   );
 }

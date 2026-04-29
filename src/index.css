@@ -98,15 +98,26 @@
 
 @layer base {
   * { @apply border-border; }
+  html { font-size: 16.5px; }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Nunito Sans', system-ui, sans-serif;
     font-feature-settings: "ss01", "cv11";
+    line-height: 1.55;
   }
-  h1, h2, h3, h4 { font-family: 'Nunito Sans', system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+  h1, h2, h3, h4 { font-family: 'Nunito Sans', system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+  code, kbd, samp, pre { font-family: 'Nunito Sans', system-ui, sans-serif; }
 }
 
 @layer utilities {
   .font-display { font-family: 'Nunito Sans', system-ui, sans-serif; font-weight: 900; letter-spacing: -0.03em; }
+  .font-code {
+    font-family: 'Nunito Sans', system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    letter-spacing: 0.01em;
+    font-weight: 600;
+  }
   .bg-paper { background: var(--gradient-paper); }
   .bg-hero { background: var(--gradient-hero); }
   .bg-hero-card { background: hsl(var(--hero-card)); color: hsl(var(--hero-card-foreground)); }

@@ -1,84 +1,62 @@
+# Unify typography on Nunito Sans + improve readability
+
+## What's happening today
+
+- Tailwind is already wired so `font-sans` and `font-display` both resolve to **Nunito Sans** (`tailwind.config.ts`), and only Nunito Sans is loaded in `index.html`.
+- The "different fonts" feel comes from two places:
+  1. **`font-mono`** is used in ~50 spots — all standard codes (e.g. `8.RP.A.2`), keyboard hints (`<kbd>J</kbd>`), and OTP-style inputs. This is the second visible typeface.
+  2. **Tiny text**: lots of `text-[9px]`, `text-[10px]`, and `text-xs` (264 occurrences) for badges, table headers, helper text — which reads as "cramped" rather than "different font," but contributes to the inconsistent feel.
+- Body text inherits the browser default (16px) with no explicit size or line-height set in `index.css`.
+
 ## Goal
 
-Treat assignments with the same name (or near-identical content) given across multiple sections of the same class as a single "logical assignment." Today the same Pre-ECA given to two sections shows up as two separate `assignments` rows because Canvas issues different `canvas_assignment_id`s per section. We need cross-class equivalence so analytics, the Compare tab, and standard tagging treat them as one.
+1. One typeface across the app: **Nunito Sans**. Standard codes keep a tabular look but in Nunito Sans, not a monospace font.
+2. A small, consistent readability bump on dense UI (tables, badges, helper text) without blowing up the layout.
 
-## Approach: Assignment Groups (non-destructive)
+## Changes
 
-Instead of merging rows in `assignments` (which would break Canvas sync, RLS, and per-course analytics), we add a lightweight **grouping layer** on top.
+### 1. Replace `font-mono` with a Nunito Sans tabular treatment
+Standard codes (`8.RP.A.2`) still need to align in tables. Instead of swapping to a mono typeface, use Nunito Sans with `tabular-nums` + slight letter-spacing.
 
-```text
-assignments (per-course rows, unchanged)
-        │
-        ▼
-assignment_group_id ──► assignment_groups (one per logical assignment)
-```
+- Add a `.font-code` utility in `src/index.css`:
+  ```css
+  .font-code {
+    font-family: 'Nunito Sans', system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    letter-spacing: 0.01em;
+  }
+  ```
+- Find/replace `font-mono` → `font-code` across `src/pages/**` and `src/components/**` (codes, kbd hints, OTP input).
+- Leave Tailwind's `font-mono` utility itself alone (no config change) so any third-party UI bits keep working.
 
-A teacher can review AI-suggested groups, accept, edit, split, or merge them. Analytics RPCs gain an "aggregate by group" mode.
+### 2. Bump base readability
+In `src/index.css` `@layer base`:
+- Set `html { font-size: 16.5px; }` (a ~3% bump — feels noticeably more readable, doesn't break layouts).
+- Set `body { line-height: 1.55; }` for body copy.
+- Keep heading styles as-is (already Nunito Sans 700/900).
 
-## Technical Plan
+### 3. Raise the floor on tiny text
+The `text-[9px]` and `text-[10px]` literals are too small. Replace with Tailwind's standard scale:
+- `text-[9px]` → `text-[10px]` (badges that need to stay micro) **or** `text-xs` where space allows.
+- `text-[10px]` → `text-xs` (12px) in body/table cells; keep `text-[10px]` only on tightly-packed badges.
+- Sweep these files: `Analytics.tsx`, `Assignments.tsx`, `Review.tsx`, `Standards.tsx`, `StudentHistory.tsx`, `Courses.tsx`, `Settings.tsx`, `Dashboard.tsx`, `QuestionBank.tsx`, `MasteryDebug.tsx`, `Mastery.tsx`.
 
-### 1. Schema (migration)
+### 4. Tables & helper text
+- In Analytics tables (rotated standard-code headers, breakdown tables), bump `text-[10px]` headers to `text-xs` and remove `font-mono` (now `font-code`).
+- Helper/description paragraphs: ensure they're at least `text-sm` (already true in most pages — fix the few `text-xs` description lines on Review/Dashboard).
 
-- New table `public.assignment_groups`:
-  - `id uuid pk`, `teacher_id uuid`, `name text`, `kind` (assignment|quiz), `subject text null`, `grade text null`, `created_at`, `updated_at`, `confirmed bool default false`
-  - RLS: teacher_id = auth.uid() ALL.
-- Add `assignment_group_id uuid null` FK on `public.assignments` (nullable; ungrouped = standalone). Index `(teacher_id, assignment_group_id)`.
-- Add `name_normalized text` generated/maintained on `assignments` (lowercased, whitespace-collapsed, punctuation trimmed) plus index, used for fast grouping suggestions.
-- No data destruction; ungrouped assignments behave exactly as today.
+## Out of scope
 
-### 2. Auto-grouping logic
+- No font-loading changes — Nunito Sans is already the only Google Font loaded.
+- No color, spacing, or component-shape changes.
+- `font-mono` Tailwind utility is left in the config (safer; we just stop using it).
 
-- New edge function `suggest-assignment-groups`:
-  - For the teacher's assignments without a group, cluster by:
-    1. Same `kind`,
-    2. Same normalized name OR ≥0.92 trigram similarity (`pg_trgm`),
-    3. Same effective subject/grade (via `teacher_disciplines` on the course),
-    4. Optional: same `points_possible` and similar `due_at` window.
-  - Optionally call Lovable AI Gateway (`google/gemini-2.5-flash-lite`) on borderline pairs with the question text to confirm equivalence — only for `confidence < 0.92`.
-  - Returns proposed groups; does NOT auto-write. Teacher confirms in UI.
-- A second function `apply-assignment-groups` writes `assignment_groups` rows and sets `assignment_group_id` on member assignments. Idempotent.
+## Files touched
 
-### 3. Analytics & Compare tab updates
+- `src/index.css` — add `.font-code`, bump base size + line-height.
+- `src/pages/app/*.tsx` (Analytics, Assignments, Review, Standards, StudentHistory, Courses, Settings, Dashboard, QuestionBank, Mastery, MasteryDebug, Admin, AssignmentGroups) — `font-mono` → `font-code`, raise `text-[9px]`/`text-[10px]` where appropriate.
+- `src/components/*.tsx` (BackfillReportDialog, InvitationsCard, others using `font-mono`) — same swap.
+- `src/pages/Auth.tsx`, `src/pages/Landing.tsx` — same swap.
 
-Update RPCs (additive — keep old signatures working):
-
-- `analytics_assignment_breakdown`: add optional `_group_by_group bool default false`. When true, group by `assignment_group_id` (fallback to `assignments.id` for ungrouped) and sum submissions/avg pct across member assignments.
-- `analytics_compare_classes`: accept either `_assignment_id` (single) or new `_assignment_group_id`. When a group is given, the source CTE pulls submissions for **all** member assignments whose course is in `_course_ids`. This is what handles the "two sections of 8th Grade Science B took the same Pre-ECA" case directly.
-- `analytics_question_breakdown` and `analytics_question_bank`: optional group filter, merging questions that share normalized text across the group's assignments.
-- Standards tagging: when a group is confirmed, propagate confirmed standard tags from any member assignment to the others (via `assignment_standards`) so mastery is recomputed consistently. `recompute-mastery` already runs per teacher and will pick this up.
-
-### 4. UI
-
-New page **Assignment Groups** (`src/pages/app/AssignmentGroups.tsx`), linked from Assignments page header and the admin/troubleshooting area:
-
-- "Suggested groups" list (from `suggest-assignment-groups`): each card shows name, member courses, # submissions, confidence. Buttons: **Confirm group**, **Split**, **Edit name**.
-- "Confirmed groups" list with member chips and an "Add another assignment" picker (search by name).
-- "Ungrouped" tab to manually create a group from selected assignments.
-
-Update **Assignments page** (`src/pages/app/Assignments.tsx`):
-
-- Show a small "Group: <name>" badge next to assignments that belong to a group; click to open the group page.
-- Banner above the list when ≥1 suggestion exists: "We found N assignments that look like duplicates across classes — Review."
-
-Update **Analytics → Compare tab** (`src/pages/app/Analytics.tsx`):
-
-- The assignment picker switches its options to **groups first** (with member-count badge), then ungrouped assignments. Selecting a group passes `_assignment_group_id` to the RPC. The mastery bands chart will then naturally split by class while pulling from the unified group.
-
-### 5. Files
-
-- **New migration** `*_assignment_groups.sql`: creates `assignment_groups`, adds `assignment_group_id` and `name_normalized` to `assignments`, enables `pg_trgm`, updates the four analytics RPCs above, adds a `merge_assignment_group` RPC (admin-style helper to unify two existing groups).
-- **New edge functions**: `supabase/functions/suggest-assignment-groups/index.ts`, `supabase/functions/apply-assignment-groups/index.ts`.
-- **New component**: `src/pages/app/AssignmentGroups.tsx` and a small `AssignmentGroupBadge.tsx`.
-- **Edited**: `src/App.tsx` (route), `src/layouts/AppLayout.tsx` (sidebar entry under Assignments or Admin), `src/pages/app/Assignments.tsx` (badge + suggestions banner), `src/pages/app/Analytics.tsx` (Compare uses group ids).
-
-### 6. Backfill / safety
-
-- Migration runs no destructive updates. After it ships, the user clicks "Find duplicate assignments" once on the new page; they review and confirm. Nothing is grouped silently.
-- Mastery recompute is triggered after a group is confirmed (only for affected courses).
-- All new RPCs are `SECURITY DEFINER` with `auth.uid()` scoping, mirroring existing analytics RPCs.
-
-## Out of scope (for now)
-
-- Auto-grouping by question-text similarity alone (we use it only as a tiebreaker).
-- Merging Canvas-side data — Canvas remains the source of truth per section.
-- Cross-teacher group sharing.
+No DB, no edge function, no config changes.

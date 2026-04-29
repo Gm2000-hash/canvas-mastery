@@ -264,15 +264,15 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
           ) : (
             grouped.map(([year, list]) => (
               <div key={year}>
-                <div className="sticky top-0 z-10 bg-muted/80 backdrop-blur px-3 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground border-b flex items-center justify-between">
+                <div className="sticky top-0 z-10 bg-muted/80 backdrop-blur px-3 py-1.5 text-xs uppercase tracking-wider text-muted-foreground border-b flex items-center justify-between">
                   <span>
                     {year}
                     {year === currentYear && (
-                      <Badge variant="outline" className="ml-2 text-[9px]">current</Badge>
+                      <Badge variant="outline" className="ml-2 text-[11px]">current</Badge>
                     )}
                   </span>
                   <button
-                    className="text-[10px] hover:text-foreground"
+                    className="text-[11px] hover:text-foreground"
                     onClick={() =>
                       setSelected((prev) => {
                         const next = new Set(prev);
@@ -297,13 +297,13 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium truncate">{c.name}</span>
-                            {c.course_code && <Badge variant="outline" className="text-[10px]">{c.course_code}</Badge>}
-                            {c.already_imported && <Badge className="text-[10px] bg-mastery-high/10 text-mastery-high border-mastery-high/30" variant="outline">Already imported</Badge>}
+                            {c.course_code && <Badge variant="outline" className="text-[11px]">{c.course_code}</Badge>}
+                            {c.already_imported && <Badge className="text-[11px] bg-mastery-high/10 text-mastery-high border-mastery-high/30" variant="outline">Already imported</Badge>}
                             {c.workflow_state === "completed" && (
-                              <Badge variant="outline" className="text-[10px]">concluded</Badge>
+                              <Badge variant="outline" className="text-[11px]">concluded</Badge>
                             )}
                             {c.workflow_state && c.workflow_state !== "available" && c.workflow_state !== "completed" && (
-                              <Badge variant="outline" className="text-[10px] capitalize">{c.workflow_state}</Badge>
+                              <Badge variant="outline" className="text-[11px] capitalize">{c.workflow_state}</Badge>
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5">
@@ -365,7 +365,7 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
                 <div className="rounded-md border bg-muted/30 p-2 max-h-40 overflow-y-auto text-xs space-y-1">
                   {pendingDuplicates.map((c) => (
                     <div key={c.canvas_course_id} className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-[9px]">already imported</Badge>
+                      <Badge variant="outline" className="text-[11px]">already imported</Badge>
                       <span className="truncate">{c.name}</span>
                       {c.school_year && <span className="text-muted-foreground">· {c.school_year}</span>}
                     </div>

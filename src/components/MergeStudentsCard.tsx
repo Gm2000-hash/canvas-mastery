@@ -147,7 +147,7 @@ function SelectedRow({ label, row }: { label: string; row: StudentRow | null }) 
   if (!row) return null;
   return (
     <div className="rounded-md border p-3">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
       <div className="font-medium">{row.real_name ?? row.display_name}</div>
       <div className="text-xs text-muted-foreground">
         {row.course_name}{row.school_year ? ` · ${row.school_year}` : ""}
@@ -203,7 +203,7 @@ function StudentSearch({ excludeId, onPick }: { excludeId: string | null; onPick
             <div className="font-medium">{r.real_name ?? r.display_name}</div>
             <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
               <span>{r.course_name}</span>
-              {r.school_year && <Badge variant="outline" className="text-[9px]">{r.school_year}</Badge>}
+              {r.school_year && <Badge variant="outline" className="text-[11px]">{r.school_year}</Badge>}
             </div>
           </button>
         ))}

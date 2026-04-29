@@ -65,7 +65,7 @@ export default function Landing() {
               { code: "7.SP.A.1", label: "Random sampling & inference", val: 0.81 },
             ].map((s) => (
               <div key={s.code} className="flex items-center gap-3 text-sm">
-                <div className="w-24 font-mono text-xs text-muted-foreground">{s.code}</div>
+                <div className="w-24 font-code text-xs text-muted-foreground">{s.code}</div>
                 <div className="flex-1 truncate text-foreground/85">{s.label}</div>
                 <div className="w-32 h-2.5 rounded-full bg-mastery-bg overflow-hidden">
                   <div

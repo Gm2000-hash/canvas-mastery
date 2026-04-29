@@ -342,9 +342,9 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
           <div className="min-w-0">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               {assignment.name}
-              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">{assignment.kind}</Badge>
+              <Badge variant="outline" className="text-[11px] uppercase tracking-wide">{assignment.kind}</Badge>
               {assignment.kind === "quiz" && assignment.quiz_engine && (
-                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                <Badge variant="secondary" className="text-[11px] uppercase tracking-wide">
                   {assignment.quiz_engine === "new" ? "New Quiz" : "Classic"}
                 </Badge>
               )}
@@ -417,7 +417,7 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
                     checked={selected.has(t.id)}
                     onCheckedChange={(c) => toggleOne(t.id, c === true)}
                   />
-                  <span className="font-mono shrink-0">{t.standards.code}</span>
+                  <span className="font-code shrink-0">{t.standards.code}</span>
                   {t.confidence != null && (
                     <span className="text-muted-foreground shrink-0">({Math.round(t.confidence * 100)}%)</span>
                   )}
@@ -477,7 +477,7 @@ function AddStandardDialog({ assignmentId, onAdded }: { assignmentId: string; on
             <CommandGroup>
               {standards.map((s) => (
                 <CommandItem key={s.id} value={`${s.code} ${s.description}`} onSelect={() => add(s.id)}>
-                  <span className="font-mono text-xs mr-2 text-muted-foreground">{s.code}</span>
+                  <span className="font-code text-xs mr-2 text-muted-foreground">{s.code}</span>
                   <span className="truncate">{s.description}</span>
                 </CommandItem>
               ))}

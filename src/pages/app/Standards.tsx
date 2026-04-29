@@ -132,7 +132,7 @@ export default function Standards() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="font-medium text-sm">{subj}</div>
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-[11px] text-muted-foreground">
                         {stateCount > 0 && <span>State {stateCount}</span>}
                         {stateCount > 0 && nationalCount > 0 && <span> · </span>}
                         {nationalCount > 0 && <span>National {nationalCount}</span>}
@@ -142,7 +142,7 @@ export default function Standards() {
                       {entries.sort((a, b) => b[1] - a[1]).map(([fw, count]) => {
                         const meta = getFramework(fw);
                         return (
-                          <Badge key={fw} variant="outline" className={`text-[10px] ${fwBadgeClass(fw)}`} title={meta.description}>
+                          <Badge key={fw} variant="outline" className={`text-[11px] ${fwBadgeClass(fw)}`} title={meta.description}>
                             {meta.shortLabel} · {count}
                           </Badge>
                         );
@@ -240,12 +240,12 @@ export default function Standards() {
               <div key={s.id} className="p-4 flex items-start gap-3 hover:bg-muted/30">
                 <Badge
                   variant="outline"
-                  className={`text-[10px] shrink-0 mt-0.5 ${fwBadgeClass(fwId)}`}
+                  className={`text-[11px] shrink-0 mt-0.5 ${fwBadgeClass(fwId)}`}
                   title={`${fw.label}${fw.national ? " (national)" : " (state)"} — ${fw.description}`}
                 >
                   {fw.shortLabel}
                 </Badge>
-                <div className="font-mono text-xs text-muted-foreground w-36 shrink-0 pt-0.5 break-all">{s.code}</div>
+                <div className="font-code text-xs text-muted-foreground w-36 shrink-0 pt-0.5 break-all">{s.code}</div>
                 <div className="flex-1 min-w-0 text-sm">{s.description}</div>
                 <div className="text-xs text-muted-foreground shrink-0 flex items-center gap-1.5">
                   <span className={fw.national ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
