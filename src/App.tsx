@@ -12,7 +12,6 @@ import Settings from "./pages/app/Settings";
 import Courses from "./pages/app/Courses";
 import Assignments from "./pages/app/Assignments";
 import Standards from "./pages/app/Standards";
-import Mastery from "./pages/app/Mastery";
 import MasteryDebug from "./pages/app/MasteryDebug";
 import Review from "./pages/app/Review";
 import Analytics from "./pages/app/Analytics";
