@@ -1345,11 +1345,26 @@ function CompareView({ courses }: { courses: Course[] }) {
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Assignment</Label>
               <Select value={assignmentId} onValueChange={setAssignmentId}>
-                <SelectTrigger className="w-[280px] h-9"><SelectValue placeholder="Pick an assignment…" /></SelectTrigger>
+                <SelectTrigger className="w-[300px] h-9"><SelectValue placeholder="Pick an assignment or group…" /></SelectTrigger>
                 <SelectContent>
-                  {assignmentOptions.length === 0 && <SelectItem value="__none" disabled>No assignments</SelectItem>}
+                  {groupOptions.length === 0 && assignmentOptions.length === 0 && <SelectItem value="__none" disabled>No assignments</SelectItem>}
+                  {groupOptions.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Groups</div>
+                      {groupOptions.map((g) => (
+                        <SelectItem key={`group:${g.id}`} value={`group:${g.id}`}>
+                          <span className="inline-flex items-center gap-1.5">
+                            <Layers className="h-3 w-3" />
+                            {g.name}
+                            <span className="text-muted-foreground text-xs">· {g.course_count} classes</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                      <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground border-t mt-1 pt-2">Individual assignments</div>
+                    </>
+                  )}
                   {assignmentOptions.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
+                    <SelectItem key={`assignment:${a.id}`} value={`assignment:${a.id}`}>
                       {a.name}{a.course_name ? ` · ${a.course_name}` : ""}
                     </SelectItem>
                   ))}
