@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Pulls the real server-side error message out of a supabase.functions.invoke() error.
 // Without this, FunctionsHttpError just says "Edge Function returned a non-2xx status code".
