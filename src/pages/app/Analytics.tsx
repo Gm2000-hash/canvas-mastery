@@ -1133,6 +1133,8 @@ type SplitMode = "all" | "by_class" | "by_level" | "class_x_level";
 type ChartStyle = "grouped" | "stacked";
 
 function CompareView({ courses }: { courses: Course[] }) {
+  const [subject, setSubject] = useState<string>("");
+  const [courseSubjects, setCourseSubjects] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string[]>([]);
   const [scope, setScope] = useState<ScopeKind>("standard");
   const [assignmentId, setAssignmentId] = useState<string>("");
@@ -1144,6 +1146,37 @@ function CompareView({ courses }: { courses: Course[] }) {
   const [standardOptions, setStandardOptions] = useState<{ id: string; code: string; description: string }[]>([]);
   const [rows, setRows] = useState<CompareRow[] | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Build a map of course_id → subject from teacher_disciplines (via courses.discipline_id).
+  useEffect(() => {
+    supabase.from("courses").select("id, discipline_id, teacher_disciplines(subject)").then(({ data }) => {
+      const map: Record<string, string> = {};
+      ((data as any[]) ?? []).forEach((c) => {
+        const s = c.teacher_disciplines?.subject;
+        if (s) map[c.id] = s;
+      });
+      setCourseSubjects(map);
+    });
+  }, []);
+
+  // Subjects available across the user's courses.
+  const compareSubjects = useMemo(
+    () => Array.from(new Set(Object.values(courseSubjects))).sort(),
+    [courseSubjects]
+  );
+
+  // Only show classes that match the chosen content area.
+  const subjectCourses = useMemo(
+    () => (subject ? courses.filter((c) => courseSubjects[c.id] === subject) : []),
+    [courses, courseSubjects, subject]
+  );
+
+  // If subject changes, drop any selected classes that no longer match.
+  useEffect(() => {
+    if (!subject) { setSelected([]); return; }
+    const allowed = new Set(subjectCourses.map((c) => c.id));
+    setSelected((prev) => prev.filter((id) => allowed.has(id)));
+  }, [subject, subjectCourses]);
 
   // Load pickers (assessments / standards). Standards list is global; assessments
   // list is filtered to the selected classes when any are picked.
@@ -1157,10 +1190,12 @@ function CompareView({ courses }: { courses: Course[] }) {
   }, [selected]);
 
   useEffect(() => {
-    supabase.from("standards").select("id, code, description").order("code").limit(2000).then(({ data }) => {
+    let q = supabase.from("standards").select("id, code, description, subject").order("code").limit(2000);
+    if (subject) q = q.eq("subject", subject);
+    q.then(({ data }) => {
       setStandardOptions(((data as any) ?? []).map((s: any) => ({ id: s.id, code: s.code, description: s.description })));
     });
-  }, []);
+  }, [subject]);
 
   const targetId = scope === "assignment" ? assignmentId : standardId;
   const canQuery = selected.length > 0 && !!targetId;
