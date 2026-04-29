@@ -2,8 +2,8 @@ import { Link, NavLink, Outlet, useNavigate, useLocation } from "react-router-do
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect, useState } from "react";
-import { ArrowRightLeft, BarChart3, BookMarked, Building2, CheckCheck, GraduationCap, History, Layers, LayoutDashboard, Library, ListChecks, Menu, Settings as SettingsIcon, Shield } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowRightLeft, BarChart3, BookMarked, Building2, CheckCheck, GraduationCap, GripVertical, History, Layers, LayoutDashboard, Library, ListChecks, Menu, Settings as SettingsIcon, Shield } from "lucide-react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
@@ -23,12 +23,17 @@ const nav = [
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },
 ];
 
-function NavList({ items, onNavigate, userEmail, onSignOut }: {
+function NavList({ items, onNavigate, userEmail, onSignOut, onReorder, draggable }: {
   items: typeof nav;
   onNavigate?: () => void;
   userEmail: string;
   onSignOut: () => void;
+  onReorder?: (from: number, to: number) => void;
+  draggable?: boolean;
 }) {
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+
   return (
     <>
       <Link to="/app" onClick={onNavigate} className="px-6 py-6 border-b border-sidebar-border block">
@@ -36,24 +41,63 @@ function NavList({ items, onNavigate, userEmail, onSignOut }: {
         <div className="text-xs text-sidebar-foreground/60 mt-1 font-medium">Mastery for Canvas teachers</div>
       </Link>
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {items.map((item) => (
-          <NavLink
+        {items.map((item, idx) => (
+          <div
             key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 px-4 py-2.5 rounded-full text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              )
-            }
+            onDragOver={(e) => {
+              if (!draggable || dragIdx === null) return;
+              e.preventDefault();
+              setOverIdx(idx);
+            }}
+            onDrop={(e) => {
+              if (!draggable || dragIdx === null) return;
+              e.preventDefault();
+              onReorder?.(dragIdx, idx);
+              setDragIdx(null);
+              setOverIdx(null);
+            }}
+            className={cn(
+              "rounded-full transition-colors",
+              overIdx === idx && dragIdx !== null && dragIdx !== idx && "ring-2 ring-sidebar-ring",
+              dragIdx === idx && "opacity-50"
+            )}
           >
-            <item.icon className="h-4 w-4" />
-            {item.label}
-          </NavLink>
+            <NavLink
+              to={item.to}
+              end={item.end}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                cn(
+                  "group flex items-center gap-2 px-3 py-2.5 rounded-full text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                    : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                )
+              }
+            >
+              {draggable && (
+                <span
+                  draggable
+                  onDragStart={(e) => {
+                    setDragIdx(idx);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragEnd={() => {
+                    setDragIdx(null);
+                    setOverIdx(null);
+                  }}
+                  onClick={(e) => e.preventDefault()}
+                  className="cursor-grab active:cursor-grabbing opacity-40 hover:opacity-100 -ml-1"
+                  aria-label="Drag to reorder"
+                  title="Drag to reorder"
+                >
+                  <GripVertical className="h-4 w-4" />
+                </span>
+              )}
+              <item.icon className="h-4 w-4" />
+              <span className="truncate">{item.label}</span>
+            </NavLink>
+          </div>
         ))}
       </nav>
       <div className="p-4 border-t border-sidebar-border">
@@ -95,7 +139,40 @@ export default function AppLayout() {
     );
   }
 
-  const items = [...nav, ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Shield, end: false as const }] : [])];
+  const baseItems = [...nav, ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Shield, end: false as const }] : [])];
+
+  const ORDER_KEY = "nav-order-v1";
+  const [order, setOrder] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(ORDER_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+  });
+
+  const items = useMemo(() => {
+    const map = new Map(baseItems.map((i) => [i.to, i]));
+    const ordered: typeof baseItems = [];
+    for (const to of order) {
+      const item = map.get(to);
+      if (item) {
+        ordered.push(item);
+        map.delete(to);
+      }
+    }
+    return [...ordered, ...map.values()];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, order]);
+
+  const handleReorder = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    const newOrder = next.map((i) => i.to);
+    setOrder(newOrder);
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(newOrder)); } catch {}
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -132,7 +209,7 @@ export default function AppLayout() {
 
         {/* Desktop sidebar */}
         <aside className="hidden md:flex w-64 shrink-0 bg-sidebar text-sidebar-foreground flex-col rounded-[1.75rem] shadow-soft border border-sidebar-border">
-          <NavList items={items} userEmail={user.email ?? ""} onSignOut={handleSignOut} />
+          <NavList items={items} userEmail={user.email ?? ""} onSignOut={handleSignOut} draggable onReorder={handleReorder} />
         </aside>
 
         <main className="flex-1 min-w-0 bg-card rounded-[1.75rem] shadow-soft border overflow-hidden">
