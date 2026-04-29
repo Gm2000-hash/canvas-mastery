@@ -8,7 +8,6 @@ import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
