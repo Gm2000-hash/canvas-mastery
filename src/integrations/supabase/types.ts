@@ -898,6 +898,21 @@ export type Database = {
           subject: string
         }[]
       }
+      analytics_compare_classes: {
+        Args: {
+          _assignment_id?: string
+          _course_ids: string[]
+          _standard_id?: string
+        }
+        Returns: {
+          avg_score: number
+          band: string
+          count: number
+          course_id: string
+          course_name: string
+          total_n: number
+        }[]
+      }
       analytics_mastery_distribution: {
         Args: { _course_id?: string; _subject?: string }
         Returns: {
