@@ -464,15 +464,15 @@ export default function QuestionBank() {
       ) : bank.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="grid lg:grid-cols-[420px_1fr] gap-4 items-start">
-          <Card className="lg:sticky lg:top-4">
+        <div className="space-y-4" style={{ fontFamily: "'Nunito Sans', system-ui, sans-serif" }}>
+          <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
                 <Library className="h-4 w-4 text-accent" /> Standards tree
               </CardTitle>
-              <CardDescription className="text-xs">Click a standard to load its questions.</CardDescription>
+              <CardDescription className="text-sm">Click a standard to open its questions in a popout.</CardDescription>
             </CardHeader>
-            <CardContent className="px-2 pb-3 max-h-[70vh] overflow-y-auto">
+            <CardContent className="px-3 pb-4 max-h-[75vh] overflow-y-auto">
               <TreeView
                 node={tree}
                 depth={0}
@@ -485,19 +485,30 @@ export default function QuestionBank() {
               />
             </CardContent>
           </Card>
+        </div>
+      )}
 
-          <div className="space-y-3">
-            {!selectedStandardId ? (
-              <Card><CardContent className="py-12 text-center text-muted-foreground text-sm">
-                <BookOpen className="h-8 w-8 mx-auto mb-3 text-accent" />
-                Pick a standard from the tree to see its questions.
-              </CardContent></Card>
-            ) : loadingQs ? (
+      {/* Questions popout dialog */}
+      <Dialog open={!!selectedStandardId} onOpenChange={(open) => !open && setSelectedStandardId(null)}>
+        <DialogContent
+          className="max-w-4xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col"
+          style={{ fontFamily: "'Nunito Sans', system-ui, sans-serif" }}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-accent" /> Questions for selected standard
+            </DialogTitle>
+            <DialogDescription>
+              {questions ? `${questions.length} question${questions.length === 1 ? "" : "s"} found` : "Loading…"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+            {loadingQs ? (
               <div className="space-y-2">{[0,1,2,3].map((i) => <Skeleton key={i} className="h-20" />)}</div>
             ) : !questions || questions.length === 0 ? (
-              <Card><CardContent className="py-12 text-center text-muted-foreground text-sm">
+              <div className="py-12 text-center text-muted-foreground text-sm">
                 No questions tagged to this standard yet.
-              </CardContent></Card>
+              </div>
             ) : (
               questions.map((q) => (
                 <button
@@ -548,8 +559,8 @@ export default function QuestionBank() {
               ))
             )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Question detail drawer */}
       <QuestionDrawer question={openQuestion} onClose={() => setOpenQuestion(null)} />
