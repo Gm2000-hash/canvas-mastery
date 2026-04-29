@@ -645,7 +645,7 @@ function TreeView({
   );
 
   return (
-    <div>
+    <div style={{ fontFamily: "'Nunito Sans', system-ui, sans-serif" }}>
       {sortedChildren.map((child) => {
         const isOpen = expanded.has(child.code);
         const hasChildren = child.children.size > 0;
@@ -655,40 +655,40 @@ function TreeView({
           <div key={child.code}>
             <div
               className={cn(
-                "group flex items-center gap-1 py-1 pr-2 rounded-md hover:bg-muted/60",
+                "group flex items-center gap-1.5 py-1.5 pr-2 rounded-md hover:bg-muted/60",
                 isSelected && "bg-accent/10",
               )}
-              style={{ paddingLeft: 4 + depth * 14 }}
+              style={{ paddingLeft: 4 + depth * 18 }}
             >
               <button
                 type="button"
                 onClick={() => hasChildren && onToggle(child.code)}
-                className={cn("h-5 w-5 inline-flex items-center justify-center text-muted-foreground", !hasChildren && "invisible")}
+                className={cn("h-6 w-6 inline-flex items-center justify-center text-muted-foreground", !hasChildren && "invisible")}
                 aria-label={isOpen ? "Collapse" : "Expand"}
               >
-                {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
               <button
                 type="button"
                 onClick={() => child.row && onSelect(child.row.standard_id)}
                 className={cn(
-                  "flex-1 min-w-0 flex items-center gap-2 text-left text-xs py-0.5",
+                  "flex-1 min-w-0 flex items-center gap-2 text-left text-sm py-0.5",
                   child.row ? "cursor-pointer" : "cursor-default text-muted-foreground",
                 )}
                 disabled={!child.row}
                 title={child.row?.description}
               >
-                <span className="font-code shrink-0">{child.code}</span>
+                <span className="font-code shrink-0 text-sm">{child.code}</span>
                 {child.row?.description && (
-                  <span className="truncate text-muted-foreground">{child.row.description}</span>
+                  <span className="truncate text-muted-foreground text-sm">{child.row.description}</span>
                 )}
               </button>
-              <div className="shrink-0 flex items-center gap-1.5">
-                <Badge variant="outline" className="text-[11px] h-4 px-1 font-code">
+              <div className="shrink-0 flex items-center gap-2">
+                <Badge variant="outline" className="text-xs h-5 px-1.5 font-code">
                   {child.totals.questions}q
                 </Badge>
                 {avg != null && (
-                  <span className="text-[11px] tabular-nums" style={{ color: bandColor(avg) }}>
+                  <span className="text-xs tabular-nums font-medium" style={{ color: bandColor(avg) }}>
                     {Math.round(avg * 100)}%
                   </span>
                 )}
