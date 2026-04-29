@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Info, Users, GraduationCap, BookMarked, ListChecks } from "lucide-react";
 import { recentSchoolYears, currentSchoolYearLabel } from "@/lib/schoolYear";
 import { GRADES } from "@/lib/frameworks";
+import DepartmentReports from "@/components/department/DepartmentReports";
 
 type Overview = {
   teacher_count: number;
