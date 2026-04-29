@@ -1390,7 +1390,10 @@ function CompareView({ courses }: { courses: Course[] }) {
                   )}
                   {assignmentOptions.map((a) => (
                     <SelectItem key={`assignment:${a.id}`} value={`assignment:${a.id}`}>
-                      {a.name}{a.course_name ? ` · ${a.course_name}` : ""}
+                      {a.name}
+                      {a.class_count > 1
+                        ? <span className="text-muted-foreground text-xs"> · {a.class_count} classes</span>
+                        : a.course_name ? <span className="text-muted-foreground text-xs"> · {a.course_name}</span> : null}
                     </SelectItem>
                   ))}
                 </SelectContent>
