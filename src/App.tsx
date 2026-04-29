@@ -20,6 +20,8 @@ import StudentHistory from "./pages/app/StudentHistory";
 import Admin from "./pages/app/Admin";
 import AssignmentGroups from "./pages/app/AssignmentGroups";
 import MasteryConnect from "./pages/app/MasteryConnect";
+import Department from "./pages/app/Department";
+import DepartmentDashboard from "./pages/app/DepartmentDashboard";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +50,8 @@ const App = () => (
             <Route path="student-history" element={<StudentHistory />} />
             <Route path="settings" element={<Settings />} />
             <Route path="mastery-connect" element={<MasteryConnect />} />
+            <Route path="department" element={<Department />} />
+            <Route path="department/:subject" element={<DepartmentDashboard />} />
             <Route path="admin" element={<Admin />} />
           </Route>
           <Route path="*" element={<NotFound />} />
