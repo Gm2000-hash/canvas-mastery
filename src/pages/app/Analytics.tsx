@@ -1147,7 +1147,7 @@ const EmptyState = forwardRef<HTMLDivElement, { message: string }>(({ message },
     <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-60" />
     <p className="text-sm">{message}</p>
     <p className="text-xs mt-2">
-      Need to set things up? Visit <Link to="/app/classes" className="underline">Courses</Link>, <Link to="/app/review" className="underline">Tag Review</Link>.
+      Need to set things up? Visit <Link to="/app/classes" className="underline">Classes</Link>, <Link to="/app/review" className="underline">Tag Review</Link>.
     </p>
   </div>
 ));
