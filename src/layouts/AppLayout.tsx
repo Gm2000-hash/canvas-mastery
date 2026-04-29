@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
-import { BarChart3, BookMarked, CheckCheck, GraduationCap, History, Layers, LayoutDashboard, Library, ListChecks, Menu, Settings as SettingsIcon, Shield, Sparkles } from "lucide-react";
+import { BarChart3, BookMarked, CheckCheck, GraduationCap, History, Layers, LayoutDashboard, Library, ListChecks, Menu, Settings as SettingsIcon, Shield } from "lucide-react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
