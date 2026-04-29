@@ -122,25 +122,6 @@ export default function AppLayout() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Close drawer on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    if (!loading && !user) navigate("/auth", { replace: true });
-  }, [loading, user, navigate]);
-
-  if (loading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-paper">
-        <div className="text-muted-foreground">Loading…</div>
-      </div>
-    );
-  }
-
-  const baseItems = [...nav, ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Shield, end: false as const }] : [])];
-
   const ORDER_KEY = "nav-order-v1";
   const [order, setOrder] = useState<string[]>(() => {
     try {
@@ -150,7 +131,17 @@ export default function AppLayout() {
     return [];
   });
 
+  // Close drawer on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!loading && !user) navigate("/auth", { replace: true });
+  }, [loading, user, navigate]);
+
   const items = useMemo(() => {
+    const baseItems = [...nav, ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Shield, end: false as const }] : [])];
     const map = new Map(baseItems.map((i) => [i.to, i]));
     const ordered: typeof baseItems = [];
     for (const to of order) {
@@ -161,8 +152,15 @@ export default function AppLayout() {
       }
     }
     return [...ordered, ...map.values()];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, order]);
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-paper">
+        <div className="text-muted-foreground">Loading…</div>
+      </div>
+    );
+  }
 
   const handleReorder = (from: number, to: number) => {
     if (from === to) return;
