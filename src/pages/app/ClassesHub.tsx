@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, BarChartHorizontal, ExternalLink, Eye, EyeOff, GraduationCap, Loader2, Shuffle, Tag } from "lucide-react";
+import { ArrowRight, BarChartHorizontal, Eye, EyeOff, GraduationCap, Loader2, Shuffle, Tag } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -353,8 +353,8 @@ export default function ClassesHub() {
                     <Stat label="Mastered" value={pct(s?.pct_mastered)} />
                   </div>
                   <div className="flex items-center justify-between gap-2 pt-1">
-                    <Link to={`/app/assignments?course=${c.id}`}>
-                      <Button variant="ghost" size="sm">Assignments <ExternalLink className="h-3 w-3 ml-1" /></Button>
+                    <Link to={`/app/classes/${c.id}/assignments`}>
+                      <Button variant="ghost" size="sm">Assignments <ArrowRight className="h-3 w-3 ml-1" /></Button>
                     </Link>
                     <Link to={`/app/classes/${c.id}`}>
                       <Button size="sm">

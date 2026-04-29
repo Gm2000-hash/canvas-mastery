@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen, Download, FileUp, Layers } from "lucide-react";
+import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen, Download, FileUp, Layers, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -47,8 +47,10 @@ type StandardTag = {
 
 export default function Assignments() {
   const [params, setParams] = useSearchParams();
+  const routeParams = useParams<{ courseId?: string }>();
+  const lockedCourseId = routeParams.courseId ?? null;
   const [courses, setCourses] = useState<Course[] | null>(null);
-  const [courseId, setCourseId] = useState<string>(params.get("course") ?? "");
+  const [courseId, setCourseId] = useState<string>(lockedCourseId ?? params.get("course") ?? "");
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const [tagsByAssignment, setTagsByAssignment] = useState<Record<string, StandardTag[]>>({});
   const [recomputing, setRecomputing] = useState(false);
@@ -66,9 +68,16 @@ export default function Assignments() {
   async function loadCourses() {
     // Hidden classes are excluded everywhere except the Courses page itself.
     // Archived courses (past school year + Canvas-completed) are also hidden by default.
-    const { data } = await supabase.from("courses").select("id, name, discipline_id").eq("hidden", false).is("archived_at", null).order("name");
+    // When locked to a specific course via the route, also include it even if hidden/archived.
+    let q = supabase.from("courses").select("id, name, discipline_id");
+    if (!lockedCourseId) q = q.eq("hidden", false).is("archived_at", null);
+    const { data } = await q.order("name");
     setCourses((data as Course[]) ?? []);
-    if (!courseId && data?.length) setCourseId(data[0].id);
+    if (lockedCourseId) {
+      setCourseId(lockedCourseId);
+    } else if (!courseId && data?.length) {
+      setCourseId(data[0].id);
+    }
   }
   async function loadDisciplines() {
     const { data } = await supabase
@@ -104,7 +113,20 @@ export default function Assignments() {
       setTagsByAssignment(map);
     }
   }
-  useEffect(() => { if (courseId) { setParams((p) => { p.set("course", courseId); return p; }, { replace: true }); loadAssignments(courseId); } /* eslint-disable-next-line */ }, [courseId]);
+  useEffect(() => {
+    if (!courseId) return;
+    if (!lockedCourseId) {
+      setParams((p) => { p.set("course", courseId); return p; }, { replace: true });
+    }
+    loadAssignments(courseId);
+    /* eslint-disable-next-line */
+  }, [courseId]);
+
+  // If the route's :courseId changes, follow it.
+  useEffect(() => {
+    if (lockedCourseId && lockedCourseId !== courseId) setCourseId(lockedCourseId);
+    /* eslint-disable-next-line */
+  }, [lockedCourseId]);
 
   async function recompute() {
     setRecomputing(true);
@@ -118,10 +140,25 @@ export default function Assignments() {
     <div className="space-y-8">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Assignments</h1>
+          {lockedCourseId && (
+            <Link
+              to="/app/classes"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2"
+            >
+              <ArrowLeft className="h-3 w-3" /> All classes
+            </Link>
+          )}
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">
+            {lockedCourseId && currentCourse ? `${currentCourse.name} — Assignments` : "Assignments"}
+          </h1>
           <p className="text-muted-foreground">Tag each assignment with one or more standards.</p>
         </div>
         <div className="flex gap-2">
+          {lockedCourseId && (
+            <Link to={`/app/classes/${lockedCourseId}`}>
+              <Button variant="outline">Open analytics</Button>
+            </Link>
+          )}
           <Button variant="outline" onClick={() => setCsvOpen(true)}>
             <FileUp className="h-4 w-4 mr-2" />
             Import CSV
@@ -155,11 +192,15 @@ export default function Assignments() {
 
 
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-sm text-muted-foreground">Course:</span>
-        <Select value={courseId} onValueChange={setCourseId}>
-          <SelectTrigger className="w-72"><SelectValue placeholder="Select course" /></SelectTrigger>
-          <SelectContent>{(courses ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-        </Select>
+        {!lockedCourseId && (
+          <>
+            <span className="text-sm text-muted-foreground">Course:</span>
+            <Select value={courseId} onValueChange={setCourseId}>
+              <SelectTrigger className="w-72"><SelectValue placeholder="Select course" /></SelectTrigger>
+              <SelectContent>{(courses ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </>
+        )}
 
         {currentCourse && (
           <DisciplinePicker
