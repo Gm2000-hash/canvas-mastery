@@ -39,7 +39,6 @@ const App = () => (
             <Route path="review" element={<Review />} />
             <Route path="standards" element={<Standards />} />
             <Route path="question-bank" element={<QuestionBank />} />
-            <Route path="mastery" element={<Mastery />} />
             <Route path="mastery/debug" element={<MasteryDebug />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="student-history" element={<StudentHistory />} />
