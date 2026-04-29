@@ -202,7 +202,7 @@ function StatCard({ icon: Icon, label, value }: { icon: any; label: string; valu
     <Card>
       <CardContent className="pt-6">
         <Icon className="h-5 w-5 text-accent mb-3" />
-        <div className="text-3xl font-display font-semibold tabular-nums">{value}</div>
+        <div className="text-2xl sm:text-3xl font-display font-semibold tabular-nums">{value}</div>
         <div className="text-xs text-muted-foreground mt-1">{label}</div>
       </CardContent>
     </Card>

@@ -66,7 +66,7 @@ export default function Auth() {
       <div className="hidden lg:flex flex-col justify-between p-12 bg-hero text-primary-foreground">
         <Link to="/" className="font-display text-2xl font-semibold">StandardsTrack</Link>
         <div className="max-w-md">
-          <h2 className="font-display text-4xl font-semibold leading-tight mb-4">
+          <h2 className="font-display text-3xl sm:text-4xl font-semibold leading-tight mb-4">
             Finally see what every student knows.
           </h2>
           <p className="text-primary-foreground/80">
