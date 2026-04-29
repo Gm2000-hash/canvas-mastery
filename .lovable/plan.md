@@ -1,73 +1,84 @@
-## Multi-class analytics tracker
+## Goal
 
-Add a new **Compare** tab to Analytics that lets the teacher pick several classes at once and view their performance on either an **assignment** or a **standard**, with three split modes:
+Treat assignments with the same name (or near-identical content) given across multiple sections of the same class as a single "logical assignment." Today the same Pre-ECA given to two sections shows up as two separate `assignments` rows because Canvas issues different `canvas_assignment_id`s per section. We need cross-class equivalence so analytics, the Compare tab, and standard tagging treat them as one.
 
-- **All together** — one combined bar (or single value)
-- **By class** — one bar per class
-- **By mastery level** — bars split into Below (&lt;60%), Approaching (60–80%), Mastered (≥80%)
-- **By class × mastery level** — both, rendered as grouped or stacked
+## Approach: Assignment Groups (non-destructive)
 
-The same multi-class picker is also added to the existing **Assessments** and **Standards** tabs so those tables can be filtered to an arbitrary subset of classes (today they only accept "all" or one course).
-
-### UX layout (Compare tab)
+Instead of merging rows in `assignments` (which would break Canvas sync, RLS, and per-course analytics), we add a lightweight **grouping layer** on top.
 
 ```text
-┌─ Compare classes ──────────────────────────────────────┐
-│ Classes: [▼ Multi-select chips: Bio 7A, Bio 7B, …]     │
-│ Scope:   ( ) Assignment  (•) Standard                  │
-│          [▼ pick assignment / standard]                │
-│ Split:   [All] [By class] [By level] [Class × level]   │
-│ Chart:   [Grouped] [Stacked]                           │
-├────────────────────────────────────────────────────────┤
-│  ▇ ▇ ▇                                                 │
-│  ▇ ▇ ▇   bar chart                                     │
-│  ────────────────────                                  │
-│  Bio 7A  Bio 7B  Bio 7C                                │
-└────────────────────────────────────────────────────────┘
-│  Summary table: class · n · avg % · % mastered          │
-└────────────────────────────────────────────────────────┘
+assignments (per-course rows, unchanged)
+        │
+        ▼
+assignment_group_id ──► assignment_groups (one per logical assignment)
 ```
 
-### Plan
+A teacher can review AI-suggested groups, accept, edit, split, or merge them. Analytics RPCs gain an "aggregate by group" mode.
 
-1. **DB function** `analytics_compare_classes(_course_ids uuid[], _assignment_id uuid, _standard_id uuid)` — security definer, scoped to `auth.uid()`.
-   - When `_assignment_id` is passed: aggregate `submissions.percentage` per class, plus a histogram into the 3 bands.
-   - When `_standard_id` is passed: aggregate latest `mastery_snapshots.mastery_score` per class, plus the same 3-band histogram.
-   - Returns one row per (course_id, band) with: course_name, n, avg_score, band, count.
-2. **New `CompareView` component** in `Analytics.tsx`:
-   - Multi-select class picker (checkbox popover, reusing the already-loaded `courses` list).
-   - Scope toggle (Assignment / Standard) + searchable single-select for the chosen item.
-   - Split toggle (All / By class / By level / Class × level).
-   - Chart-style toggle (Grouped / Stacked) — only relevant for Class × level.
-   - `recharts` `BarChart` with the right `dataKey`/`stackId` based on split mode; reuses `ChartContainer` styling.
-   - Summary table beneath the chart.
-   - CSV export of the visible rows.
-3. **Extend Assessments tab** (`AssignmentsView`):
-   - Add the same multi-class chip picker beside the search box; rows filter client-side by `course_id ∈ selected`.
-4. **Extend Standards tab** (`StandardsView`):
-   - Add the multi-class picker; pass `_course_ids` to a new overload of `analytics_standard_breakdown` (or filter client-side via `analytics_class_matrix` cross-class — simpler: just call `analytics_standard_breakdown` once per selected course and merge in the client, since the standards list is small).
-5. **New shared component** `<CourseMultiSelect />` (in `src/components/CourseMultiSelect.tsx`) — checkbox-list inside a popover with "Select all / Clear" — used by all three places.
-6. **Tab list** in `Analytics.tsx`: insert "Compare" after "Mastery by subject", icon `BarChartHorizontal` (lucide).
+## Technical Plan
 
-### Technical details
+### 1. Schema (migration)
 
-- Bands defined as a single client-side helper:
-  ```ts
-  const BANDS = [
-    { key: "below",       label: "Below (<60%)",        min: 0,    max: 0.60, color: "hsl(0 72% 51%)" },
-    { key: "approaching", label: "Approaching (60–80%)", min: 0.60, max: 0.80, color: "hsl(38 92% 50%)" },
-    { key: "mastered",    label: "Mastered (≥80%)",      min: 0.80, max: 1.01, color: "hsl(160 84% 39%)" },
-  ];
-  ```
-- The DB function bands rows server-side using the same thresholds so the histogram is computed once.
-- For Class × level the chart uses `<Bar stackId={mode === "stacked" ? "a" : undefined} />` per band.
-- All RPCs filter on `teacher_id = auth.uid()`; existing RLS continues to protect raw tables.
-- No schema changes — no new tables, no migrations beyond the new function.
+- New table `public.assignment_groups`:
+  - `id uuid pk`, `teacher_id uuid`, `name text`, `kind` (assignment|quiz), `subject text null`, `grade text null`, `created_at`, `updated_at`, `confirmed bool default false`
+  - RLS: teacher_id = auth.uid() ALL.
+- Add `assignment_group_id uuid null` FK on `public.assignments` (nullable; ungrouped = standalone). Index `(teacher_id, assignment_group_id)`.
+- Add `name_normalized text` generated/maintained on `assignments` (lowercased, whitespace-collapsed, punctuation trimmed) plus index, used for fast grouping suggestions.
+- No data destruction; ungrouped assignments behave exactly as today.
 
-### Files touched
+### 2. Auto-grouping logic
 
-- **Migration**: new SQL file adding `public.analytics_compare_classes(...)`.
-- **New**: `src/components/CourseMultiSelect.tsx`.
-- **Edited**: `src/pages/app/Analytics.tsx` — add `<CompareView />`, new tab trigger, and multi-class picker on Assessments + Standards tabs.
+- New edge function `suggest-assignment-groups`:
+  - For the teacher's assignments without a group, cluster by:
+    1. Same `kind`,
+    2. Same normalized name OR ≥0.92 trigram similarity (`pg_trgm`),
+    3. Same effective subject/grade (via `teacher_disciplines` on the course),
+    4. Optional: same `points_possible` and similar `due_at` window.
+  - Optionally call Lovable AI Gateway (`google/gemini-2.5-flash-lite`) on borderline pairs with the question text to confirm equivalence — only for `confidence < 0.92`.
+  - Returns proposed groups; does NOT auto-write. Teacher confirms in UI.
+- A second function `apply-assignment-groups` writes `assignment_groups` rows and sets `assignment_group_id` on member assignments. Idempotent.
 
-No other files change. The feature is additive — existing single-course flows keep working unchanged.
+### 3. Analytics & Compare tab updates
+
+Update RPCs (additive — keep old signatures working):
+
+- `analytics_assignment_breakdown`: add optional `_group_by_group bool default false`. When true, group by `assignment_group_id` (fallback to `assignments.id` for ungrouped) and sum submissions/avg pct across member assignments.
+- `analytics_compare_classes`: accept either `_assignment_id` (single) or new `_assignment_group_id`. When a group is given, the source CTE pulls submissions for **all** member assignments whose course is in `_course_ids`. This is what handles the "two sections of 8th Grade Science B took the same Pre-ECA" case directly.
+- `analytics_question_breakdown` and `analytics_question_bank`: optional group filter, merging questions that share normalized text across the group's assignments.
+- Standards tagging: when a group is confirmed, propagate confirmed standard tags from any member assignment to the others (via `assignment_standards`) so mastery is recomputed consistently. `recompute-mastery` already runs per teacher and will pick this up.
+
+### 4. UI
+
+New page **Assignment Groups** (`src/pages/app/AssignmentGroups.tsx`), linked from Assignments page header and the admin/troubleshooting area:
+
+- "Suggested groups" list (from `suggest-assignment-groups`): each card shows name, member courses, # submissions, confidence. Buttons: **Confirm group**, **Split**, **Edit name**.
+- "Confirmed groups" list with member chips and an "Add another assignment" picker (search by name).
+- "Ungrouped" tab to manually create a group from selected assignments.
+
+Update **Assignments page** (`src/pages/app/Assignments.tsx`):
+
+- Show a small "Group: <name>" badge next to assignments that belong to a group; click to open the group page.
+- Banner above the list when ≥1 suggestion exists: "We found N assignments that look like duplicates across classes — Review."
+
+Update **Analytics → Compare tab** (`src/pages/app/Analytics.tsx`):
+
+- The assignment picker switches its options to **groups first** (with member-count badge), then ungrouped assignments. Selecting a group passes `_assignment_group_id` to the RPC. The mastery bands chart will then naturally split by class while pulling from the unified group.
+
+### 5. Files
+
+- **New migration** `*_assignment_groups.sql`: creates `assignment_groups`, adds `assignment_group_id` and `name_normalized` to `assignments`, enables `pg_trgm`, updates the four analytics RPCs above, adds a `merge_assignment_group` RPC (admin-style helper to unify two existing groups).
+- **New edge functions**: `supabase/functions/suggest-assignment-groups/index.ts`, `supabase/functions/apply-assignment-groups/index.ts`.
+- **New component**: `src/pages/app/AssignmentGroups.tsx` and a small `AssignmentGroupBadge.tsx`.
+- **Edited**: `src/App.tsx` (route), `src/layouts/AppLayout.tsx` (sidebar entry under Assignments or Admin), `src/pages/app/Assignments.tsx` (badge + suggestions banner), `src/pages/app/Analytics.tsx` (Compare uses group ids).
+
+### 6. Backfill / safety
+
+- Migration runs no destructive updates. After it ships, the user clicks "Find duplicate assignments" once on the new page; they review and confirm. Nothing is grouped silently.
+- Mastery recompute is triggered after a group is confirmed (only for affected courses).
+- All new RPCs are `SECURITY DEFINER` with `auth.uid()` scoping, mirroring existing analytics RPCs.
+
+## Out of scope (for now)
+
+- Auto-grouping by question-text similarity alone (we use it only as a tiebreaker).
+- Merging Canvas-side data — Canvas remains the source of truth per section.
+- Cross-teacher group sharing.
