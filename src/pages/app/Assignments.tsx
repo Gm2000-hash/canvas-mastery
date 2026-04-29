@@ -68,9 +68,16 @@ export default function Assignments() {
   async function loadCourses() {
     // Hidden classes are excluded everywhere except the Courses page itself.
     // Archived courses (past school year + Canvas-completed) are also hidden by default.
-    const { data } = await supabase.from("courses").select("id, name, discipline_id").eq("hidden", false).is("archived_at", null).order("name");
+    // When locked to a specific course via the route, also include it even if hidden/archived.
+    let q = supabase.from("courses").select("id, name, discipline_id");
+    if (!lockedCourseId) q = q.eq("hidden", false).is("archived_at", null);
+    const { data } = await q.order("name");
     setCourses((data as Course[]) ?? []);
-    if (!courseId && data?.length) setCourseId(data[0].id);
+    if (lockedCourseId) {
+      setCourseId(lockedCourseId);
+    } else if (!courseId && data?.length) {
+      setCourseId(data[0].id);
+    }
   }
   async function loadDisciplines() {
     const { data } = await supabase
@@ -106,7 +113,20 @@ export default function Assignments() {
       setTagsByAssignment(map);
     }
   }
-  useEffect(() => { if (courseId) { setParams((p) => { p.set("course", courseId); return p; }, { replace: true }); loadAssignments(courseId); } /* eslint-disable-next-line */ }, [courseId]);
+  useEffect(() => {
+    if (!courseId) return;
+    if (!lockedCourseId) {
+      setParams((p) => { p.set("course", courseId); return p; }, { replace: true });
+    }
+    loadAssignments(courseId);
+    /* eslint-disable-next-line */
+  }, [courseId]);
+
+  // If the route's :courseId changes, follow it.
+  useEffect(() => {
+    if (lockedCourseId && lockedCourseId !== courseId) setCourseId(lockedCourseId);
+    /* eslint-disable-next-line */
+  }, [lockedCourseId]);
 
   async function recompute() {
     setRecomputing(true);
