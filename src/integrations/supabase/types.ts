@@ -1309,6 +1309,23 @@ export type Database = {
           trend: Json
         }[]
       }
+      department_standard_class_matrix: {
+        Args: { _grades?: string[]; _school_year?: string; _subject: string }
+        Returns: {
+          avg_mastery: number
+          class_grade: string
+          class_label: string
+          course_id: string
+          is_own: boolean
+          pct_mastered: number
+          standard_code: string
+          standard_description: string
+          standard_grade: string
+          standard_id: string
+          students_assessed: number
+          students_mastered: number
+        }[]
+      }
       department_standards: {
         Args: { _grades?: string[]; _school_year?: string; _subject: string }
         Returns: {
@@ -1321,6 +1338,19 @@ export type Database = {
           standard_id: string
           students_assessed: number
           students_mastered: number
+        }[]
+      }
+      department_student_standard_matrix: {
+        Args: { _grades?: string[]; _school_year?: string; _subject: string }
+        Returns: {
+          class_label: string
+          is_own: boolean
+          mastered: boolean
+          mastery_score: number
+          standard_code: string
+          standard_id: string
+          student_id: string
+          student_label: string
         }[]
       }
       department_students: {

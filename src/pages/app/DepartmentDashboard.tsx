@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Info, Users, GraduationCap, BookMarked, ListChecks } from "lucide-react";
 import { recentSchoolYears, currentSchoolYearLabel } from "@/lib/schoolYear";
 import { GRADES } from "@/lib/frameworks";
+import DepartmentReports from "@/components/department/DepartmentReports";
 
 type Overview = {
   teacher_count: number;
@@ -196,6 +197,7 @@ export default function DepartmentDashboard() {
           <TabsTrigger value="classes">Classes</TabsTrigger>
           <TabsTrigger value="students">Students</TabsTrigger>
           <TabsTrigger value="assessments">Common Assessments</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
         {/* OVERVIEW */}
@@ -460,6 +462,10 @@ export default function DepartmentDashboard() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        {/* REPORTS — flexible builder */}
+        <TabsContent value="reports">
+          <DepartmentReports subject={subject} schoolYear={schoolYear} grades={grades} />
         </TabsContent>
       </Tabs>
     </div>
