@@ -19,6 +19,7 @@ import Analytics from "./pages/app/Analytics";
 import QuestionBank from "./pages/app/QuestionBank";
 import StudentHistory from "./pages/app/StudentHistory";
 import Admin from "./pages/app/Admin";
+import AssignmentGroups from "./pages/app/AssignmentGroups";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
             <Route index element={<Dashboard />} />
             <Route path="courses" element={<Courses />} />
             <Route path="assignments" element={<Assignments />} />
+            <Route path="assignment-groups" element={<AssignmentGroups />} />
             <Route path="review" element={<Review />} />
             <Route path="standards" element={<Standards />} />
             <Route path="question-bank" element={<QuestionBank />} />
