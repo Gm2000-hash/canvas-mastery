@@ -140,10 +140,25 @@ export default function Assignments() {
     <div className="space-y-8">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Assignments</h1>
+          {lockedCourseId && (
+            <Link
+              to="/app/classes"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2"
+            >
+              <ArrowLeft className="h-3 w-3" /> All classes
+            </Link>
+          )}
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">
+            {lockedCourseId && currentCourse ? `${currentCourse.name} — Assignments` : "Assignments"}
+          </h1>
           <p className="text-muted-foreground">Tag each assignment with one or more standards.</p>
         </div>
         <div className="flex gap-2">
+          {lockedCourseId && (
+            <Link to={`/app/classes/${lockedCourseId}`}>
+              <Button variant="outline">Open analytics</Button>
+            </Link>
+          )}
           <Button variant="outline" onClick={() => setCsvOpen(true)}>
             <FileUp className="h-4 w-4 mr-2" />
             Import CSV
@@ -177,11 +192,15 @@ export default function Assignments() {
 
 
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-sm text-muted-foreground">Course:</span>
-        <Select value={courseId} onValueChange={setCourseId}>
-          <SelectTrigger className="w-72"><SelectValue placeholder="Select course" /></SelectTrigger>
-          <SelectContent>{(courses ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-        </Select>
+        {!lockedCourseId && (
+          <>
+            <span className="text-sm text-muted-foreground">Course:</span>
+            <Select value={courseId} onValueChange={setCourseId}>
+              <SelectTrigger className="w-72"><SelectValue placeholder="Select course" /></SelectTrigger>
+              <SelectContent>{(courses ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </>
+        )}
 
         {currentCourse && (
           <DisciplinePicker
