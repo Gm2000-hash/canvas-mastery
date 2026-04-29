@@ -748,6 +748,39 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
               {question.question_text || <span className="italic text-muted-foreground">(no text)</span>}
             </div>
           </div>
+          {question.answers && question.answers.length > 0 && (
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                Choices {question.item_type ? <span className="normal-case text-muted-foreground/70">· {question.item_type}</span> : null}
+              </div>
+              <ul className="space-y-1.5">
+                {question.answers.map((a, i) => {
+                  const isCorrect = (a.weight ?? 0) > 0;
+                  return (
+                    <li
+                      key={i}
+                      className={cn(
+                        "rounded-md border p-2.5 text-sm flex items-start gap-2",
+                        isCorrect ? "border-mastery-high/40 bg-mastery-high/5" : "bg-card"
+                      )}
+                    >
+                      <span className="font-code text-xs text-muted-foreground shrink-0 mt-0.5 w-5">
+                        {String.fromCharCode(65 + i)}.
+                      </span>
+                      <span className="flex-1 min-w-0 whitespace-pre-wrap">
+                        {a.text || <span className="italic text-muted-foreground">(no text)</span>}
+                      </span>
+                      {isCorrect && (
+                        <Badge variant="outline" className="text-[10px] bg-mastery-high/10 border-mastery-high/30 text-mastery-high shrink-0">
+                          correct
+                        </Badge>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
           <div>
             <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Confirmed standards</div>
             {(question.standards?.length ?? 0) === 0 ? (
