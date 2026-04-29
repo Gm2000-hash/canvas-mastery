@@ -1267,6 +1267,86 @@ export type Database = {
           note: string
         }[]
       }
+      department_assessments: {
+        Args: { _grades?: string[]; _school_year?: string; _subject: string }
+        Returns: {
+          avg_percentage: number
+          class_count: number
+          display_name: string
+          name_normalized: string
+          standards_tagged: number
+          submission_count: number
+          teacher_count: number
+        }[]
+      }
+      department_classes: {
+        Args: { _grades?: string[]; _school_year?: string; _subject: string }
+        Returns: {
+          avg_mastery: number
+          course_id: string
+          display_label: string
+          grade: string
+          is_own: boolean
+          pct_mastered: number
+          student_count: number
+        }[]
+      }
+      department_membership: {
+        Args: { _grades?: string[]; _school_year?: string; _subject: string }
+        Returns: {
+          teacher_id: string
+        }[]
+      }
+      department_overview: {
+        Args: { _grades?: string[]; _school_year?: string; _subject: string }
+        Returns: {
+          avg_mastery: number
+          class_count: number
+          distribution: Json
+          pct_mastered: number
+          student_count: number
+          teacher_count: number
+          trend: Json
+        }[]
+      }
+      department_standards: {
+        Args: { _grades?: string[]; _school_year?: string; _subject: string }
+        Returns: {
+          avg_mastery: number
+          code: string
+          description: string
+          framework: string
+          grade: string
+          pct_mastered: number
+          standard_id: string
+          students_assessed: number
+          students_mastered: number
+        }[]
+      }
+      department_students: {
+        Args: { _grades?: string[]; _school_year?: string; _subject: string }
+        Returns: {
+          avg_mastery: number
+          class_label: string
+          display_name: string
+          grade: string
+          is_own: boolean
+          last_activity: string
+          standards_assessed: number
+          standards_mastered: number
+          student_id: string
+        }[]
+      }
+      department_subjects: {
+        Args: { _school_year?: string }
+        Returns: {
+          class_count: number
+          grades: string[]
+          student_count: number
+          subject: string
+          teacher_count: number
+        }[]
+      }
       force_archive_state: {
         Args: { _archive: boolean; _course_id: string }
         Returns: boolean
