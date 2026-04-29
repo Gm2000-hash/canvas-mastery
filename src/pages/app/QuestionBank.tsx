@@ -35,6 +35,8 @@ type BankRow = {
 
 type Course = { id: string; name: string };
 
+type QuestionAnswer = { text: string | null; html: string | null; weight: number | null };
+
 type QuestionRow = {
   id: string;
   position: number | null;
@@ -42,6 +44,8 @@ type QuestionRow = {
   points_possible: number | null;
   assignment_id: string;
   assignments: { id: string; name: string; course_id: string } | null;
+  answers: QuestionAnswer[] | null;
+  item_type: string | null;
   // computed
   response_count?: number;
   avg_pct?: number | null;
@@ -235,7 +239,7 @@ export default function QuestionBank() {
     // Pull tags honoring the status filter (default: all — confirmed AND ai-suggested)
     let qsQuery = supabase
       .from("question_standards")
-      .select("question_id, standard_id, ai_suggested, confirmed, standards(code, description), quiz_questions!inner(id, position, question_text, points_possible, assignment_id, assignments!inner(id, name, course_id))")
+      .select("question_id, standard_id, ai_suggested, confirmed, standards(code, description), quiz_questions!inner(id, position, question_text, points_possible, assignment_id, answers, item_type, assignments!inner(id, name, course_id))")
       .in("standard_id", stdIds);
     if (statusFilter === "CONFIRMED") qsQuery = qsQuery.eq("confirmed", true);
     if (statusFilter === "SUGGESTED") qsQuery = qsQuery.eq("confirmed", false).eq("ai_suggested", true);
@@ -255,6 +259,8 @@ export default function QuestionBank() {
           points_possible: q.points_possible,
           assignment_id: q.assignment_id,
           assignments: q.assignments,
+          answers: q.answers ?? null,
+          item_type: q.item_type ?? null,
           standards: [],
           _anyConfirmed: false,
         });
@@ -742,6 +748,39 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
               {question.question_text || <span className="italic text-muted-foreground">(no text)</span>}
             </div>
           </div>
+          {question.answers && question.answers.length > 0 && (
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                Choices {question.item_type ? <span className="normal-case text-muted-foreground/70">· {question.item_type}</span> : null}
+              </div>
+              <ul className="space-y-1.5">
+                {question.answers.map((a, i) => {
+                  const isCorrect = (a.weight ?? 0) > 0;
+                  return (
+                    <li
+                      key={i}
+                      className={cn(
+                        "rounded-md border p-2.5 text-sm flex items-start gap-2",
+                        isCorrect ? "border-mastery-high/40 bg-mastery-high/5" : "bg-card"
+                      )}
+                    >
+                      <span className="font-code text-xs text-muted-foreground shrink-0 mt-0.5 w-5">
+                        {String.fromCharCode(65 + i)}.
+                      </span>
+                      <span className="flex-1 min-w-0 whitespace-pre-wrap">
+                        {a.text || <span className="italic text-muted-foreground">(no text)</span>}
+                      </span>
+                      {isCorrect && (
+                        <Badge variant="outline" className="text-[10px] bg-mastery-high/10 border-mastery-high/30 text-mastery-high shrink-0">
+                          correct
+                        </Badge>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
           <div>
             <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Confirmed standards</div>
             {(question.standards?.length ?? 0) === 0 ? (
