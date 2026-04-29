@@ -1111,3 +1111,318 @@ const EmptyState = forwardRef<HTMLDivElement, { message: string }>(({ message },
   </div>
 ));
 EmptyState.displayName = "EmptyState";
+
+// ───────────────────────── Compare classes ─────────────────────────
+type CompareRow = {
+  course_id: string;
+  course_name: string;
+  band: "below" | "approaching" | "mastered";
+  count: number;
+  avg_score: number | null;
+  total_n: number;
+};
+
+const BANDS = [
+  { key: "below" as const,       label: "Below (<60%)",         color: "hsl(0 72% 51%)" },
+  { key: "approaching" as const, label: "Approaching (60–80%)", color: "hsl(38 92% 50%)" },
+  { key: "mastered" as const,    label: "Mastered (≥80%)",      color: "hsl(160 84% 39%)" },
+];
+
+type ScopeKind = "assignment" | "standard";
+type SplitMode = "all" | "by_class" | "by_level" | "class_x_level";
+type ChartStyle = "grouped" | "stacked";
+
+function CompareView({ courses }: { courses: Course[] }) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const [scope, setScope] = useState<ScopeKind>("standard");
+  const [assignmentId, setAssignmentId] = useState<string>("");
+  const [standardId, setStandardId] = useState<string>("");
+  const [split, setSplit] = useState<SplitMode>("by_class");
+  const [chartStyle, setChartStyle] = useState<ChartStyle>("grouped");
+
+  const [assignmentOptions, setAssignmentOptions] = useState<{ id: string; name: string; course_name: string }[]>([]);
+  const [standardOptions, setStandardOptions] = useState<{ id: string; code: string; description: string }[]>([]);
+  const [rows, setRows] = useState<CompareRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Load pickers (assessments / standards). Standards list is global; assessments
+  // list is filtered to the selected classes when any are picked.
+  useEffect(() => {
+    let q = supabase.from("assignments").select("id, name, course_id, courses(name)").order("name").limit(500);
+    if (selected.length > 0) q = q.in("course_id", selected);
+    q.then(({ data }) => {
+      const list = (data as any[] | null) ?? [];
+      setAssignmentOptions(list.map((a) => ({ id: a.id, name: a.name, course_name: a.courses?.name ?? "" })));
+    });
+  }, [selected]);
+
+  useEffect(() => {
+    supabase.from("standards").select("id, code, description").order("code").limit(2000).then(({ data }) => {
+      setStandardOptions(((data as any) ?? []).map((s: any) => ({ id: s.id, code: s.code, description: s.description })));
+    });
+  }, []);
+
+  const targetId = scope === "assignment" ? assignmentId : standardId;
+  const canQuery = selected.length > 0 && !!targetId;
+
+  useEffect(() => {
+    if (!canQuery) { setRows(null); return; }
+    setLoading(true);
+    supabase.rpc("analytics_compare_classes" as any, {
+      _course_ids: selected,
+      _assignment_id: scope === "assignment" ? assignmentId : null,
+      _standard_id: scope === "standard" ? standardId : null,
+    }).then(({ data, error }) => {
+      setLoading(false);
+      if (error) { setRows([]); return; }
+      setRows(((data as any) ?? []) as CompareRow[]);
+    });
+  }, [canQuery, selected, scope, assignmentId, standardId]);
+
+  // Pivot rows for chart: one entry per course with band counts.
+  const perCourse = useMemo(() => {
+    if (!rows) return [];
+    const m = new Map<string, { course_id: string; course_name: string; total_n: number; avg_score: number | null; below: number; approaching: number; mastered: number }>();
+    for (const r of rows) {
+      const cur = m.get(r.course_id) ?? {
+        course_id: r.course_id, course_name: r.course_name,
+        total_n: r.total_n, avg_score: r.avg_score,
+        below: 0, approaching: 0, mastered: 0,
+      };
+      cur[r.band] = r.count;
+      m.set(r.course_id, cur);
+    }
+    return Array.from(m.values()).sort((a, b) => a.course_name.localeCompare(b.course_name));
+  }, [rows]);
+
+  // Chart-ready data + which series (bars) to render.
+  const chartData = useMemo(() => {
+    if (split === "all") {
+      // single combined bar
+      const total = perCourse.reduce((acc, c) => {
+        acc.below += c.below; acc.approaching += c.approaching; acc.mastered += c.mastered;
+        acc.total_n += c.total_n;
+        return acc;
+      }, { below: 0, approaching: 0, mastered: 0, total_n: 0 });
+      const weighted = perCourse.reduce((sum, c) => sum + (Number(c.avg_score ?? 0) * c.total_n), 0);
+      const avg = total.total_n > 0 ? weighted / total.total_n : 0;
+      return [{ name: "All selected", below: total.below, approaching: total.approaching, mastered: total.mastered, avg_pct: Math.round(avg * 100) }];
+    }
+    if (split === "by_level") {
+      const total = perCourse.reduce((acc, c) => {
+        acc.below += c.below; acc.approaching += c.approaching; acc.mastered += c.mastered;
+        return acc;
+      }, { below: 0, approaching: 0, mastered: 0 });
+      return BANDS.map((b) => ({ name: b.label, count: total[b.key] }));
+    }
+    // by_class or class_x_level
+    return perCourse.map((c) => ({
+      name: c.course_name,
+      below: c.below,
+      approaching: c.approaching,
+      mastered: c.mastered,
+      avg_pct: c.avg_score != null ? Math.round(Number(c.avg_score) * 100) : 0,
+    }));
+  }, [perCourse, split]);
+
+  function exportCsv() {
+    const header = ["Class", "n", "Avg %", "Below", "Approaching", "Mastered"];
+    const lines = [header.join(",")];
+    perCourse.forEach((c) => {
+      lines.push([
+        JSON.stringify(c.course_name),
+        c.total_n,
+        c.avg_score != null ? Math.round(Number(c.avg_score) * 100) : "",
+        c.below, c.approaching, c.mastered,
+      ].join(","));
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "class_comparison.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Compare classes</CardTitle>
+        <CardDescription>
+          Pick one or more classes and a target — an assignment or a standard — to compare performance side by side.
+          Split the view by class, by mastery level, or both.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Classes</Label>
+            <CourseMultiSelect courses={courses} selected={selected} onChange={setSelected} placeholder="Pick classes…" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Scope</Label>
+            <div className="flex rounded-md border overflow-hidden h-9">
+              {(["standard", "assignment"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setScope(s)}
+                  className={`px-3 text-xs font-medium transition ${scope === s ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                >
+                  {s === "standard" ? "Standard" : "Assignment"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {scope === "assignment" ? (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Assignment</Label>
+              <Select value={assignmentId} onValueChange={setAssignmentId}>
+                <SelectTrigger className="w-[280px] h-9"><SelectValue placeholder="Pick an assignment…" /></SelectTrigger>
+                <SelectContent>
+                  {assignmentOptions.length === 0 && <SelectItem value="__none" disabled>No assignments</SelectItem>}
+                  {assignmentOptions.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}{a.course_name ? ` · ${a.course_name}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Standard</Label>
+              <Select value={standardId} onValueChange={setStandardId}>
+                <SelectTrigger className="w-[320px] h-9"><SelectValue placeholder="Pick a standard…" /></SelectTrigger>
+                <SelectContent>
+                  {standardOptions.length === 0 && <SelectItem value="__none" disabled>No standards</SelectItem>}
+                  {standardOptions.slice(0, 500).map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="font-mono mr-1.5">{s.code}</span>
+                      <span className="text-muted-foreground">{s.description.slice(0, 60)}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Split</Label>
+            <div className="flex rounded-md border overflow-hidden h-9">
+              {([
+                ["all", "All"],
+                ["by_class", "By class"],
+                ["by_level", "By level"],
+                ["class_x_level", "Class × level"],
+              ] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setSplit(k)}
+                  className={`px-3 text-xs font-medium transition ${split === k ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {split === "class_x_level" && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Bars</Label>
+              <div className="flex rounded-md border overflow-hidden h-9">
+                {(["grouped", "stacked"] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setChartStyle(g)}
+                    className={`px-3 text-xs font-medium transition ${chartStyle === g ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                  >
+                    {g === "grouped" ? "Grouped" : "Stacked"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="ml-auto">
+            <Button size="sm" variant="outline" onClick={exportCsv} disabled={perCourse.length === 0}>
+              <Download className="h-3.5 w-3.5 mr-1" /> CSV
+            </Button>
+          </div>
+        </div>
+
+        {!canQuery ? (
+          <EmptyState message="Pick at least one class and a target to compare." />
+        ) : loading ? (
+          <Skeleton className="h-72 w-full" />
+        ) : perCourse.length === 0 ? (
+          <EmptyState message="No data yet for this selection." />
+        ) : (
+          <>
+            <ChartContainer
+              config={{
+                below:       { label: BANDS[0].label, color: BANDS[0].color },
+                approaching: { label: BANDS[1].label, color: BANDS[1].color },
+                mastered:    { label: BANDS[2].label, color: BANDS[2].color },
+                count:       { label: "Count",        color: "hsl(var(--primary))" },
+                avg_pct:     { label: "Avg %",        color: "hsl(var(--primary))" },
+              }}
+              className="h-80 w-full"
+            >
+              <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {split === "by_level" ? (
+                  <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" />
+                ) : split === "by_class" ? (
+                  <Bar dataKey="avg_pct" name="Avg %" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" />
+                ) : (
+                  // "all" or "class_x_level": three band bars
+                  BANDS.map((b) => (
+                    <Bar
+                      key={b.key}
+                      dataKey={b.key}
+                      name={b.label}
+                      stackId={split === "class_x_level" && chartStyle === "stacked" ? "a" : split === "all" ? "a" : undefined}
+                      fill={b.color}
+                      radius={split === "class_x_level" && chartStyle === "stacked" ? undefined : [6, 6, 0, 0]}
+                    />
+                  ))
+                )}
+              </BarChart>
+            </ChartContainer>
+
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Class</TableHead>
+                <TableHead className="text-right">n</TableHead>
+                <TableHead className="text-right">Avg</TableHead>
+                <TableHead className="text-right" style={{ color: BANDS[0].color }}>Below</TableHead>
+                <TableHead className="text-right" style={{ color: BANDS[1].color }}>Approaching</TableHead>
+                <TableHead className="text-right" style={{ color: BANDS[2].color }}>Mastered</TableHead>
+                <TableHead className="text-right">% mastered</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {perCourse.map((c) => {
+                  const pctMastered = c.total_n > 0 ? c.mastered / c.total_n : 0;
+                  return (
+                    <TableRow key={c.course_id}>
+                      <TableCell className="font-medium">{c.course_name}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.total_n}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.avg_score != null ? `${Math.round(Number(c.avg_score) * 100)}%` : "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.below}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.approaching}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.mastered}</TableCell>
+                      <TableCell className="text-right tabular-nums">{`${Math.round(pctMastered * 100)}%`}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
