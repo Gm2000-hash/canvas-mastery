@@ -261,6 +261,59 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
   const confirmed = tags.filter((t) => t.confirmed);
   const suggested = tags.filter((t) => !t.confirmed);
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Drop selections that no longer apply (e.g., after a refresh).
+  useEffect(() => {
+    setSelected((prev) => {
+      const next = new Set<string>();
+      for (const t of suggested) if (prev.has(t.id)) next.add(t.id);
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags]);
+
+  function toggleOne(id: string, checked: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+  }
+  function toggleAll(checked: boolean) {
+    setSelected(checked ? new Set(suggested.map((t) => t.id)) : new Set());
+  }
+
+  async function approveSelected() {
+    const ids = suggested.filter((t) => selected.has(t.id)).map((t) => t.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("assignment_standards").update({ confirmed: true }).in("id", ids);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Approved ${ids.length} standard${ids.length === 1 ? "" : "s"}`);
+    setSelected(new Set());
+    onChange();
+  }
+  async function approveAll() {
+    const ids = suggested.map((t) => t.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("assignment_standards").update({ confirmed: true }).in("id", ids);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Approved ${ids.length} standard${ids.length === 1 ? "" : "s"}`);
+    setSelected(new Set());
+    onChange();
+  }
+  async function dismissSelected() {
+    const ids = suggested.filter((t) => selected.has(t.id)).map((t) => t.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("assignment_standards").delete().in("id", ids);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Dismissed ${ids.length} suggestion${ids.length === 1 ? "" : "s"}`);
+    setSelected(new Set());
+    onChange();
+  }
+
+  const allSelected = suggested.length > 0 && selected.size === suggested.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
   return (
     <Card>
       <CardHeader className="pb-3">
