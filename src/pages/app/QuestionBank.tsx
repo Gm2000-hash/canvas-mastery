@@ -35,6 +35,8 @@ type BankRow = {
 
 type Course = { id: string; name: string };
 
+type QuestionAnswer = { text: string | null; html: string | null; weight: number | null };
+
 type QuestionRow = {
   id: string;
   position: number | null;
@@ -42,6 +44,8 @@ type QuestionRow = {
   points_possible: number | null;
   assignment_id: string;
   assignments: { id: string; name: string; course_id: string } | null;
+  answers: QuestionAnswer[] | null;
+  item_type: string | null;
   // computed
   response_count?: number;
   avg_pct?: number | null;
