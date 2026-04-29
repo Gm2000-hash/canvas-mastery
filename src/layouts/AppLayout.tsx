@@ -11,14 +11,12 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from 
 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/app/courses", label: "Courses", icon: GraduationCap },
+  { to: "/app/classes", label: "Classes", icon: GraduationCap },
   { to: "/app/assignments", label: "Assignments", icon: ListChecks },
   { to: "/app/assignment-groups", label: "Assignment Groups", icon: Layers },
   { to: "/app/review", label: "Tag Review", icon: CheckCheck },
   { to: "/app/standards", label: "Standards", icon: BookMarked },
   { to: "/app/question-bank", label: "Question Bank", icon: Library },
-  
-  { to: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/app/student-history", label: "Student History", icon: History },
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },
 ];
