@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, ResponsiveContainer, Legend } from "recharts";
-import { ArrowLeft, ArrowRight, BarChart3, TrendingUp, GraduationCap, BookMarked, ListChecks, Layers, HelpCircle, Download, ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowLeft, ArrowRight, BarChart3, BarChartHorizontal, TrendingUp, GraduationCap, BookMarked, ListChecks, Layers, HelpCircle, Download, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getFramework, FRAMEWORKS } from "@/lib/frameworks";
 import { Link } from "react-router-dom";
@@ -18,6 +18,7 @@ import { useRevealedNames } from "@/hooks/useRevealedNames";
 import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 import { HistoricalToggle } from "@/components/HistoricalToggle";
 import { recentSchoolYears, currentSchoolYearLabel } from "@/lib/schoolYear";
+import { CourseMultiSelect } from "@/components/CourseMultiSelect";
 
 type Course = { id: string; name: string };
 type Trend = { bucket_label: string; bucket_ts: string | null; framework: string; subject: string; avg_mastery: number; sample_size: number };
