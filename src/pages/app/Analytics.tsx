@@ -1173,7 +1173,7 @@ type ScopeKind = "assignment" | "standard";
 type SplitMode = "all" | "by_class" | "by_level" | "class_x_level";
 type ChartStyle = "grouped" | "stacked";
 
-function CompareView({ courses }: { courses: Course[] }) {
+export function CompareView({ courses }: { courses: Course[] }) {
   const [subject, setSubject] = useState<string>("");
   const [courseSubjects, setCourseSubjects] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string[]>([]);
