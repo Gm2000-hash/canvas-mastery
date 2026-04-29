@@ -84,7 +84,7 @@ export default function AppLayout() {
         </div>
       </aside>
       <main className="flex-1 min-w-0 bg-card rounded-[1.75rem] shadow-soft border overflow-hidden">
-        <div className="max-w-6xl mx-auto px-8 py-10">
+        <div className="max-w-6xl mx-auto px-4 py-6 sm:px-8 sm:py-10">
           <Outlet />
         </div>
       </main>
