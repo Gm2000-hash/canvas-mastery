@@ -1,80 +1,73 @@
-# Class-first Analytics + merge Courses into the hub
 
-## New navigation
+## Mastery Connect Integration
 
-- **Sidebar:** rename "Analytics" → **"Classes"** and remove the standalone "Courses" entry. The icon becomes `GraduationCap` (matches the concept).
-- **Routes:**
-  - `/app/classes` → hub page (class list + management)
-  - `/app/classes/:courseId` → per-class analytics detail (the old Analytics tabs)
-  - `/app/courses` and `/app/analytics` → redirect to `/app/classes` so existing links and bookmarks still work.
+A new "Mastery Connect" page where you map this app's entities (standards, assessments, students, classes) to their Mastery Connect (MC) equivalents, then export CSV files you can upload to MC (or hand to your district for SFTP ingest).
 
-## Hub page (`/app/classes`)
+No live API calls — Mastery Connect doesn't expose a public write API. CSVs are the realistic, today-it-works path.
 
-A single class-management surface that combines today's Courses page + a stats overlay from Analytics.
+### What you'll see in the app
 
-Header row:
-- Title "Classes" + short description.
-- Right-side controls: **School year** select, **Show hidden** toggle, **Show archived (historical)** toggle, **Import from Canvas** button, **Backfill from Canvas** button (the existing `ImportCoursesDialog` in `mode="backfill"`).
+**Sidebar:** new "Mastery Connect" entry under Settings, route `/app/mastery-connect`.
 
-Class cards (grid, one per class), each showing:
-- Course name + code/term
-- Subject / framework / grade badge
-- **Mastery stats** from `analytics_class_breakdown`: students, assessments, avg mastery, % mastered
-- Inline actions kept from today's Courses page:
-  - **Discipline popover** — assign state/subject/grade (unchanged behavior)
-  - **Hide / Unhide**
-  - **Re-pseudonymize** (with the existing alert dialog)
-- Primary CTA: **"Open analytics →"** navigates to `/app/classes/:courseId`
-- Secondary link: **"Assignments"** → existing `/app/assignments?course=:id`
+**Page layout:** four mapping tabs + an Export tab.
 
-Empty / hidden / archived states and the Canvas-not-set-up empty state are preserved from `Courses.tsx`.
+```text
+[ Standards ] [ Assessments ] [ Students ] [ Classes ] [ Export ]
+```
 
-The hub does **not** have tabs — that's the whole point of the redesign.
+1. **Standards tab** — every standard tagged on your assignments, with a text field for the matching MC standard code. "Import MC standards CSV" button bulk-fills mappings by code.
+2. **Assessments tab** — Canvas assignments (and Assignment Groups, for cross-section quizzes) on the left, MC tracker/assessment ID + name on the right. Filter by class.
+3. **Students tab** — your students (real names visible to you only) ↔ MC student ID / SIS ID. Bulk import via CSV.
+4. **Classes tab** — Canvas courses ↔ MC tracker/section ID + name.
+5. **Export tab** — pick a class + date range + export type, click Generate, get a downloadable CSV. Three formats:
+   - **Per-student mastery by standard** — one row per student × standard with mastery score and mastered flag, MC standard codes substituted in
+   - **Item analysis** — one row per student × question with correct/incorrect, with MC standard codes attached
+   - **Assessment scores** — one row per student × assessment with score, %, and mastery flag
 
-## Per-class detail page (`/app/classes/:courseId`)
+Unmapped entities are flagged with a warning badge in the export preview so you can fix mappings before downloading.
 
-Reads `courseId` from the route. Removes the top-of-page Course `<Select>`. Tabs at the top, scoped to this single class:
+### Technical details
 
-1. **Students** (default) — the student × standard mastery matrix that today is hidden inside the Classes-tab accordion. Promoted to its own tab. (`ClassMatrixView`, always expanded, no collapse logic.)
-2. **Mastery by subject** (Trends)
-3. **Standards**
-4. **Assessments**
-5. **Mastery levels**
-6. **Questions**
+**New tables (migrations):**
 
-Above the tabs:
-- Back link "← All classes" → `/app/classes`
-- Course name + framework/subject badge
-- **School year** select and **Show historical** toggle (kept here, since these scope the analytics views)
+- `mc_settings` (teacher_id pk, default_mc_org_id text, last_export_at timestamptz)
+- `mc_standard_mappings` (id, teacher_id, standard_id → standards.id, mc_code text, mc_name text, unique(teacher_id, standard_id))
+- `mc_assessment_mappings` (id, teacher_id, assignment_id nullable, assignment_group_id nullable, mc_assessment_id text, mc_assessment_name text, check exactly one of assignment_id/assignment_group_id is set, unique partial indexes)
+- `mc_student_mappings` (id, teacher_id, student_id → students.id, mc_student_id text, mc_sis_id text, unique(teacher_id, student_id))
+- `mc_course_mappings` (id, teacher_id, course_id → courses.id, mc_tracker_id text, mc_tracker_name text, unique(teacher_id, course_id))
+- `mc_export_log` (id, teacher_id, export_type text, course_id nullable, row_count int, created_at)
 
-The multi-class **Compare** tab moves to the hub as a separate "Compare classes" card or a small CTA at the top of the hub (it's inherently multi-class). When opened, it uses the existing `CompareView` which already accepts a list of courses.
+All tables get RLS `(teacher_id = auth.uid())` ALL policy, matching existing patterns.
 
-## Redirects + cleanup
+**New files:**
+- `src/pages/app/MasteryConnect.tsx` — tabs container
+- `src/components/mc/StandardsMappingTable.tsx`
+- `src/components/mc/AssessmentsMappingTable.tsx`
+- `src/components/mc/StudentsMappingTable.tsx`
+- `src/components/mc/ClassesMappingTable.tsx`
+- `src/components/mc/ExportPanel.tsx`
+- `src/lib/mc-csv.ts` — pure CSV builders that take mapped rows + raw data and emit MC-shaped CSV strings; download via Blob (no edge function needed for export — the data already lives in tables you can query client-side under RLS)
+- `src/components/mc/ImportMappingsCsvDialog.tsx` — shared CSV upload that pre-fills any of the four mapping tables by code/email/canvas_id
 
-- `/app/courses` → `<Navigate to="/app/classes" replace />`
-- `/app/analytics` → `<Navigate to="/app/classes" replace />`
-- Remove the Courses sidebar entry. Keep Assignments, Assignment Groups, Tag Review, Standards, Question Bank, Student History, Settings, Admin.
-- Update any in-app links that point to `/app/courses` (Dashboard onboarding, settings empty states) to point to `/app/classes` — quick `rg` sweep.
+**Edited files:**
+- `src/App.tsx` — add `<Route path="mastery-connect" element={<MasteryConnect />} />`
+- `src/layouts/AppLayout.tsx` — add nav entry (icon: `Link2` or `ArrowRightLeft`) just above Settings
 
-## Implementation outline
+**Where the export data comes from (all already in the DB):**
+- Mastery by standard → `mastery_snapshots` joined with `students`, `standards`, `mc_*_mappings`
+- Item analysis → `question_responses` joined with `quiz_questions`, `question_standards`, mappings
+- Assessment scores → `submissions` joined with `assignments`, `students`, mappings
 
-- **New file** `src/pages/app/ClassesHub.tsx` — built from `Courses.tsx` (kept as-is for discipline/hide/import/repseudonymize), augmented with stats from `analytics_class_breakdown`, plus an "Open analytics" button per card, plus a "Compare classes" CTA that opens a dialog wrapping the existing `CompareView`.
-- **Refactor `src/pages/app/Analytics.tsx` → ClassDetail page**:
-  - Read `useParams<{ courseId: string }>()`.
-  - Drop `<CourseMultiSelect>`-style top filter and the Classes tab.
-  - Promote the per-class matrix into a "Students" tab that is the default.
-  - Pass the route's `courseId` into every existing sub-view (`TrendsView`, `StandardsView`, `AssignmentsView`, `LevelsView`, `QuestionsView`).
-- **`src/App.tsx`** — add `/app/classes` and `/app/classes/:courseId` routes; add redirects from `/app/courses` and `/app/analytics`.
-- **`src/layouts/AppLayout.tsx`** — replace the Courses + Analytics nav items with a single **"Classes"** entry pointing at `/app/classes`.
-- **Delete** `src/pages/app/Courses.tsx` once its logic has been moved into the hub (or keep it as a thin re-export during transition — simpler to just delete and reuse the JSX inside the hub).
+Export runs as a single read-side query per format, formatted to CSV in the browser, downloaded as `mc-<type>-<class>-<date>.csv`. Unmapped rows are either skipped (with a count shown) or included with a blank MC column based on a toggle.
 
-## What stays the same
+**Out of scope for this iteration:**
+- Live MC API push (no public API exists)
+- Auto-sync on a schedule
+- SFTP delivery — can be layered on later via an edge function once you confirm a district SFTP target
 
-- All RPCs (`analytics_class_breakdown`, `analytics_class_matrix`, `analytics_mastery_trends`, `analytics_compare_classes`, etc.) — no DB changes.
-- `ImportCoursesDialog`, discipline assignment, repseudonymize, historical toggle behavior.
-- All other tab views' internals (Standards, Assessments, Levels, Questions).
+### Acceptance
 
-## Out of scope
-
-- Visual redesign of the per-class tabs themselves.
-- Changes to Compare logic — only its placement (hub instead of detail page).
+- All four mapping tabs persist edits with a single click (debounced upsert).
+- CSV bulk-import for each of the four mappings works from a sample MC export.
+- Each of the three export CSVs downloads with correct headers, no unmapped surprises (warnings shown first), and re-substitutes MC codes/IDs everywhere your app's IDs would appear.
+- Sidebar link present; route protected behind existing auth.
