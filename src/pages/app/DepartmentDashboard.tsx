@@ -463,6 +463,10 @@ export default function DepartmentDashboard() {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* REPORTS — flexible builder */}
+        <TabsContent value="reports">
+          <DepartmentReports subject={subject} schoolYear={schoolYear} grades={grades} />
+        </TabsContent>
       </Tabs>
     </div>
   );
