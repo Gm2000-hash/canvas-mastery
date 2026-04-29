@@ -23,12 +23,17 @@ const nav = [
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },
 ];
 
-function NavList({ items, onNavigate, userEmail, onSignOut }: {
+function NavList({ items, onNavigate, userEmail, onSignOut, onReorder, draggable }: {
   items: typeof nav;
   onNavigate?: () => void;
   userEmail: string;
   onSignOut: () => void;
+  onReorder?: (from: number, to: number) => void;
+  draggable?: boolean;
 }) {
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+
   return (
     <>
       <Link to="/app" onClick={onNavigate} className="px-6 py-6 border-b border-sidebar-border block">
@@ -36,24 +41,63 @@ function NavList({ items, onNavigate, userEmail, onSignOut }: {
         <div className="text-xs text-sidebar-foreground/60 mt-1 font-medium">Mastery for Canvas teachers</div>
       </Link>
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {items.map((item) => (
-          <NavLink
+        {items.map((item, idx) => (
+          <div
             key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 px-4 py-2.5 rounded-full text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              )
-            }
+            onDragOver={(e) => {
+              if (!draggable || dragIdx === null) return;
+              e.preventDefault();
+              setOverIdx(idx);
+            }}
+            onDrop={(e) => {
+              if (!draggable || dragIdx === null) return;
+              e.preventDefault();
+              onReorder?.(dragIdx, idx);
+              setDragIdx(null);
+              setOverIdx(null);
+            }}
+            className={cn(
+              "rounded-full transition-colors",
+              overIdx === idx && dragIdx !== null && dragIdx !== idx && "ring-2 ring-sidebar-ring",
+              dragIdx === idx && "opacity-50"
+            )}
           >
-            <item.icon className="h-4 w-4" />
-            {item.label}
-          </NavLink>
+            <NavLink
+              to={item.to}
+              end={item.end}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                cn(
+                  "group flex items-center gap-2 px-3 py-2.5 rounded-full text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                    : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                )
+              }
+            >
+              {draggable && (
+                <span
+                  draggable
+                  onDragStart={(e) => {
+                    setDragIdx(idx);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragEnd={() => {
+                    setDragIdx(null);
+                    setOverIdx(null);
+                  }}
+                  onClick={(e) => e.preventDefault()}
+                  className="cursor-grab active:cursor-grabbing opacity-40 hover:opacity-100 -ml-1"
+                  aria-label="Drag to reorder"
+                  title="Drag to reorder"
+                >
+                  <GripVertical className="h-4 w-4" />
+                </span>
+              )}
+              <item.icon className="h-4 w-4" />
+              <span className="truncate">{item.label}</span>
+            </NavLink>
+          </div>
         ))}
       </nav>
       <div className="p-4 border-t border-sidebar-border">
