@@ -35,6 +35,7 @@ const App = () => (
             <Route index element={<Dashboard />} />
             <Route path="classes" element={<ClassesHub />} />
             <Route path="classes/:courseId" element={<Analytics />} />
+            <Route path="classes/:courseId/assignments" element={<Assignments />} />
             <Route path="courses" element={<Navigate to="/app/classes" replace />} />
             <Route path="analytics" element={<Navigate to="/app/classes" replace />} />
             <Route path="assignments" element={<Assignments />} />

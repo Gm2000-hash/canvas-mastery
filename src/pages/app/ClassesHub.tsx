@@ -353,8 +353,8 @@ export default function ClassesHub() {
                     <Stat label="Mastered" value={pct(s?.pct_mastered)} />
                   </div>
                   <div className="flex items-center justify-between gap-2 pt-1">
-                    <Link to={`/app/assignments?course=${c.id}`}>
-                      <Button variant="ghost" size="sm">Assignments <ExternalLink className="h-3 w-3 ml-1" /></Button>
+                    <Link to={`/app/classes/${c.id}/assignments`}>
+                      <Button variant="ghost" size="sm">Assignments <ArrowRight className="h-3 w-3 ml-1" /></Button>
                     </Link>
                     <Link to={`/app/classes/${c.id}`}>
                       <Button size="sm">
