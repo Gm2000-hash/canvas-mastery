@@ -209,7 +209,7 @@ export default function AppLayout() {
 
         {/* Desktop sidebar */}
         <aside className="hidden md:flex w-64 shrink-0 bg-sidebar text-sidebar-foreground flex-col rounded-[1.75rem] shadow-soft border border-sidebar-border">
-          <NavList items={items} userEmail={user.email ?? ""} onSignOut={handleSignOut} />
+          <NavList items={items} userEmail={user.email ?? ""} onSignOut={handleSignOut} draggable onReorder={handleReorder} />
         </aside>
 
         <main className="flex-1 min-w-0 bg-card rounded-[1.75rem] shadow-soft border overflow-hidden">
