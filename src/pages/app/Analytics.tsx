@@ -1142,7 +1142,9 @@ function CompareView({ courses }: { courses: Course[] }) {
   const [split, setSplit] = useState<SplitMode>("by_class");
   const [chartStyle, setChartStyle] = useState<ChartStyle>("grouped");
 
+  // Assignment picker holds either an `assignment:<id>` or `group:<id>` value.
   const [assignmentOptions, setAssignmentOptions] = useState<{ id: string; name: string; course_name: string }[]>([]);
+  const [groupOptions, setGroupOptions] = useState<{ id: string; name: string; course_count: number; member_count: number }[]>([]);
   const [standardOptions, setStandardOptions] = useState<{ id: string; code: string; description: string }[]>([]);
   const [rows, setRows] = useState<CompareRow[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1187,6 +1189,13 @@ function CompareView({ courses }: { courses: Course[] }) {
       const list = (data as any[] | null) ?? [];
       setAssignmentOptions(list.map((a) => ({ id: a.id, name: a.name, course_name: a.courses?.name ?? "" })));
     });
+    // Also load assignment groups (teacher-wide).
+    supabase.rpc("list_assignment_groups" as any).then(({ data }) => {
+      const list = ((data as any[]) ?? []).map((g: any) => ({
+        id: g.group_id, name: g.name, course_count: g.course_count, member_count: g.member_count,
+      }));
+      setGroupOptions(list);
+    });
   }, [selected]);
 
   useEffect(() => {
@@ -1203,10 +1212,19 @@ function CompareView({ courses }: { courses: Course[] }) {
   useEffect(() => {
     if (!canQuery) { setRows(null); return; }
     setLoading(true);
+    // assignmentId is encoded as "assignment:<uuid>" or "group:<uuid>"
+    let _assignment_id: string | null = null;
+    let _assignment_group_id: string | null = null;
+    if (scope === "assignment" && assignmentId) {
+      if (assignmentId.startsWith("group:")) _assignment_group_id = assignmentId.slice("group:".length);
+      else if (assignmentId.startsWith("assignment:")) _assignment_id = assignmentId.slice("assignment:".length);
+      else _assignment_id = assignmentId; // fallback
+    }
     supabase.rpc("analytics_compare_classes" as any, {
       _course_ids: selected,
-      _assignment_id: scope === "assignment" ? assignmentId : null,
+      _assignment_id,
       _standard_id: scope === "standard" ? standardId : null,
+      _assignment_group_id,
     }).then(({ data, error }) => {
       setLoading(false);
       if (error) { setRows([]); return; }
