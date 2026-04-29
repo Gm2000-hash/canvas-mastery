@@ -139,7 +139,40 @@ export default function AppLayout() {
     );
   }
 
-  const items = [...nav, ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Shield, end: false as const }] : [])];
+  const baseItems = [...nav, ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Shield, end: false as const }] : [])];
+
+  const ORDER_KEY = "nav-order-v1";
+  const [order, setOrder] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(ORDER_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+  });
+
+  const items = useMemo(() => {
+    const map = new Map(baseItems.map((i) => [i.to, i]));
+    const ordered: typeof baseItems = [];
+    for (const to of order) {
+      const item = map.get(to);
+      if (item) {
+        ordered.push(item);
+        map.delete(to);
+      }
+    }
+    return [...ordered, ...map.values()];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, order]);
+
+  const handleReorder = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    const newOrder = next.map((i) => i.to);
+    setOrder(newOrder);
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(newOrder)); } catch {}
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
