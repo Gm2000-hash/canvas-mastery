@@ -1,18 +1,21 @@
-// Department landing page — lists subjects the teacher participates in
-// (derived from teacher_disciplines) with summary counts of peers, classes,
-// and students for the current school year.
-import { useEffect, useState } from "react";
+// Department landing page — subject cards + aggregate analytics view
+// (mastery over time, by standard, and class comparison) honoring
+// subject / school-year / grade filters. Per-subject deep dives live at
+// /app/department/:subject.
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Atom, Beaker, BookOpen, Calculator, Globe2, Users, Loader2, ArrowRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { currentSchoolYearLabel } from "@/lib/schoolYear";
-import { SUBJECTS } from "@/lib/frameworks";
+import { Beaker, BookOpen, Calculator, Globe2, Atom, ArrowRight, Info } from "lucide-react";
+import { currentSchoolYearLabel, recentSchoolYears } from "@/lib/schoolYear";
+import { GRADES } from "@/lib/frameworks";
 
-type Row = {
+type SubjectRow = {
   subject: string;
   grades: string[] | null;
   teacher_count: number;
@@ -20,125 +23,355 @@ type Row = {
   student_count: number;
 };
 
+type Overview = {
+  teacher_count: number;
+  class_count: number;
+  student_count: number;
+  avg_mastery: number | null;
+  pct_mastered: number | null;
+  distribution: { label: string; lo: number; hi: number; count: number }[];
+  trend: { label: string; ts: string; avg: number; n: number }[];
+};
+type StandardRow = { standard_id: string; code: string; description: string; grade: string; framework: string; students_assessed: number; students_mastered: number; avg_mastery: number | null; pct_mastered: number | null };
+type ClassRow = { course_id: string; is_own: boolean; display_label: string; grade: string | null; student_count: number; avg_mastery: number | null; pct_mastered: number | null };
+
 const ICONS: Record<string, any> = {
   Science: Beaker,
   "Social Studies": Globe2,
   Math: Calculator,
   ELA: BookOpen,
 };
-
 const FEATURED = ["Science", "Social Studies", "Math", "ELA"];
 
-export default function Department() {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
-  const year = currentSchoolYearLabel();
+function pct(n: number | null | undefined) {
+  if (n == null) return "—";
+  return `${(n * 100).toFixed(0)}%`;
+}
 
+export default function Department() {
+  const [rows, setRows] = useState<SubjectRow[]>([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
+
+  // Filters
+  const [schoolYear, setSchoolYear] = useState<string>(currentSchoolYearLabel());
+  const [subject, setSubject] = useState<string>(""); // "" = none yet; auto-set after load
+  const [grades, setGrades] = useState<string[]>([]); // empty = all my grades
+
+  // Analytics data
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [standards, setStandards] = useState<StandardRow[]>([]);
+  const [classes, setClasses] = useState<ClassRow[]>([]);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
+  // Load subject participation
   useEffect(() => {
     (async () => {
-      setLoading(true);
-      const { data, error } = await supabase.rpc("department_subjects", { _school_year: year });
-      if (!error) setRows((data as Row[]) ?? []);
-      setLoading(false);
+      setLoadingSubjects(true);
+      const { data } = await supabase.rpc("department_subjects", { _school_year: schoolYear });
+      const list = (data as SubjectRow[]) ?? [];
+      setRows(list);
+      setLoadingSubjects(false);
+      // Auto-pick first available subject if none selected or selection invalid
+      if (list.length && !list.some((r) => r.subject === subject)) {
+        const featured = FEATURED.find((s) => list.some((r) => r.subject === s));
+        setSubject(featured ?? list[0].subject);
+      } else if (!list.length) {
+        setSubject("");
+      }
     })();
-  }, [year]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schoolYear]);
 
-  const byKey = new Map(rows.map((r) => [r.subject, r]));
+  const byKey = useMemo(() => new Map(rows.map((r) => [r.subject, r])), [rows]);
+  const myGrades = useMemo(() => byKey.get(subject)?.grades ?? [], [byKey, subject]);
+
+  // Load analytics for the selected subject + filters
+  useEffect(() => {
+    if (!subject) {
+      setOverview(null); setStandards([]); setClasses([]);
+      return;
+    }
+    setLoadingAnalytics(true);
+    const _grades = grades.length ? grades : null;
+    Promise.all([
+      supabase.rpc("department_overview",  { _subject: subject, _grades, _school_year: schoolYear }),
+      supabase.rpc("department_standards", { _subject: subject, _grades, _school_year: schoolYear }),
+      supabase.rpc("department_classes",   { _subject: subject, _grades, _school_year: schoolYear }),
+    ]).then(([ov, std, cls]) => {
+      setOverview(((ov.data as any[]) ?? [])[0] ?? null);
+      setStandards((std.data as StandardRow[]) ?? []);
+      setClasses((cls.data as ClassRow[]) ?? []);
+      setLoadingAnalytics(false);
+    });
+  }, [subject, schoolYear, grades]);
+
+  // --- Chart-friendly slices ---
+  const trendData = useMemo(
+    () => (overview?.trend ?? []).map((t) => ({ ...t, avg: Number(t.avg) })),
+    [overview]
+  );
+  const standardsChart = useMemo(() => {
+    return [...standards]
+      .filter((s) => s.avg_mastery != null)
+      .sort((a, b) => (a.avg_mastery ?? 0) - (b.avg_mastery ?? 0))
+      .slice(0, 12) // worst 12 — the ones to focus on
+      .map((s) => ({
+        code: s.code,
+        avg: Number(s.avg_mastery ?? 0),
+        pct_mastered: Number(s.pct_mastered ?? 0),
+        description: s.description,
+      }));
+  }, [standards]);
+  const classesChart = useMemo(() => {
+    return [...classes]
+      .filter((c) => c.avg_mastery != null)
+      .sort((a, b) => (b.avg_mastery ?? 0) - (a.avg_mastery ?? 0))
+      .map((c) => ({
+        label: c.display_label,
+        avg: Number(c.avg_mastery ?? 0),
+        is_own: c.is_own,
+      }));
+  }, [classes]);
 
   return (
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-3xl">Department</h1>
         <p className="text-muted-foreground mt-1">
-          See data collectively across all teachers who teach the same subject and grade.
-          You see real names only for your own students; peers' students appear with safe pseudonyms.
+          Collective analytics across every teacher who shares your subject and grade.
+          Real names show only for your own students; peers' data is anonymized.
         </p>
-        <p className="text-xs text-muted-foreground mt-2">School year: {year}</p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
-        {FEATURED.map((subject) => {
-          const r = byKey.get(subject);
-          const Icon = ICONS[subject] ?? Atom;
+      {/* Subject cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {FEATURED.map((s) => {
+          const r = byKey.get(s);
+          const Icon = ICONS[s] ?? Atom;
           const enabled = !!r;
+          const active = subject === s;
           return (
-            <Card key={subject} className={enabled ? "" : "opacity-60"}>
-              <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-                <div className="rounded-full bg-primary/10 text-primary p-3">
-                  <Icon className="h-5 w-5" />
+            <button
+              key={s}
+              onClick={() => enabled && setSubject(s)}
+              disabled={!enabled}
+              className={`text-left rounded-xl border p-4 transition-all ${
+                active ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                       : enabled ? "hover:border-primary/50 hover:shadow-soft"
+                                 : "opacity-50 cursor-not-allowed"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="rounded-full bg-primary/10 text-primary p-2.5"><Icon className="h-5 w-5" /></div>
+                <div className="font-display text-lg">{s}</div>
+              </div>
+              {loadingSubjects ? (
+                <Skeleton className="h-12 w-full mt-3" />
+              ) : enabled ? (
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                  <Stat n={r!.teacher_count} l="Teachers" />
+                  <Stat n={r!.class_count} l="Classes" />
+                  <Stat n={r!.student_count} l="Students" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <CardTitle className="text-xl">{subject}</CardTitle>
-                  <CardDescription>
-                    {enabled
-                      ? `${r!.grades?.join(", ") || "—"} · ${r!.teacher_count} ${r!.teacher_count === 1 ? "teacher" : "teachers"}`
-                      : "Not in your disciplines yet"}
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {loading ? (
-                  <Skeleton className="h-16 w-full" />
-                ) : enabled ? (
-                  <>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <Stat label="Teachers" value={r!.teacher_count} />
-                      <Stat label="Classes" value={r!.class_count} />
-                      <Stat label="Students" value={r!.student_count} />
-                    </div>
-                    <Button asChild className="w-full rounded-full">
-                      <Link to={`/app/department/${encodeURIComponent(subject)}`}>
-                        Open department <ArrowRight className="ml-1 h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Add this subject in <Link to="/app/settings" className="text-primary underline">Settings → Disciplines</Link> to join the department.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+              ) : (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Add this subject in <Link to="/app/settings" className="text-primary underline">Settings</Link>.
+                </p>
+              )}
+            </button>
           );
         })}
       </div>
 
-      {/* Other subjects (Health/PE, etc.) where the teacher has a discipline */}
+      {/* "Other" subjects (if any) */}
       {rows.filter((r) => !FEATURED.includes(r.subject)).length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-display text-xl">Other subjects</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {rows.filter((r) => !FEATURED.includes(r.subject)).map((r) => (
-              <Card key={r.subject}>
-                <CardHeader>
-                  <CardTitle className="text-base">{r.subject}</CardTitle>
-                  <CardDescription>{r.grades?.join(", ")}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      <Users className="inline h-3.5 w-3.5 mr-1" />
-                      {r.teacher_count} · {r.class_count} classes · {r.student_count} students
-                    </span>
-                    <Button asChild size="sm" variant="ghost">
-                      <Link to={`/app/department/${encodeURIComponent(r.subject)}`}>Open</Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Other:</span>
+          {rows.filter((r) => !FEATURED.includes(r.subject)).map((r) => (
+            <button
+              key={r.subject}
+              onClick={() => setSubject(r.subject)}
+              className={`text-xs px-3 py-1 rounded-full border ${subject === r.subject ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+            >
+              {r.subject}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-end gap-3 pt-2 border-t">
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">School year</label>
+          <Select value={schoolYear} onValueChange={setSchoolYear}>
+            <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {recentSchoolYears(4).map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="text-xs text-muted-foreground block mb-1">
+            Grades {grades.length === 0 && <span className="opacity-60">(all of your grades)</span>}
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {(myGrades.length ? myGrades : GRADES).map((g) => {
+              const active = grades.includes(g);
+              return (
+                <button
+                  key={g}
+                  onClick={() => setGrades((cur) => active ? cur.filter((x) => x !== g) : [...cur, g])}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+                >
+                  {g}
+                </button>
+              );
+            })}
+            {grades.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setGrades([])}>Clear</Button>
+            )}
           </div>
-        </section>
+        </div>
+        {subject && (
+          <Button asChild variant="outline" size="sm" className="rounded-full">
+            <Link to={`/app/department/${encodeURIComponent(subject)}`}>
+              Open {subject} dashboard <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        )}
+      </div>
+
+      {/* Analytics view */}
+      {!subject ? (
+        <Card><CardContent className="pt-6 text-center text-muted-foreground">
+          Pick a subject above to see department analytics.
+        </CardContent></Card>
+      ) : (
+        <div className="space-y-4">
+          {/* KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <Kpi label="Teachers" value={overview?.teacher_count ?? "—"} loading={loadingAnalytics} />
+            <Kpi label="Classes" value={overview?.class_count ?? "—"} loading={loadingAnalytics} />
+            <Kpi label="Students" value={overview?.student_count ?? "—"} loading={loadingAnalytics} />
+            <Kpi label="Avg mastery" value={pct(overview?.avg_mastery)} loading={loadingAnalytics} />
+            <Kpi label="% mastered" value={pct(overview?.pct_mastered)} loading={loadingAnalytics} />
+          </div>
+
+          {/* Mastery over time */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Mastery over time</CardTitle>
+              <CardDescription>Weekly average mastery score across the {subject} department</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingAnalytics ? <Skeleton className="h-[260px] w-full" /> : trendData.length === 0 ? (
+                <Empty>No mastery data yet for the selected filters.</Empty>
+              ) : (
+                <ChartContainer config={{ avg: { label: "Avg mastery", color: "hsl(var(--primary))" } }} className="h-[260px]">
+                  <LineChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                    <YAxis domain={[0, 1]} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line type="monotone" dataKey="avg" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ChartContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* By standard */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Mastery by standard</CardTitle>
+                <CardDescription>Lowest 12 standards by average mastery — focus areas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingAnalytics ? <Skeleton className="h-[300px] w-full" /> : standardsChart.length === 0 ? (
+                  <Empty>No standards have been assessed yet.</Empty>
+                ) : (
+                  <ChartContainer config={{ avg: { label: "Avg mastery", color: "hsl(var(--primary))" } }} className="h-[300px]">
+                    <BarChart data={standardsChart} layout="vertical" margin={{ left: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis type="number" domain={[0, 1]} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
+                      <YAxis type="category" dataKey="code" width={90} tick={{ fontSize: 11 }} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="avg" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Class comparison */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Class comparison</CardTitle>
+                <CardDescription>
+                  All classes in the department, ranked by average mastery.
+                  Highlighted bars are yours.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingAnalytics ? <Skeleton className="h-[300px] w-full" /> : classesChart.length === 0 ? (
+                  <Empty>No classes match the current filters.</Empty>
+                ) : (
+                  <ChartContainer config={{ avg: { label: "Avg mastery", color: "hsl(var(--primary))" } }} className="h-[300px]">
+                    <BarChart data={classesChart} layout="vertical" margin={{ left: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis type="number" domain={[0, 1]} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
+                      <YAxis type="category" dataKey="label" width={110} tick={{ fontSize: 11 }} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
+                        {classesChart.map((row, i) => (
+                          <Cell key={i} fill={row.is_own ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.55)"} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="bg-muted/30 border-dashed">
+            <CardContent className="pt-4 flex gap-3 items-start text-sm text-muted-foreground">
+              <Info className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                Class labels render as <code className="text-xs bg-background px-1 rounded">Class A</code>, <code className="text-xs bg-background px-1 rounded">Class B</code>… for peer teachers.
+                Open the full <Link to={`/app/department/${encodeURIComponent(subject)}`} className="text-primary underline">{subject} dashboard</Link> for student-level details and CSV export.
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ n, l }: { n: number; l: string }) {
   return (
-    <div className="rounded-lg bg-muted/40 py-2">
-      <div className="text-2xl font-semibold tabular-nums">{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
+    <div className="rounded-md bg-muted/40 py-1.5">
+      <div className="text-base font-semibold tabular-nums leading-none">{n}</div>
+      <div className="text-[10px] text-muted-foreground mt-0.5">{l}</div>
     </div>
   );
+}
+
+function Kpi({ label, value, loading }: { label: string; value: any; loading: boolean }) {
+  return (
+    <Card>
+      <CardContent className="pt-4 pb-3">
+        <div className="text-xs text-muted-foreground">{label}</div>
+        {loading
+          ? <Skeleton className="h-7 w-16 mt-1" />
+          : <div className="text-2xl font-semibold tabular-nums mt-1">{value}</div>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{children}</div>;
 }
