@@ -61,10 +61,16 @@ export default function Settings() {
   const [importDefaults, setImportDefaults] = useState<{ framework?: any; state?: string; subject?: string; grade?: string } | undefined>(undefined);
 
   async function load() {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
     const [{ data: profile }, { data: ccRows }, { data: settings }, { data: discs }] = await Promise.all([
-      supabase.from("profiles").select("*").maybeSingle(),
+      uid
+        ? supabase.from("profiles").select("*").eq("id", uid).maybeSingle()
+        : Promise.resolve({ data: null } as any),
       supabase.rpc("get_canvas_connection_status"),
-      supabase.from("teacher_settings").select("*").maybeSingle(),
+      uid
+        ? supabase.from("teacher_settings").select("*").eq("teacher_id", uid).maybeSingle()
+        : Promise.resolve({ data: null } as any),
       supabase.from("teacher_disciplines").select("id, state, subject, grade, is_default, framework").order("created_at"),
     ]);
     if (profile) {
