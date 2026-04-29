@@ -51,38 +51,91 @@ function pctRaw(n: number | null | undefined) {
 }
 
 export default function Analytics() {
+  const { courseId } = useParams<{ courseId: string }>();
+  const [course, setCourse] = useState<ClassRow | null>(null);
+  const [courseMissing, setCourseMissing] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [hiddenCourseIds, setHiddenCourseIds] = useState<Set<string>>(new Set());
-  const [archivedCourseIds, setArchivedCourseIds] = useState<Set<string>>(new Set());
-  const [courseId, setCourseId] = useState<string>("ALL");
   const [activeDims, setActiveDims] = useState<ActiveDim[]>([]);
   const [schoolYear, setSchoolYear] = useState<string>(currentSchoolYearLabel());
   const [showHistorical, setShowHistorical] = useState(false);
 
   useEffect(() => {
-    // Show non-hidden, non-archived classes by default. When the historical
-    // toggle is on, archived classes appear in the picker too.
+    if (!courseId) return;
+    setCourse(null);
+    setCourseMissing(false);
+    // Load this course's summary stats so the header shows badges + stats.
+    supabase.rpc("analytics_class_breakdown", {
+      _school_year: schoolYear === "ALL" ? null : schoolYear,
+      _include_archived: true,
+    }).then(({ data }) => {
+      const list = (data as any as ClassRow[]) ?? [];
+      const found = list.find((r) => r.course_id === courseId) ?? null;
+      if (found) {
+        setCourse(found);
+      } else {
+        // Fallback: course exists but has no analytics rows yet.
+        supabase.from("courses").select("id, name").eq("id", courseId).maybeSingle().then(({ data: c }) => {
+          if (c) {
+            setCourse({
+              course_id: c.id, course_name: c.name,
+              subject: null, framework: null,
+              student_count: 0, assessment_count: 0,
+              avg_mastery: null, pct_mastered: null,
+            });
+          } else {
+            setCourseMissing(true);
+          }
+        });
+      }
+    });
+  }, [courseId, schoolYear]);
+
+  useEffect(() => {
+    // Other classes are only needed by sub-views (e.g. Standards, Assessments
+    // multi-class pickers). Load them once.
     supabase.from("courses").select("id, name, hidden, archived_at").order("name").then(({ data }) => {
       const all = (data ?? []) as Array<Course & { hidden: boolean; archived_at: string | null }>;
       const visible = all.filter((c) => !c.hidden && (showHistorical || !c.archived_at));
       setCourses(visible.map(({ id, name }) => ({ id, name })));
-      setHiddenCourseIds(new Set(all.filter((c) => c.hidden).map((c) => c.id)));
-      setArchivedCourseIds(new Set(all.filter((c) => !!c.archived_at).map((c) => c.id)));
     });
     supabase.rpc("analytics_active_dimensions").then(({ data }) => setActiveDims((data as any) ?? []));
   }, [showHistorical]);
 
-  const courseFilter = courseId === "ALL" ? null : courseId;
   const subjects = useMemo(() => Array.from(new Set(activeDims.map((d) => d.subject).filter(Boolean))), [activeDims]);
   const years = useMemo(() => recentSchoolYears(6), []);
+  const courseFilter = courseId ?? null;
+
+  if (courseMissing) {
+    return (
+      <div className="space-y-4">
+        <Link to="/app/classes" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4 mr-1" /> All classes
+        </Link>
+        <Card><CardContent className="py-12 text-center text-muted-foreground">Class not found.</CardContent></Card>
+      </div>
+    );
+  }
+
+  if (!course) {
+    return <Skeleton className="h-40 w-full" />;
+  }
+
+  const fw = course.framework ? getFramework(course.framework) : null;
 
   return (
     <div className="space-y-6">
+      <Link to="/app/classes" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4 mr-1" /> All classes
+      </Link>
       <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Analytics</h1>
+        <div className="min-w-0">
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2 flex items-center gap-3 flex-wrap">
+            <span className="truncate">{course.course_name}</span>
+            {course.subject && <Badge variant="outline">{course.subject}</Badge>}
+            {fw && <Badge variant="outline" style={{ borderColor: FRAMEWORK_COLOR[course.framework ?? "STATE"], color: FRAMEWORK_COLOR[course.framework ?? "STATE"] }}>{fw.shortLabel}</Badge>}
+          </h1>
           <p className="text-muted-foreground">
-            Mastery trends and breakdowns by class, student, standard, assessment, mastery level, and question.
+            {course.student_count} students · {course.assessment_count} assessments · avg {pct(course.avg_mastery)} · {pct(course.pct_mastered)} mastered
           </p>
         </div>
         <div className="flex items-end gap-3 flex-wrap">
@@ -96,36 +149,24 @@ export default function Analytics() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Course</Label>
-            <Select value={courseId} onValueChange={setCourseId}>
-              <SelectTrigger className="w-[260px] h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All courses</SelectItem>
-                {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
           <div className="pb-1">
             <HistoricalToggle value={showHistorical} onChange={setShowHistorical} reason="Analytics" />
           </div>
         </div>
       </div>
 
-      <Tabs defaultValue="classes" className="space-y-4">
+      <Tabs defaultValue="students" className="space-y-4">
         <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="classes"><GraduationCap className="h-4 w-4 mr-1.5" /> Classes</TabsTrigger>
+          <TabsTrigger value="students"><GraduationCap className="h-4 w-4 mr-1.5" /> Students</TabsTrigger>
           <TabsTrigger value="trends"><TrendingUp className="h-4 w-4 mr-1.5" /> Mastery by subject</TabsTrigger>
-          <TabsTrigger value="compare"><BarChartHorizontal className="h-4 w-4 mr-1.5" /> Compare</TabsTrigger>
           <TabsTrigger value="standards"><BookMarked className="h-4 w-4 mr-1.5" /> Standards</TabsTrigger>
           <TabsTrigger value="assignments"><ListChecks className="h-4 w-4 mr-1.5" /> Assessments</TabsTrigger>
           <TabsTrigger value="levels"><Layers className="h-4 w-4 mr-1.5" /> Mastery levels</TabsTrigger>
           <TabsTrigger value="questions"><HelpCircle className="h-4 w-4 mr-1.5" /> Questions</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="classes"><ClassesView courseFilter={courseFilter} hiddenCourseIds={hiddenCourseIds} archivedCourseIds={archivedCourseIds} schoolYear={schoolYear} includeArchived={showHistorical} /></TabsContent>
+        <TabsContent value="students"><ClassMatrixView course={course} collapsed={false} /></TabsContent>
         <TabsContent value="trends"><TrendsView courseId={courseFilter} subjects={subjects} /></TabsContent>
-        <TabsContent value="compare"><CompareView courses={courses} /></TabsContent>
         <TabsContent value="standards"><StandardsView courseId={courseFilter} subjects={subjects} courses={courses} /></TabsContent>
         <TabsContent value="assignments"><AssignmentsView courseId={courseFilter} courses={courses} /></TabsContent>
         <TabsContent value="levels"><LevelsView courseId={courseFilter} subjects={subjects} /></TabsContent>
