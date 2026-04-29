@@ -47,8 +47,10 @@ type StandardTag = {
 
 export default function Assignments() {
   const [params, setParams] = useSearchParams();
+  const routeParams = useParams<{ courseId?: string }>();
+  const lockedCourseId = routeParams.courseId ?? null;
   const [courses, setCourses] = useState<Course[] | null>(null);
-  const [courseId, setCourseId] = useState<string>(params.get("course") ?? "");
+  const [courseId, setCourseId] = useState<string>(lockedCourseId ?? params.get("course") ?? "");
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const [tagsByAssignment, setTagsByAssignment] = useState<Record<string, StandardTag[]>>({});
   const [recomputing, setRecomputing] = useState(false);
