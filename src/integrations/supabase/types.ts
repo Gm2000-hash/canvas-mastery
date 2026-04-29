@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      assignment_groups: {
+        Row: {
+          confirmed: boolean
+          created_at: string
+          grade: string | null
+          id: string
+          kind: Database["public"]["Enums"]["assignment_kind"]
+          name: string
+          subject: string | null
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          confirmed?: boolean
+          created_at?: string
+          grade?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["assignment_kind"]
+          name: string
+          subject?: string | null
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          confirmed?: boolean
+          created_at?: string
+          grade?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["assignment_kind"]
+          name?: string
+          subject?: string | null
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       assignment_standards: {
         Row: {
           ai_suggested: boolean
@@ -67,6 +103,7 @@ export type Database = {
       }
       assignments: {
         Row: {
+          assignment_group_id: string | null
           canvas_assignment_id: number
           canvas_quiz_id: number | null
           course_id: string
@@ -76,11 +113,13 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["assignment_kind"]
           name: string
+          name_normalized: string | null
           points_possible: number | null
           quiz_engine: string | null
           teacher_id: string
         }
         Insert: {
+          assignment_group_id?: string | null
           canvas_assignment_id: number
           canvas_quiz_id?: number | null
           course_id: string
@@ -90,11 +129,13 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["assignment_kind"]
           name: string
+          name_normalized?: string | null
           points_possible?: number | null
           quiz_engine?: string | null
           teacher_id: string
         }
         Update: {
+          assignment_group_id?: string | null
           canvas_assignment_id?: number
           canvas_quiz_id?: number | null
           course_id?: string
@@ -104,11 +145,19 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["assignment_kind"]
           name?: string
+          name_normalized?: string | null
           points_possible?: number | null
           quiz_engine?: string | null
           teacher_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "assignments_assignment_group_id_fkey"
+            columns: ["assignment_group_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "assignments_course_id_fkey"
             columns: ["course_id"]
@@ -900,6 +949,7 @@ export type Database = {
       }
       analytics_compare_classes: {
         Args: {
+          _assignment_group_id?: string
           _assignment_id?: string
           _course_ids: string[]
           _standard_id?: string
@@ -1029,6 +1079,10 @@ export type Database = {
           subject: string
         }[]
       }
+      apply_assignment_group: {
+        Args: { _assignment_ids: string[]; _group_id?: string; _name: string }
+        Returns: string
+      }
       create_invitation: {
         Args: { _expires_at?: string; _note?: string }
         Returns: {
@@ -1076,6 +1130,23 @@ export type Database = {
         Args: { _course_id: string }
         Returns: boolean
       }
+      list_assignment_groups: {
+        Args: never
+        Returns: {
+          assignment_ids: string[]
+          avg_percentage: number
+          confirmed: boolean
+          course_count: number
+          course_names: string[]
+          grade: string
+          group_id: string
+          kind: Database["public"]["Enums"]["assignment_kind"]
+          member_count: number
+          name: string
+          subject: string
+          total_submissions: number
+        }[]
+      }
       mastery_debug: {
         Args: { _standard_id: string; _student_id: string }
         Returns: {
@@ -1104,6 +1175,7 @@ export type Database = {
           reassigned_submissions: number
         }[]
       }
+      normalize_assignment_name: { Args: { _name: string }; Returns: string }
       redeem_invitation: {
         Args: { _code: string; _user_id: string }
         Returns: {
@@ -1173,6 +1245,27 @@ export type Database = {
               term: string
             }[]
           }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      suggest_assignment_groups: {
+        Args: never
+        Returns: {
+          assignment_ids: string[]
+          cluster_key: string
+          course_count: number
+          course_ids: string[]
+          course_names: string[]
+          grade: string
+          kind: Database["public"]["Enums"]["assignment_kind"]
+          member_count: number
+          subject: string
+          suggested_name: string
+        }[]
+      }
+      unlink_assignment_from_group: {
+        Args: { _assignment_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "teacher"

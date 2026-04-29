@@ -1142,7 +1142,9 @@ function CompareView({ courses }: { courses: Course[] }) {
   const [split, setSplit] = useState<SplitMode>("by_class");
   const [chartStyle, setChartStyle] = useState<ChartStyle>("grouped");
 
+  // Assignment picker holds either an `assignment:<id>` or `group:<id>` value.
   const [assignmentOptions, setAssignmentOptions] = useState<{ id: string; name: string; course_name: string }[]>([]);
+  const [groupOptions, setGroupOptions] = useState<{ id: string; name: string; course_count: number; member_count: number }[]>([]);
   const [standardOptions, setStandardOptions] = useState<{ id: string; code: string; description: string }[]>([]);
   const [rows, setRows] = useState<CompareRow[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1187,6 +1189,13 @@ function CompareView({ courses }: { courses: Course[] }) {
       const list = (data as any[] | null) ?? [];
       setAssignmentOptions(list.map((a) => ({ id: a.id, name: a.name, course_name: a.courses?.name ?? "" })));
     });
+    // Also load assignment groups (teacher-wide).
+    supabase.rpc("list_assignment_groups" as any).then(({ data }) => {
+      const list = ((data as any[]) ?? []).map((g: any) => ({
+        id: g.group_id, name: g.name, course_count: g.course_count, member_count: g.member_count,
+      }));
+      setGroupOptions(list);
+    });
   }, [selected]);
 
   useEffect(() => {
@@ -1203,10 +1212,19 @@ function CompareView({ courses }: { courses: Course[] }) {
   useEffect(() => {
     if (!canQuery) { setRows(null); return; }
     setLoading(true);
+    // assignmentId is encoded as "assignment:<uuid>" or "group:<uuid>"
+    let _assignment_id: string | null = null;
+    let _assignment_group_id: string | null = null;
+    if (scope === "assignment" && assignmentId) {
+      if (assignmentId.startsWith("group:")) _assignment_group_id = assignmentId.slice("group:".length);
+      else if (assignmentId.startsWith("assignment:")) _assignment_id = assignmentId.slice("assignment:".length);
+      else _assignment_id = assignmentId; // fallback
+    }
     supabase.rpc("analytics_compare_classes" as any, {
       _course_ids: selected,
-      _assignment_id: scope === "assignment" ? assignmentId : null,
+      _assignment_id,
       _standard_id: scope === "standard" ? standardId : null,
+      _assignment_group_id,
     }).then(({ data, error }) => {
       setLoading(false);
       if (error) { setRows([]); return; }
@@ -1327,11 +1345,26 @@ function CompareView({ courses }: { courses: Course[] }) {
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Assignment</Label>
               <Select value={assignmentId} onValueChange={setAssignmentId}>
-                <SelectTrigger className="w-[280px] h-9"><SelectValue placeholder="Pick an assignment…" /></SelectTrigger>
+                <SelectTrigger className="w-[300px] h-9"><SelectValue placeholder="Pick an assignment or group…" /></SelectTrigger>
                 <SelectContent>
-                  {assignmentOptions.length === 0 && <SelectItem value="__none" disabled>No assignments</SelectItem>}
+                  {groupOptions.length === 0 && assignmentOptions.length === 0 && <SelectItem value="__none" disabled>No assignments</SelectItem>}
+                  {groupOptions.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Groups</div>
+                      {groupOptions.map((g) => (
+                        <SelectItem key={`group:${g.id}`} value={`group:${g.id}`}>
+                          <span className="inline-flex items-center gap-1.5">
+                            <Layers className="h-3 w-3" />
+                            {g.name}
+                            <span className="text-muted-foreground text-xs">· {g.course_count} classes</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                      <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground border-t mt-1 pt-2">Individual assignments</div>
+                    </>
+                  )}
                   {assignmentOptions.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
+                    <SelectItem key={`assignment:${a.id}`} value={`assignment:${a.id}`}>
                       {a.name}{a.course_name ? ` · ${a.course_name}` : ""}
                     </SelectItem>
                   ))}

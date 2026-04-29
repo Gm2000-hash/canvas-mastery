@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen, Download, FileUp } from "lucide-react";
+import { Sparkles, Check, Trash2, Loader2, RefreshCw, BookOpen, Download, FileUp, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -54,6 +54,7 @@ export default function Assignments() {
   const [recomputing, setRecomputing] = useState(false);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [suggestionCount, setSuggestionCount] = useState<number>(0);
 
   const currentCourse = useMemo(() => (courses ?? []).find((c) => c.id === courseId) ?? null, [courses, courseId]);
   const effectiveDiscipline = useMemo(() => {
@@ -77,6 +78,12 @@ export default function Assignments() {
     setDisciplines((data as Discipline[]) ?? []);
   }
   useEffect(() => { loadCourses(); loadDisciplines(); /* eslint-disable-next-line */ }, []);
+
+  useEffect(() => {
+    supabase.rpc("suggest_assignment_groups" as any).then(({ data }) => {
+      setSuggestionCount(((data as any[]) ?? []).length);
+    });
+  }, []);
 
   async function loadAssignments(cid: string) {
     setAssignments(null);
@@ -133,6 +140,19 @@ export default function Assignments() {
         defaultCourseId={courseId}
         onImported={() => loadAssignments(courseId)}
       />
+
+      {suggestionCount > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-accent/30">
+          <Layers className="h-4 w-4 text-primary shrink-0" />
+          <div className="text-sm flex-1">
+            <span className="font-medium">{suggestionCount}</span> assignment{suggestionCount === 1 ? "" : "s"} look like duplicates across multiple classes (e.g., the same quiz given to two sections).
+          </div>
+          <Link to="/app/assignment-groups">
+            <Button size="sm" variant="default">Review groups</Button>
+          </Link>
+        </div>
+      )}
+
 
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-sm text-muted-foreground">Course:</span>
