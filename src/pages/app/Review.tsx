@@ -353,7 +353,7 @@ export default function Review() {
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
             <h1 className="font-display text-4xl font-semibold mb-2">Tag Review</h1>
-            <p className="text-muted-foreground">Confirm or override AI-suggested standards. Press <kbd className="rounded bg-muted px-1.5 py-0.5 text-[10px]">J</kbd>/<kbd className="rounded bg-muted px-1.5 py-0.5 text-[10px]">K</kbd> to move, <kbd className="rounded bg-muted px-1.5 py-0.5 text-[10px]">Y</kbd> to confirm, <kbd className="rounded bg-muted px-1.5 py-0.5 text-[10px]">N</kbd> to reject, <kbd className="rounded bg-muted px-1.5 py-0.5 text-[10px]">A</kbd> to AI-suggest.</p>
+            <p className="text-muted-foreground">Confirm or override AI-suggested standards. Press <kbd className="rounded bg-muted px-1.5 py-0.5 text-[11px]">J</kbd>/<kbd className="rounded bg-muted px-1.5 py-0.5 text-[11px]">K</kbd> to move, <kbd className="rounded bg-muted px-1.5 py-0.5 text-[11px]">Y</kbd> to confirm, <kbd className="rounded bg-muted px-1.5 py-0.5 text-[11px]">N</kbd> to reject, <kbd className="rounded bg-muted px-1.5 py-0.5 text-[11px]">A</kbd> to AI-suggest.</p>
           </div>
         </div>
 
@@ -457,15 +457,15 @@ export default function Review() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium truncate">{a.name}</span>
-                          <Badge variant="outline" className="text-[10px] uppercase">{a.kind}</Badge>
+                          <Badge variant="outline" className="text-[11px] uppercase">{a.kind}</Badge>
                           {isQuiz && qCount > 0 && (
-                            <Badge variant="outline" className="text-[10px]">
+                            <Badge variant="outline" className="text-[11px]">
                               {qCount} question{qCount === 1 ? "" : "s"}
                             </Badge>
                           )}
                           {course && <span className="text-xs text-muted-foreground truncate">{course.name}</span>}
                           {disc && (
-                            <Badge variant="outline" className="text-[10px] bg-accent/5 text-accent border-accent/30">
+                            <Badge variant="outline" className="text-[11px] bg-accent/5 text-accent border-accent/30">
                               {disc.subject} · {disc.grade}
                             </Badge>
                           )}
@@ -604,7 +604,7 @@ export default function Review() {
                                 {(qConfirmed.length > 0 || qSuggested.length > 0) && (
                                   <div className="mt-1.5 flex flex-wrap gap-1">
                                     {qConfirmed.map((t) => (
-                                      <Badge key={t.id} className="bg-mastery-high/10 text-mastery-high border-mastery-high/30 text-[10px]" variant="outline">
+                                      <Badge key={t.id} className="bg-mastery-high/10 text-mastery-high border-mastery-high/30 text-[11px]" variant="outline">
                                         <Check className="h-2.5 w-2.5 mr-0.5" /> {t.standards?.code}
                                         <button onClick={() => removeQTag(t, a.id)} className="ml-1 opacity-70 hover:opacity-100">
                                           <Trash2 className="h-2.5 w-2.5" />
@@ -614,7 +614,7 @@ export default function Review() {
                                     {qSuggested.map((t) => (
                                       <Tooltip key={t.id}>
                                         <TooltipTrigger asChild>
-                                          <div className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/5 px-1.5 py-0.5 text-[10px]">
+                                          <div className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/5 px-1.5 py-0.5 text-[11px]">
                                             <Sparkles className="h-2.5 w-2.5 text-accent" />
                                             <span className="font-code">{t.standards?.code}</span>
                                             {t.confidence != null && <span className="text-muted-foreground">{Math.round(t.confidence * 100)}%</span>}

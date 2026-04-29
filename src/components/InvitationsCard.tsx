@@ -141,7 +141,7 @@ export default function InvitationsCard() {
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <code className="font-code text-sm font-semibold">{inv.code}</code>
-                      <span className={"text-[10px] px-2 py-0.5 rounded-full " + s.tone}>{s.label}</span>
+                      <span className={"text-[11px] px-2 py-0.5 rounded-full " + s.tone}>{s.label}</span>
                       {inv.note && <span className="text-xs text-muted-foreground truncate">· {inv.note}</span>}
                     </div>
                     <div className="text-xs text-muted-foreground">

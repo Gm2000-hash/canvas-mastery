@@ -326,7 +326,7 @@ export default function StudentHistory() {
                             <span className="truncate">{h.course_name}</span>
                             {h.school_year && (<><span>·</span><span>{h.school_year}</span></>)}
                             {h.course_archived && (
-                              <Badge variant="outline" className="text-[9px] gap-1 px-1 py-0">
+                              <Badge variant="outline" className="text-[11px] gap-1 px-1 py-0">
                                 <Archive className="h-2.5 w-2.5" /> archived
                               </Badge>
                             )}
@@ -386,7 +386,7 @@ export default function StudentHistory() {
                           <span className="text-muted-foreground">·</span>
                           <span>Grade {g.grade}</span>
                           {g.archived && (
-                            <Badge variant="outline" className="text-[9px] gap-1">
+                            <Badge variant="outline" className="text-[11px] gap-1">
                               <Archive className="h-2.5 w-2.5" /> archived
                             </Badge>
                           )}
@@ -408,7 +408,7 @@ export default function StudentHistory() {
                                   <div className="flex items-center gap-2">
                                     <span className="font-code text-xs">{r.standard_code}</span>
                                     {r.mastered && (
-                                      <Badge variant="outline" className="text-[9px] bg-mastery-high/10 text-mastery-high border-mastery-high/30">
+                                      <Badge variant="outline" className="text-[11px] bg-mastery-high/10 text-mastery-high border-mastery-high/30">
                                         mastered
                                       </Badge>
                                     )}
@@ -419,7 +419,7 @@ export default function StudentHistory() {
                                   <div className="text-sm font-semibold tabular-nums">
                                     {r.mastery_score != null ? `${Math.round(r.mastery_score * 100)}%` : "—"}
                                   </div>
-                                  <div className="text-[10px] text-muted-foreground">
+                                  <div className="text-[11px] text-muted-foreground">
                                     {r.attempts ?? 0} attempt{(r.attempts ?? 0) === 1 ? "" : "s"}
                                   </div>
                                 </div>

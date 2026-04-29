@@ -162,9 +162,9 @@ export default function Courses() {
                     <div className="min-w-0">
                       <CardTitle className="font-display text-xl flex items-center gap-2">
                         <span className="truncate">{c.name}</span>
-                        {c.hidden && <Badge variant="outline" className="text-[9px]">hidden</Badge>}
+                        {c.hidden && <Badge variant="outline" className="text-[11px]">hidden</Badge>}
                         {c.archived_at && (
-                          <Badge variant="outline" className="text-[9px]" title={`Archived ${new Date(c.archived_at).toLocaleDateString()}`}>
+                          <Badge variant="outline" className="text-[11px]" title={`Archived ${new Date(c.archived_at).toLocaleDateString()}`}>
                             archived
                           </Badge>
                         )}
@@ -242,7 +242,7 @@ export default function Courses() {
                           </div>
                         ) : (
                           <div className="space-y-1">
-                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 pt-1">Assign discipline</div>
+                            <div className="text-[11px] uppercase tracking-wider text-muted-foreground px-2 pt-1">Assign discipline</div>
                             {disciplines.map((d) => (
                               <button
                                 key={d.id}
@@ -252,7 +252,7 @@ export default function Courses() {
                                 }`}
                               >
                                 <span>{d.subject} · {d.grade} · {d.state}</span>
-                                {d.is_default && <Badge variant="outline" className="text-[9px]">default</Badge>}
+                                {d.is_default && <Badge variant="outline" className="text-[11px]">default</Badge>}
                               </button>
                             ))}
                             <div className="border-t my-1" />

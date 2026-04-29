@@ -374,7 +374,7 @@ export default function Settings() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge
                         variant="outline"
-                        className="text-[10px] font-medium"
+                        className="text-[11px] font-medium"
                         title={fw.description}
                       >
                         {fw.shortLabel}
@@ -389,7 +389,7 @@ export default function Settings() {
                         </>
                       )}
                       {d.is_default && (
-                        <Badge variant="outline" className="text-[10px] gap-1">
+                        <Badge variant="outline" className="text-[11px] gap-1">
                           <Star className="h-2.5 w-2.5" /> default
                         </Badge>
                       )}

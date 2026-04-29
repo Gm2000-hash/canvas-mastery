@@ -262,7 +262,7 @@ export default function MasteryDebug() {
                             </div>
                           )}
                           {!r.confirmed && r.ai_suggested && (
-                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                            <div className="text-[11px] text-muted-foreground mt-0.5">
                               AI tag • confidence {r.confidence != null ? Math.round(Number(r.confidence) * 100) + "%" : "—"}
                             </div>
                           )}

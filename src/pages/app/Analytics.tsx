@@ -718,17 +718,17 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
                   {leafColumns.map((c) => {
                     if (c.kind === "child") {
                       return (
-                        <th key={c.key} className="border-b border-r p-2 font-code font-normal text-[10px] whitespace-nowrap bg-muted/30"
+                        <th key={c.key} className="border-b border-r p-2 font-code font-normal text-[11px] whitespace-nowrap bg-muted/30"
                             title={c.childDescription ? `${c.childCode} — ${c.childDescription}` : c.childCode}>
                           <div className="text-muted-foreground">{c.childCode}</div>
-                          <div className="text-[9px] font-sans text-muted-foreground/80">substandard</div>
+                          <div className="text-[11px] font-sans text-muted-foreground/80">substandard</div>
                         </th>
                       );
                     }
                     const isOpen = expanded.has(c.group.key);
                     const canExpand = c.group.children.length > 1;
                     return (
-                      <th key={c.key} className="border-b border-r p-2 font-code font-normal text-[10px] whitespace-nowrap">
+                      <th key={c.key} className="border-b border-r p-2 font-code font-normal text-[11px] whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => canExpand && toggleParent(c.group.key)}
@@ -743,7 +743,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
                             : <ChevronRight className="h-3 w-3" />)}
                           <span>{c.group.label}</span>
                         </button>
-                        <div className="text-[9px] text-muted-foreground font-sans">
+                        <div className="text-[11px] text-muted-foreground font-sans">
                           {c.group.children.length === 1 ? "1 standard" : `${c.group.children.length} substandards`}
                         </div>
                       </th>
@@ -810,7 +810,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
             </div>
           </div>
         )}
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-500/15 border border-emerald-500/30" /> ≥ 80%</span>
           <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-amber-500/15 border border-amber-500/30" /> 60–79%</span>
           <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-red-500/15 border border-red-500/30" /> &lt; 60%</span>
@@ -990,7 +990,7 @@ function AssignmentsView({ courseId, courses }: { courseId: string | null; cours
                 <TableRow key={r.assignment_id}>
                   <TableCell className="font-medium max-w-sm truncate" title={r.name}>{r.name}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{r.course_name}</TableCell>
-                  <TableCell><Badge variant="secondary" className="text-[10px]">{r.kind}</Badge></TableCell>
+                  <TableCell><Badge variant="secondary" className="text-[11px]">{r.kind}</Badge></TableCell>
                   <TableCell className="text-xs text-muted-foreground">{r.due_at ? new Date(r.due_at).toLocaleDateString() : "—"}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.submission_count}</TableCell>
                   <TableCell className="text-right tabular-nums">{pctRaw(r.avg_percentage)}</TableCell>
@@ -1375,7 +1375,7 @@ function CompareView({ courses }: { courses: Course[] }) {
                   {groupOptions.length === 0 && assignmentOptions.length === 0 && <SelectItem value="__none" disabled>No assignments</SelectItem>}
                   {groupOptions.length > 0 && (
                     <>
-                      <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Groups</div>
+                      <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">Groups</div>
                       {groupOptions.map((g) => (
                         <SelectItem key={`group:${g.id}`} value={`group:${g.id}`}>
                           <span className="inline-flex items-center gap-1.5">
@@ -1385,7 +1385,7 @@ function CompareView({ courses }: { courses: Course[] }) {
                           </span>
                         </SelectItem>
                       ))}
-                      <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground border-t mt-1 pt-2">Individual assignments</div>
+                      <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground border-t mt-1 pt-2">Individual assignments</div>
                     </>
                   )}
                   {assignmentOptions.map((a) => (

@@ -190,7 +190,7 @@ export default function Mastery() {
                   <tr>
                     <th className="text-left pl-2 sticky left-0 bg-card z-10">Student</th>
                     {standards.map((s) => (
-                      <th key={s.id} className="px-1 font-code text-[10px] text-muted-foreground rotate-[-30deg] origin-bottom-left h-16 whitespace-nowrap">{s.code}</th>
+                      <th key={s.id} className="px-1 font-code text-[11px] text-muted-foreground rotate-[-30deg] origin-bottom-left h-16 whitespace-nowrap">{s.code}</th>
                     ))}
                   </tr>
                 </thead>
@@ -204,7 +204,7 @@ export default function Mastery() {
                         return (
                           <td key={s.id} className="p-0">
                             <div
-                              className="w-9 h-9 rounded-md flex items-center justify-center text-[10px] font-medium tabular-nums"
+                              className="w-9 h-9 rounded-md flex items-center justify-center text-[11px] font-medium tabular-nums"
                               style={{
                                 background: v == null ? "hsl(var(--mastery-bg))" : bandColor(Number(v)),
                                 color: v == null ? "hsl(var(--muted-foreground))" : "white",

@@ -342,9 +342,9 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
           <div className="min-w-0">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               {assignment.name}
-              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">{assignment.kind}</Badge>
+              <Badge variant="outline" className="text-[11px] uppercase tracking-wide">{assignment.kind}</Badge>
               {assignment.kind === "quiz" && assignment.quiz_engine && (
-                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                <Badge variant="secondary" className="text-[11px] uppercase tracking-wide">
                   {assignment.quiz_engine === "new" ? "New Quiz" : "Classic"}
                 </Badge>
               )}

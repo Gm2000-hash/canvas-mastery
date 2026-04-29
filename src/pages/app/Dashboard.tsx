@@ -260,7 +260,7 @@ function AssignmentsList({
                   </Link>
                   <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
                     <span className="truncate">{a.course?.name ?? "—"}</span>
-                    {a.kind === "quiz" && <Badge variant="outline" className="text-[9px] py-0 h-4">quiz</Badge>}
+                    {a.kind === "quiz" && <Badge variant="outline" className="text-[11px] py-0 h-4">quiz</Badge>}
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground tabular-nums shrink-0 text-right">
