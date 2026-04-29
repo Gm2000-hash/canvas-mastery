@@ -353,26 +353,67 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex flex-wrap gap-2">
-          {confirmed.map((t) => (
-            <Badge key={t.id} className="bg-mastery-high/10 text-mastery-high border-mastery-high/30 hover:bg-mastery-high/20" variant="outline">
-              <Check className="h-3 w-3 mr-1" /> {t.standards.code}
-              <button onClick={() => removeTag(t)} className="ml-2 text-mastery-high/70 hover:text-mastery-high"><Trash2 className="h-3 w-3" /></button>
-            </Badge>
-          ))}
-          {suggested.map((t) => (
-            <div key={t.id} className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/5 px-2 py-1 text-xs">
-              <Sparkles className="h-3 w-3 text-accent" />
-              <span className="font-mono">{t.standards.code}</span>
-              {t.confidence != null && <span className="text-muted-foreground">({Math.round(t.confidence * 100)}%)</span>}
-              <span className="truncate max-w-[280px] text-muted-foreground">— {t.standards.description}</span>
-              <Button size="sm" variant="ghost" className="h-6 px-2 ml-1" onClick={() => confirmTag(t)}><Check className="h-3 w-3" /></Button>
-              <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => removeTag(t)}><Trash2 className="h-3 w-3" /></Button>
+      <CardContent className="pt-0 space-y-3">
+        {confirmed.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {confirmed.map((t) => (
+              <Badge key={t.id} className="bg-mastery-high/10 text-mastery-high border-mastery-high/30 hover:bg-mastery-high/20" variant="outline">
+                <Check className="h-3 w-3 mr-1" /> {t.standards.code}
+                <button onClick={() => removeTag(t)} className="ml-2 text-mastery-high/70 hover:text-mastery-high"><Trash2 className="h-3 w-3" /></button>
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {suggested.length > 0 && (
+          <div className="rounded-md border border-accent/40 bg-accent/5">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-accent/30">
+              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                <Checkbox
+                  checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                  onCheckedChange={(c) => toggleAll(c === true)}
+                />
+                <Sparkles className="h-3 w-3 text-accent" />
+                AI suggestions ({suggested.length})
+                {selected.size > 0 && <span className="text-muted-foreground">— {selected.size} selected</span>}
+              </label>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" className="h-7" onClick={dismissSelected} disabled={selected.size === 0}>
+                  <Trash2 className="h-3 w-3 mr-1" /> Dismiss
+                </Button>
+                <Button size="sm" variant="outline" className="h-7" onClick={approveSelected} disabled={selected.size === 0}>
+                  <Check className="h-3 w-3 mr-1" /> Approve selected
+                </Button>
+                <Button size="sm" className="h-7" onClick={approveAll}>
+                  <Check className="h-3 w-3 mr-1" /> Approve all
+                </Button>
+              </div>
             </div>
-          ))}
-          {tags.length === 0 && <span className="text-xs text-muted-foreground italic">No standards tagged yet.</span>}
-        </div>
+            <ul className="divide-y divide-accent/20">
+              {suggested.map((t) => (
+                <li key={t.id} className="flex items-center gap-2 px-3 py-2 text-xs">
+                  <Checkbox
+                    checked={selected.has(t.id)}
+                    onCheckedChange={(c) => toggleOne(t.id, c === true)}
+                  />
+                  <span className="font-mono shrink-0">{t.standards.code}</span>
+                  {t.confidence != null && (
+                    <span className="text-muted-foreground shrink-0">({Math.round(t.confidence * 100)}%)</span>
+                  )}
+                  <span className="truncate text-muted-foreground flex-1">— {t.standards.description}</span>
+                  <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => confirmTag(t)} title="Approve">
+                    <Check className="h-3 w-3" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => removeTag(t)} title="Dismiss">
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {tags.length === 0 && <span className="text-xs text-muted-foreground italic">No standards tagged yet.</span>}
       </CardContent>
     </Card>
   );
