@@ -116,10 +116,8 @@ export default function AppLayout() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0 bg-sidebar text-sidebar-foreground border-sidebar-border flex flex-col">
-              <VisuallyHidden>
-                <SheetTitle>Navigation</SheetTitle>
-                <SheetDescription>Main app navigation</SheetDescription>
-              </VisuallyHidden>
+              <SheetTitle className="sr-only">Navigation</SheetTitle>
+              <SheetDescription className="sr-only">Main app navigation</SheetDescription>
               <NavList
                 items={items}
                 onNavigate={() => setMobileOpen(false)}
