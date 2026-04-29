@@ -1143,7 +1143,7 @@ function CompareView({ courses }: { courses: Course[] }) {
   const [chartStyle, setChartStyle] = useState<ChartStyle>("grouped");
 
   // Assignment picker holds either an `assignment:<id>` or `group:<id>` value.
-  const [assignmentOptions, setAssignmentOptions] = useState<{ id: string; name: string; course_name: string }[]>([]);
+  const [assignmentOptions, setAssignmentOptions] = useState<{ id: string; name: string; course_name: string; class_count: number }[]>([]);
   const [groupOptions, setGroupOptions] = useState<{ id: string; name: string; course_count: number; member_count: number }[]>([]);
   const [standardOptions, setStandardOptions] = useState<{ id: string; code: string; description: string }[]>([]);
   const [rows, setRows] = useState<CompareRow[] | null>(null);
