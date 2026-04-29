@@ -116,6 +116,7 @@ export default function Analytics() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="classes"><GraduationCap className="h-4 w-4 mr-1.5" /> Classes</TabsTrigger>
           <TabsTrigger value="trends"><TrendingUp className="h-4 w-4 mr-1.5" /> Mastery by subject</TabsTrigger>
+          <TabsTrigger value="compare"><BarChartHorizontal className="h-4 w-4 mr-1.5" /> Compare</TabsTrigger>
           <TabsTrigger value="standards"><BookMarked className="h-4 w-4 mr-1.5" /> Standards</TabsTrigger>
           <TabsTrigger value="assignments"><ListChecks className="h-4 w-4 mr-1.5" /> Assessments</TabsTrigger>
           <TabsTrigger value="levels"><Layers className="h-4 w-4 mr-1.5" /> Mastery levels</TabsTrigger>
@@ -124,8 +125,9 @@ export default function Analytics() {
 
         <TabsContent value="classes"><ClassesView courseFilter={courseFilter} hiddenCourseIds={hiddenCourseIds} archivedCourseIds={archivedCourseIds} schoolYear={schoolYear} includeArchived={showHistorical} /></TabsContent>
         <TabsContent value="trends"><TrendsView courseId={courseFilter} subjects={subjects} /></TabsContent>
-        <TabsContent value="standards"><StandardsView courseId={courseFilter} subjects={subjects} /></TabsContent>
-        <TabsContent value="assignments"><AssignmentsView courseId={courseFilter} /></TabsContent>
+        <TabsContent value="compare"><CompareView courses={courses} /></TabsContent>
+        <TabsContent value="standards"><StandardsView courseId={courseFilter} subjects={subjects} courses={courses} /></TabsContent>
+        <TabsContent value="assignments"><AssignmentsView courseId={courseFilter} courses={courses} /></TabsContent>
         <TabsContent value="levels"><LevelsView courseId={courseFilter} subjects={subjects} /></TabsContent>
         <TabsContent value="questions"><QuestionsView courseId={courseFilter} /></TabsContent>
       </Tabs>
