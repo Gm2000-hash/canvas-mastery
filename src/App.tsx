@@ -47,6 +47,7 @@ const App = () => (
             <Route path="mastery/debug" element={<MasteryDebug />} />
             <Route path="student-history" element={<StudentHistory />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="mastery-connect" element={<MasteryConnect />} />
             <Route path="admin" element={<Admin />} />
           </Route>
           <Route path="*" element={<NotFound />} />
