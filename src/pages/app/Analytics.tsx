@@ -824,7 +824,7 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
 }
 
 // ───────────────────────── Standards ─────────────────────────
-function StandardsView({ courseId, subjects }: { courseId: string | null; subjects: string[] }) {
+function StandardsView({ courseId, subjects, courses }: { courseId: string | null; subjects: string[]; courses: Course[] }) {
   const [subject, setSubject] = useState<string>("ALL");
   const [framework, setFramework] = useState<string>("ALL");
   const [rows, setRows] = useState<StandardRow[] | null>(null);
