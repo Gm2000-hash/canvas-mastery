@@ -112,7 +112,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-4xl font-semibold mb-2">Dashboard</h1>
+        <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Dashboard</h1>
         <p className="text-muted-foreground">An at-a-glance look at your classes and standards coverage.</p>
       </div>
 

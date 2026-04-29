@@ -267,7 +267,7 @@ export default function Settings() {
   return (
     <div className="space-y-8 max-w-3xl">
       <div>
-        <h1 className="font-display text-4xl font-semibold mb-2">Settings</h1>
+        <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Settings</h1>
         <p className="text-muted-foreground">Profile, Canvas connection, standards, and mastery rules.</p>
       </div>
 

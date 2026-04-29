@@ -116,7 +116,7 @@ export default function Mastery() {
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-4xl font-semibold mb-2">Mastery</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Mastery</h1>
           <p className="text-muted-foreground">Per-student mastery on each standard tagged in this course.</p>
         </div>
         <div className="flex gap-2 items-center">

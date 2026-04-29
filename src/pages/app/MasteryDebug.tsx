@@ -157,7 +157,7 @@ export default function MasteryDebug() {
               <Link to="/app/mastery"><ArrowLeft className="h-4 w-4 mr-1" /> Mastery</Link>
             </Button>
           </div>
-          <h1 className="font-display text-4xl font-semibold mb-2 flex items-center gap-3">
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2 flex items-center gap-3">
             <Bug className="h-7 w-7 text-accent" /> Mastery debug
           </h1>
           <p className="text-muted-foreground">

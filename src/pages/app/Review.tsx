@@ -352,7 +352,7 @@ export default function Review() {
       <div className="space-y-6">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="font-display text-4xl font-semibold mb-2">Tag Review</h1>
+            <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Tag Review</h1>
             <p className="text-muted-foreground">Confirm or override AI-suggested standards. Press <kbd className="rounded bg-muted px-1.5 py-0.5 text-[11px]">J</kbd>/<kbd className="rounded bg-muted px-1.5 py-0.5 text-[11px]">K</kbd> to move, <kbd className="rounded bg-muted px-1.5 py-0.5 text-[11px]">Y</kbd> to confirm, <kbd className="rounded bg-muted px-1.5 py-0.5 text-[11px]">N</kbd> to reject, <kbd className="rounded bg-muted px-1.5 py-0.5 text-[11px]">A</kbd> to AI-suggest.</p>
           </div>
         </div>
