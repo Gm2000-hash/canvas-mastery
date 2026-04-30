@@ -1191,6 +1191,7 @@ export function CompareView({ courses }: { courses: Course[] }) {
   const [groupOptions, setGroupOptions] = useState<{ id: string; name: string; course_count: number; member_count: number }[]>([]);
   const [standardOptions, setStandardOptions] = useState<{ id: string; code: string; description: string }[]>([]);
   const [rows, setRows] = useState<CompareRow[] | null>(null);
+  const [studentRows, setStudentRows] = useState<StudentBandRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Build a map of course_id → subject from teacher_disciplines (via courses.discipline_id).
