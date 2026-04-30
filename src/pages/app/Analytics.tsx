@@ -1357,6 +1357,20 @@ export function CompareView({ courses }: { courses: Course[] }) {
     }));
   }, [perCourse, split]);
 
+  // Lookup: students grouped by course_name → band → names[].
+  // Also a global "by band only" map for the by_level / all splits.
+  const namesByCourseBand = useMemo(() => {
+    const byCourse = new Map<string, Record<BandKey, string[]>>();
+    const byBand: Record<BandKey, string[]> = { below: [], approaching: [], mastered: [] };
+    for (const s of studentRows) {
+      const cur = byCourse.get(s.course_name) ?? { below: [], approaching: [], mastered: [] };
+      cur[s.band].push(s.student_name);
+      byCourse.set(s.course_name, cur);
+      byBand[s.band].push(s.student_name);
+    }
+    return { byCourse, byBand };
+  }, [studentRows]);
+
   function exportCsv() {
     const header = ["Class", "n", "Avg %", "Below", "Approaching", "Mastered"];
     const lines = [header.join(",")];
