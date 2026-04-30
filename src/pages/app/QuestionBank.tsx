@@ -890,9 +890,12 @@ const QB_BANDS = [
 ];
 type QBBandKey = "basic" | "proficient" | "advanced";
 
-function QuestionPerformanceChart({ questionId }: { questionId: string }) {
+function QuestionPerformanceChart({ questionId, revealedNames }: { questionId: string; revealedNames: Record<string, string> }) {
   const [loading, setLoading] = useState(true);
-  const [namesByBand, setNamesByBand] = useState<Record<QBBandKey, string[]>>({ basic: [], proficient: [], advanced: [] });
+  // Store student IDs + pseudonyms per band so we can resolve real names dynamically
+  // when the teacher toggles "reveal real names".
+  type Entry = { id: string; pseudonym: string };
+  const [idsByBand, setIdsByBand] = useState<Record<QBBandKey, Entry[]>>({ basic: [], proficient: [], advanced: [] });
 
   useEffect(() => {
     let cancelled = false;
@@ -904,7 +907,7 @@ function QuestionPerformanceChart({ questionId }: { questionId: string }) {
         .eq("question_id", questionId);
       if (cancelled) return;
       if (error || !data) {
-        setNamesByBand({ basic: [], proficient: [], advanced: [] });
+        setIdsByBand({ basic: [], proficient: [], advanced: [] });
         setLoading(false);
         return;
       }
@@ -919,24 +922,31 @@ function QuestionPerformanceChart({ questionId }: { questionId: string }) {
           .in("id", studentIds);
         for (const s of (studs as any[] | null) ?? []) nameById.set(s.id, s.name);
       }
-      const buckets: Record<QBBandKey, string[]> = { basic: [], proficient: [], advanced: [] };
+      const buckets: Record<QBBandKey, Entry[]> = { basic: [], proficient: [], advanced: [] };
       for (const r of data as any[]) {
         const pp = Number(r.points_possible ?? 0);
         const pts = Number(r.points ?? 0);
         if (!pp || pp <= 0) continue;
         const pct = pts / pp;
         const band: QBBandKey = pct < 0.6 ? "basic" : pct < 0.8 ? "proficient" : "advanced";
-        const name = nameById.get(r.student_id) ?? "Unknown";
-        buckets[band].push(name);
+        buckets[band].push({ id: r.student_id, pseudonym: nameById.get(r.student_id) ?? "Unknown" });
       }
-      for (const k of Object.keys(buckets) as QBBandKey[]) {
-        buckets[k].sort((a, b) => a.localeCompare(b));
-      }
-      setNamesByBand(buckets);
+      setIdsByBand(buckets);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [questionId]);
+
+  // Resolve display names per band, sorting alphabetically by the visible name.
+  const namesByBand = useMemo(() => {
+    const out: Record<QBBandKey, string[]> = { basic: [], proficient: [], advanced: [] };
+    for (const k of Object.keys(idsByBand) as QBBandKey[]) {
+      out[k] = idsByBand[k]
+        .map((e) => revealedNames[e.id] ?? e.pseudonym)
+        .sort((a, b) => a.localeCompare(b));
+    }
+    return out;
+  }, [idsByBand, revealedNames]);
 
   const data = QB_BANDS.map((b) => ({
     name: b.short,
