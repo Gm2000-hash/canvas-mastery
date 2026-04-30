@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Beaker, BookOpen, Calculator, Globe2, Atom, ArrowRight, Info } from "lucide-react";
+import { Beaker, BookOpen, Calculator, Globe2, Atom, ArrowRight, Info, Plus, Loader2 } from "lucide-react";
 import { currentSchoolYearLabel, recentSchoolYears } from "@/lib/schoolYear";
 import { GRADES } from "@/lib/frameworks";
+import { toast } from "sonner";
 
 type SubjectRow = {
   subject: string;
