@@ -216,78 +216,100 @@ export default function AssignmentGroups() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight flex items-center gap-2">
-            <Layers className="h-7 w-7" /> Class Groups
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-2xl">
-            Group your classes (e.g. all sections of "8th Grade Science A"), then have AI find equivalent
-            assessments <em>within</em> each group. This keeps matches scoped to the right prep — Science A pre-tests
-            won't get matched against Science B.
-          </p>
+    <div className="space-y-10 pb-12">
+      <header className="border-b pb-8">
+        <div className="flex items-start justify-between gap-6 flex-wrap">
+          <div className="max-w-2xl space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium tracking-wide uppercase">
+              <Layers className="h-3.5 w-3.5" /> Class Groups
+            </div>
+            <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">
+              Group sections.<br />
+              <span className="text-muted-foreground">Match assessments.</span>
+            </h1>
+            <p className="text-muted-foreground text-base leading-relaxed">
+              Bundle your class sections (e.g. all periods of <span className="text-foreground font-medium">8th Grade Science A</span>),
+              then let AI find equivalent assessments <em>within</em> each group — keeping matches scoped to the right prep.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={loadAll} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> New class group</Button>
+              </DialogTrigger>
+              <ClassGroupDialog
+                courses={courses}
+                onClose={() => setCreateOpen(false)}
+                onSaved={() => { setCreateOpen(false); loadAll(); }}
+              />
+            </Dialog>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadAll} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> New class group</Button>
-            </DialogTrigger>
-            <ClassGroupDialog
-              courses={courses}
-              onClose={() => setCreateOpen(false)}
-              onSaved={() => { setCreateOpen(false); loadAll(); }}
-            />
-          </Dialog>
-        </div>
-      </div>
+      </header>
 
       {loading && !classGroups && <Skeleton className="h-32" />}
       {classGroups && classGroups.length === 0 && (
-        <Card><CardContent className="py-10 text-center text-muted-foreground text-sm">
-          You haven't created any class groups yet. Create one to start grouping equivalent assessments across sections.
-        </CardContent></Card>
+        <Card className="border-dashed">
+          <CardContent className="py-16 text-center space-y-3">
+            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Layers className="h-6 w-6 text-primary" />
+            </div>
+            <div className="text-sm text-muted-foreground max-w-sm mx-auto">
+              You haven't created any class groups yet. Create one to start grouping equivalent assessments across sections.
+            </div>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Create your first group
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      <div className="space-y-3">
+
+      <div className="space-y-4">
         {classGroups?.map((cg) => {
           const isOpen = expanded[cg.id] ?? true;
           const groupAGs = assessmentGroups[cg.id] ?? [];
           const groupSugs = suggestions[cg.id] ?? [];
           return (
-            <Card key={cg.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
+            <Card key={cg.id} className="overflow-hidden transition-shadow hover:shadow-md">
+              <CardHeader className="pb-4 bg-muted/30 border-b">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <button
                       onClick={() => setExpanded((e) => ({ ...e, [cg.id]: !isOpen }))}
-                      className="flex items-center gap-1.5 text-left"
+                      className="flex items-center gap-2 text-left group"
                     >
-                      {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      <CardTitle className="text-base">{cg.name}</CardTitle>
+                      {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      <CardTitle className="text-lg font-semibold tracking-tight group-hover:text-primary transition-colors">
+                        {cg.name}
+                      </CardTitle>
                     </button>
-                    <CardDescription className="mt-1 flex flex-wrap gap-1.5 ml-5">
-                      <Badge variant="outline">{cg.course_count} {cg.course_count === 1 ? "class" : "classes"}</Badge>
-                      <Badge variant="outline">{cg.assessment_group_count} confirmed</Badge>
+                    <CardDescription className="mt-2 flex flex-wrap gap-1.5 ml-6">
+                      <Badge variant="outline" className="font-normal">
+                        {cg.course_count} {cg.course_count === 1 ? "class" : "classes"}
+                      </Badge>
+                      <Badge variant="outline" className="font-normal">
+                        {cg.assessment_group_count} confirmed
+                      </Badge>
                       {cg.pending_suggestion_count > 0 && (
-                        <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30" variant="outline">
+                        <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 font-normal" variant="outline">
+                          <Sparkles className="h-3 w-3 mr-1" />
                           {cg.pending_suggestion_count} suggested
                         </Badge>
                       )}
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-1.5 flex-wrap">
                     <Button
                       size="sm"
-                      variant="secondary"
                       onClick={() => findMatches(cg)}
                       disabled={matchingId === cg.id || cg.course_count < 2}
                     >
                       <Sparkles className={`h-3.5 w-3.5 mr-1.5 ${matchingId === cg.id ? "animate-pulse" : ""}`} />
-                      {matchingId === cg.id ? "Finding…" : "Find equivalent assessments"}
+                      {matchingId === cg.id ? "Finding…" : "Find equivalents"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setManualPickerCg(cg)} disabled={cg.course_count < 1}>
                       <Plus className="h-3.5 w-3.5 mr-1" /> Add manually
@@ -303,26 +325,35 @@ export default function AssignmentGroups() {
               </CardHeader>
 
               {isOpen && (
-                <CardContent className="space-y-4">
-                  <div className="text-xs text-muted-foreground">
-                    <span className="font-medium">Classes:</span>{" "}
-                    {cg.course_names.length > 0 ? cg.course_names.join(" · ") : <em>none yet</em>}
+                <CardContent className="space-y-6 pt-6">
+                  <div className="text-sm">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Classes</span>
+                    <div className="mt-1.5 text-foreground">
+                      {cg.course_names.length > 0
+                        ? cg.course_names.map((n, i) => (
+                            <span key={i}>
+                              {i > 0 && <span className="text-muted-foreground/50 mx-2">·</span>}
+                              {n}
+                            </span>
+                          ))
+                        : <em className="text-muted-foreground">none yet</em>}
+                    </div>
                   </div>
 
                   {/* Suggestions */}
                   {groupSugs.length > 0 && (
-                    <div>
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                          <Sparkles className="h-3 w-3" /> AI suggestions ({groupSugs.length})
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <div className="text-xs uppercase tracking-wider text-amber-700 dark:text-amber-300 flex items-center gap-1.5 font-semibold">
+                          <Sparkles className="h-3.5 w-3.5" /> AI suggestions · {groupSugs.length}
                         </div>
-                        <Button size="sm" variant="outline" className="h-7" onClick={() => confirmAllSuggestions(cg)}>
+                        <Button size="sm" variant="outline" className="h-7 bg-background" onClick={() => confirmAllSuggestions(cg)}>
                           <Check className="h-3.5 w-3.5 mr-1" /> Approve all
                         </Button>
                       </div>
                       <ul className="space-y-2">
                         {groupSugs.map((s) => (
-                          <li key={s.id} className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                          <li key={s.id} className="rounded-md border bg-background p-3 transition-colors hover:border-amber-500/50">
                             <div className="flex items-start justify-between gap-3 flex-wrap">
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-sm">{s.suggested_name}</div>
@@ -351,26 +382,26 @@ export default function AssignmentGroups() {
 
                   {/* Confirmed equivalent assessments */}
                   <div>
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-3">
                       Confirmed equivalent assessments
                     </div>
                     {groupAGs.length === 0 ? (
-                      <div className="text-xs text-muted-foreground italic">
-                        None yet. Use "Find equivalent assessments" once your classes are added.
+                      <div className="text-sm text-muted-foreground italic py-6 text-center border border-dashed rounded-md">
+                        None yet. Use "Find equivalents" once your classes are added.
                       </div>
                     ) : (
-                      <ul className="space-y-1.5">
+                      <ul className="space-y-2">
                         {groupAGs.map((g) => (
-                          <li key={g.group_id} className="rounded-md border bg-card p-2.5 flex items-center justify-between gap-2">
+                          <li key={g.group_id} className="rounded-md border bg-card p-3 flex items-center justify-between gap-3 transition-colors hover:border-primary/40">
                             <div className="min-w-0 flex-1">
-                              <div className="text-sm truncate">{g.name}</div>
-                              <div className="text-xs text-muted-foreground flex flex-wrap gap-1.5 mt-0.5">
-                                <Badge variant="secondary" className="text-[10px] py-0">{g.kind}</Badge>
+                              <div className="text-sm font-medium truncate">{g.name}</div>
+                              <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
+                                <Badge variant="secondary" className="text-[10px] py-0 font-normal">{g.kind}</Badge>
                                 <span>{g.course_count} classes · {g.member_count} assignments</span>
                                 {g.avg_percentage != null && <span>· avg {Number(g.avg_percentage).toFixed(0)}%</span>}
                               </div>
                             </div>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteAssessmentGroup(g.group_id)}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => deleteAssessmentGroup(g.group_id)}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </li>
