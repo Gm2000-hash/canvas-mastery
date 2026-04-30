@@ -55,7 +55,7 @@ export default function Landing() {
                     size="lg"
                     className="rounded-full bg-accent text-accent-foreground hover:bg-accent/90 px-8 py-6 text-base font-bold"
                   >
-                    Start free <ArrowRight className="ml-2 h-5 w-5" />
+                    Start free
                   </Button>
                 </Link>
                 <a href="#how">
