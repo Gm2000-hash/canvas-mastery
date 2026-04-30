@@ -50,14 +50,6 @@ export default function Landing() {
                 One assignment can hit many standards. AI suggests the tags — you confirm in seconds, and every student's growth shows up automatically.
               </p>
               <div className="flex flex-wrap gap-3">
-                <Link to="/auth">
-                  <Button
-                    size="lg"
-                    className="rounded-full bg-accent text-accent-foreground hover:bg-accent/90 px-8 py-6 text-base font-bold"
-                  >
-                    Start free
-                  </Button>
-                </Link>
                 <a href="#how">
                   <Button
                     size="lg"
