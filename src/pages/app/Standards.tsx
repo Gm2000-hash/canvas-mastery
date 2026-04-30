@@ -63,7 +63,7 @@ export default function Standards() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="library" className="mt-0">
-          <StandardsLibraryTab />
+          <StandardsLibraryTab onOpenQuestions={openStandardInQuestions} />
         </TabsContent>
         <TabsContent value="questions" className="mt-0">
           <QuestionsTab />
