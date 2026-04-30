@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Layers, Sparkles, Check, Trash2, RefreshCw, Edit2, Plus, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Layers, Sparkles, Check, Trash2, RefreshCw, Edit2, Plus, X, ChevronDown, ChevronRight, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
