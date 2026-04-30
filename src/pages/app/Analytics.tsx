@@ -1555,7 +1555,7 @@ export function CompareView({ courses }: { courses: Course[] }) {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartTooltip content={<CompareBandTooltip namesByCourseBand={namesByCourseBand} split={split} />} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {split === "by_level" ? (
                   <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" />
