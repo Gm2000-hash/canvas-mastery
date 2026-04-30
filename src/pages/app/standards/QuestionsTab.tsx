@@ -39,7 +39,7 @@ type Course = { id: string; name: string };
 
 type QuestionAnswer = { text: string | null; html: string | null; weight: number | null };
 
-type QuestionRow = {
+export type QuestionRow = {
   id: string;
   position: number | null;
   question_text: string | null;
