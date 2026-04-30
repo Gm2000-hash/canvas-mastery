@@ -216,41 +216,57 @@ export default function AssignmentGroups() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight flex items-center gap-2">
-            <Layers className="h-7 w-7" /> Class Groups
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-2xl">
-            Group your classes (e.g. all sections of "8th Grade Science A"), then have AI find equivalent
-            assessments <em>within</em> each group. This keeps matches scoped to the right prep — Science A pre-tests
-            won't get matched against Science B.
-          </p>
+    <div className="space-y-10 pb-12">
+      <header className="border-b pb-8">
+        <div className="flex items-start justify-between gap-6 flex-wrap">
+          <div className="max-w-2xl space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium tracking-wide uppercase">
+              <Layers className="h-3.5 w-3.5" /> Class Groups
+            </div>
+            <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">
+              Group sections.<br />
+              <span className="text-muted-foreground">Match assessments.</span>
+            </h1>
+            <p className="text-muted-foreground text-base leading-relaxed">
+              Bundle your class sections (e.g. all periods of <span className="text-foreground font-medium">8th Grade Science A</span>),
+              then let AI find equivalent assessments <em>within</em> each group — keeping matches scoped to the right prep.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={loadAll} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> New class group</Button>
+              </DialogTrigger>
+              <ClassGroupDialog
+                courses={courses}
+                onClose={() => setCreateOpen(false)}
+                onSaved={() => { setCreateOpen(false); loadAll(); }}
+              />
+            </Dialog>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadAll} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> New class group</Button>
-            </DialogTrigger>
-            <ClassGroupDialog
-              courses={courses}
-              onClose={() => setCreateOpen(false)}
-              onSaved={() => { setCreateOpen(false); loadAll(); }}
-            />
-          </Dialog>
-        </div>
-      </div>
+      </header>
 
       {loading && !classGroups && <Skeleton className="h-32" />}
       {classGroups && classGroups.length === 0 && (
-        <Card><CardContent className="py-10 text-center text-muted-foreground text-sm">
-          You haven't created any class groups yet. Create one to start grouping equivalent assessments across sections.
-        </CardContent></Card>
+        <Card className="border-dashed">
+          <CardContent className="py-16 text-center space-y-3">
+            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Layers className="h-6 w-6 text-primary" />
+            </div>
+            <div className="text-sm text-muted-foreground max-w-sm mx-auto">
+              You haven't created any class groups yet. Create one to start grouping equivalent assessments across sections.
+            </div>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Create your first group
+            </Button>
+          </CardContent>
+        </Card>
       )}
+
 
       <div className="space-y-3">
         {classGroups?.map((cg) => {
