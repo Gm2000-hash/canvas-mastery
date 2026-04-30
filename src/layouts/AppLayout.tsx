@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRightLeft, BarChart3, BookMarked, Building2, CheckCheck, GraduationCap, GripVertical, History, Layers, LayoutDashboard, Library, Menu, Settings as SettingsIcon, Shield } from "lucide-react";
+import { ArrowRightLeft, BarChart3, BookMarked, Building2, CheckCheck, GraduationCap, GripVertical, History, Layers, LayoutDashboard, Menu, Settings as SettingsIcon, Shield } from "lucide-react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
@@ -17,7 +17,7 @@ const nav = [
   { to: "/app/assignment-groups", label: "Class Groups", icon: Layers },
   { to: "/app/review", label: "Tag Review", icon: CheckCheck },
   { to: "/app/standards", label: "Standards", icon: BookMarked },
-  { to: "/app/question-bank", label: "Question Bank", icon: Library },
+  
   { to: "/app/student-history", label: "Student History", icon: History },
   { to: "/app/department", label: "Department", icon: Building2 },
   { to: "/app/mastery-connect", label: "Mastery Connect", icon: ArrowRightLeft },

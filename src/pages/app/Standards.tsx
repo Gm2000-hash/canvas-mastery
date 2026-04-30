@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,9 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Trash2, BookMarked } from "lucide-react";
+import { Plus, Trash2, BookMarked, Library } from "lucide-react";
 import { FRAMEWORKS, getFramework, SUBJECTS, GRADES, STATES, type FrameworkId } from "@/lib/frameworks";
+import QuestionsTab from "./standards/QuestionsTab";
 
 type Standard = {
   id: string;
@@ -24,6 +27,45 @@ type Standard = {
 };
 
 export default function Standards() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "questions" ? "questions" : "library";
+  const setTab = (v: string) => {
+    setParams((p) => {
+      if (v === "library") p.delete("tab"); else p.set("tab", v);
+      return p;
+    }, { replace: true });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Standards library</h1>
+        <p className="text-muted-foreground">
+          Browse standards by framework and explore the quiz questions tagged to each one.
+        </p>
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="library" className="gap-2">
+            <BookMarked className="h-4 w-4" /> Library
+          </TabsTrigger>
+          <TabsTrigger value="questions" className="gap-2">
+            <Library className="h-4 w-4" /> Questions
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="library" className="mt-0">
+          <StandardsLibraryTab />
+        </TabsContent>
+        <TabsContent value="questions" className="mt-0">
+          <QuestionsTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function StandardsLibraryTab() {
   const [rows, setRows] = useState<Standard[]>([]);
   const [filter, setFilter] = useState("");
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
@@ -102,13 +144,10 @@ export default function Standards() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Standards library</h1>
-          <p className="text-muted-foreground">
-            Mix state-specific standards (e.g. Idaho Science) and national frameworks (e.g. NGSS, Common Core) per subject.
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <p className="text-sm text-muted-foreground">
+          Mix state-specific standards (e.g. Idaho Science) and national frameworks (e.g. NGSS, Common Core) per subject.
+        </p>
         <AddStandardDialog defaults={profile} onAdded={load} />
       </div>
 

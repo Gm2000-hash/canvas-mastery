@@ -15,7 +15,7 @@ import Standards from "./pages/app/Standards";
 import MasteryDebug from "./pages/app/MasteryDebug";
 import Review from "./pages/app/Review";
 import Analytics from "./pages/app/Analytics";
-import QuestionBank from "./pages/app/QuestionBank";
+
 import StudentHistory from "./pages/app/StudentHistory";
 import Admin from "./pages/app/Admin";
 import AssignmentGroups from "./pages/app/AssignmentGroups";
@@ -45,7 +45,8 @@ const App = () => (
             <Route path="assignment-groups" element={<AssignmentGroups />} />
             <Route path="review" element={<Review />} />
             <Route path="standards" element={<Standards />} />
-            <Route path="question-bank" element={<QuestionBank />} />
+            <Route path="question-bank" element={<Navigate to="/app/standards?tab=questions" replace />} />
+            
             <Route path="mastery/debug" element={<MasteryDebug />} />
             <Route path="student-history" element={<StudentHistory />} />
             <Route path="settings" element={<Settings />} />
