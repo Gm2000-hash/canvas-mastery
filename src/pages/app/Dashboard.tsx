@@ -226,7 +226,7 @@ function AssignmentsList({
             <h2 className="font-display text-xl text-primary">{title}</h2>
           </div>
         </div>
-        <Link to="/app/assignments">
+        <Link to="/app/classes">
           <Button variant="ghost" size="sm" className="h-8 -mr-2 rounded-full">
             All <ArrowRight className="h-3 w-3 ml-1" />
           </Button>
