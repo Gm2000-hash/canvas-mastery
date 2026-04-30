@@ -1285,7 +1285,7 @@ export function CompareView({ courses }: { courses: Course[] }) {
   const canQuery = selected.length > 0 && !!targetId;
 
   useEffect(() => {
-    if (!canQuery) { setRows(null); return; }
+    if (!canQuery) { setRows(null); setStudentRows([]); return; }
     setLoading(true);
     // assignmentId is encoded as "assignment:<uuid>" or "group:<uuid>"
     let _assignment_id: string | null = null;
@@ -1295,15 +1295,19 @@ export function CompareView({ courses }: { courses: Course[] }) {
       else if (assignmentId.startsWith("assignment:")) _assignment_id = assignmentId.slice("assignment:".length);
       else _assignment_id = assignmentId; // fallback
     }
-    supabase.rpc("analytics_compare_classes" as any, {
+    const args = {
       _course_ids: selected,
       _assignment_id,
       _standard_id: scope === "standard" ? standardId : null,
       _assignment_group_id,
-    }).then(({ data, error }) => {
+    };
+    Promise.all([
+      supabase.rpc("analytics_compare_classes" as any, args),
+      supabase.rpc("analytics_compare_classes_students" as any, args),
+    ]).then(([agg, students]) => {
       setLoading(false);
-      if (error) { setRows([]); return; }
-      setRows(((data as any) ?? []) as CompareRow[]);
+      if (agg.error) { setRows([]); } else { setRows(((agg.data as any) ?? []) as CompareRow[]); }
+      if (students.error) { setStudentRows([]); } else { setStudentRows(((students.data as any) ?? []) as StudentBandRow[]); }
     });
   }, [canQuery, selected, scope, assignmentId, standardId]);
 
