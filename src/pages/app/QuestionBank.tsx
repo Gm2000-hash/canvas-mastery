@@ -861,13 +861,24 @@ function QuestionPerformanceChart({ questionId }: { questionId: string }) {
     (async () => {
       const { data, error } = await supabase
         .from("question_responses")
-        .select("points, points_possible, student_id, students(name)")
+        .select("points, points_possible, student_id")
         .eq("question_id", questionId);
       if (cancelled) return;
       if (error || !data) {
         setNamesByBand({ basic: [], proficient: [], advanced: [] });
         setLoading(false);
         return;
+      }
+      // Fetch student names in a second query (no FK between question_responses
+      // and students, so PostgREST embedding isn't available here).
+      const studentIds = Array.from(new Set((data as any[]).map((r) => r.student_id).filter(Boolean)));
+      const nameById = new Map<string, string>();
+      if (studentIds.length > 0) {
+        const { data: studs } = await supabase
+          .from("students")
+          .select("id, name")
+          .in("id", studentIds);
+        for (const s of (studs as any[] | null) ?? []) nameById.set(s.id, s.name);
       }
       const buckets: Record<QBBandKey, string[]> = { basic: [], proficient: [], advanced: [] };
       for (const r of data as any[]) {
@@ -876,7 +887,7 @@ function QuestionPerformanceChart({ questionId }: { questionId: string }) {
         if (!pp || pp <= 0) continue;
         const pct = pts / pp;
         const band: QBBandKey = pct < 0.6 ? "basic" : pct < 0.8 ? "proficient" : "advanced";
-        const name = r.students?.name ?? "Unknown";
+        const name = nameById.get(r.student_id) ?? "Unknown";
         buckets[band].push(name);
       }
       for (const k of Object.keys(buckets) as QBBandKey[]) {
