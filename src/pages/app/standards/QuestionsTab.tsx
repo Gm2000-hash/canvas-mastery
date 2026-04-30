@@ -505,7 +505,7 @@ export default function QuestionsTab() {
       )}
 
       {/* Questions popout dialog */}
-      <Dialog open={!!selectedStandardId} onOpenChange={(open) => !open && setSelectedStandardId(null)}>
+      <Dialog open={!!selectedStandardId} onOpenChange={(open) => !open && clearSelectedStandard()}>
         <DialogContent
           className="max-w-4xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col"
           style={{ fontFamily: "'Nunito Sans', system-ui, sans-serif" }}
