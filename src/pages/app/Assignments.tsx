@@ -225,6 +225,18 @@ export default function Assignments() {
           ))}
         </div>
       )}
+
+      {suggestionCount > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-accent/30">
+          <Layers className="h-4 w-4 text-primary shrink-0" />
+          <div className="text-sm flex-1">
+            <span className="font-medium">{suggestionCount}</span> assignment{suggestionCount === 1 ? "" : "s"} look like duplicates across multiple classes (e.g., the same quiz given to two sections).
+          </div>
+          <Link to="/app/assignment-groups">
+            <Button size="sm" variant="default">Review groups</Button>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
