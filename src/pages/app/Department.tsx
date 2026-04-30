@@ -74,6 +74,37 @@ export default function Department() {
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [joiningSubject, setJoiningSubject] = useState<string | null>(null);
+  const [leavingSubject, setLeavingSubject] = useState<string | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState<string | null>(null);
+
+  async function leaveDepartment(s: string) {
+    setLeavingSubject(s);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) { toast.error("Please sign in"); return; }
+      const { error } = await supabase
+        .from("teacher_disciplines")
+        .delete()
+        .eq("teacher_id", u.user.id)
+        .eq("subject", s);
+      if (error) { toast.error(error.message); return; }
+      // Clear default subject if it matches
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("default_subject")
+        .eq("id", u.user.id)
+        .maybeSingle();
+      if (profile?.default_subject === s) {
+        await supabase.from("profiles").update({ default_subject: null }).eq("id", u.user.id);
+      }
+      toast.success(`Left ${s} department`);
+      if (subject === s) setSubject("");
+      await reloadSubjects();
+    } finally {
+      setLeavingSubject(null);
+      setConfirmLeave(null);
+    }
+  }
 
   async function reloadSubjects(autoSelect: string | null = null) {
     setLoadingSubjects(true);
