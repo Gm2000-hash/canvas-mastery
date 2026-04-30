@@ -200,6 +200,15 @@ export default function Assignments() {
             <FileUp className="h-4 w-4 mr-2" />
             Import CSV
           </Button>
+          <Button
+            variant="outline"
+            onClick={regenerateAll}
+            disabled={regenAll || !assignments || assignments.length === 0}
+            title="Clear unconfirmed AI tags on all assignments and re-ask AI"
+          >
+            <Sparkles className={`h-4 w-4 mr-2 ${regenAll ? "animate-pulse" : ""}`} />
+            {regenAll ? "Regenerating…" : "Regenerate all"}
+          </Button>
           <Button variant="outline" onClick={recompute} disabled={recomputing}>
             <RefreshCw className={`h-4 w-4 mr-2 ${recomputing ? "animate-spin" : ""}`} />
             Recompute mastery
