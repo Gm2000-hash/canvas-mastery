@@ -269,11 +269,22 @@ export default function Department() {
               {loadingSubjects ? (
                 <Skeleton className="h-12 w-full mt-3" />
               ) : enabled ? (
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                  <Stat n={r!.teacher_count} l="Teachers" />
-                  <Stat n={r!.class_count} l="Classes" />
-                  <Stat n={r!.student_count} l="Students" />
-                </div>
+                <>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                    <Stat n={r!.teacher_count} l="Teachers" />
+                    <Stat n={r!.class_count} l="Classes" />
+                    <Stat n={r!.student_count} l="Students" />
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="w-full rounded-full mt-3 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => { e.stopPropagation(); setConfirmLeave(s); }}
+                  >
+                    <LogOut className="h-3.5 w-3.5 mr-1" /> Leave
+                  </Button>
+                </>
+
               ) : (
                 <div className="mt-3 space-y-2">
                   <p className="text-xs text-muted-foreground">
