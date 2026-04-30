@@ -14,8 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      assessment_match_suggestions: {
+        Row: {
+          applied_group_id: string | null
+          assignment_ids: string[]
+          class_group_id: string
+          confidence: number | null
+          created_at: string
+          dismissed_at: string | null
+          id: string
+          rationale: string | null
+          suggested_name: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          applied_group_id?: string | null
+          assignment_ids: string[]
+          class_group_id: string
+          confidence?: number | null
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          rationale?: string | null
+          suggested_name: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          applied_group_id?: string | null
+          assignment_ids?: string[]
+          class_group_id?: string
+          confidence?: number | null
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          rationale?: string | null
+          suggested_name?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_match_suggestions_applied_group_id_fkey"
+            columns: ["applied_group_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_match_suggestions_class_group_id_fkey"
+            columns: ["class_group_id"]
+            isOneToOne: false
+            referencedRelation: "class_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assignment_groups: {
         Row: {
+          class_group_id: string | null
           confirmed: boolean
           created_at: string
           grade: string | null
@@ -27,6 +85,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          class_group_id?: string | null
           confirmed?: boolean
           created_at?: string
           grade?: string | null
@@ -38,6 +97,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          class_group_id?: string | null
           confirmed?: boolean
           created_at?: string
           grade?: string | null
@@ -48,7 +108,15 @@ export type Database = {
           teacher_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "assignment_groups_class_group_id_fkey"
+            columns: ["class_group_id"]
+            isOneToOne: false
+            referencedRelation: "class_groups"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       assignment_standards: {
         Row: {
@@ -189,6 +257,59 @@ export type Database = {
           base_url?: string
           created_at?: string
           last_sync_at?: string | null
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      class_group_courses: {
+        Row: {
+          class_group_id: string
+          course_id: string
+          created_at: string
+          teacher_id: string
+        }
+        Insert: {
+          class_group_id: string
+          course_id: string
+          created_at?: string
+          teacher_id: string
+        }
+        Update: {
+          class_group_id?: string
+          course_id?: string
+          created_at?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_group_courses_class_group_id_fkey"
+            columns: ["class_group_id"]
+            isOneToOne: false
+            referencedRelation: "class_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_groups: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
           teacher_id?: string
           updated_at?: string
         }
@@ -1257,6 +1378,19 @@ export type Database = {
         Args: { _assignment_ids: string[]; _group_id?: string; _name: string }
         Returns: string
       }
+      apply_assignment_group_in_class_group: {
+        Args: {
+          _assignment_ids: string[]
+          _class_group_id: string
+          _group_id?: string
+          _name: string
+        }
+        Returns: string
+      }
+      create_class_group: {
+        Args: { _course_ids: string[]; _name: string }
+        Returns: string
+      }
       create_invitation: {
         Args: { _expires_at?: string; _note?: string }
         Returns: {
@@ -1431,6 +1565,20 @@ export type Database = {
           total_submissions: number
         }[]
       }
+      list_class_groups: {
+        Args: never
+        Returns: {
+          assessment_group_count: number
+          course_count: number
+          course_ids: string[]
+          course_names: string[]
+          created_at: string
+          id: string
+          name: string
+          pending_suggestion_count: number
+          updated_at: string
+        }[]
+      }
       mastery_debug: {
         Args: { _standard_id: string; _student_id: string }
         Returns: {
@@ -1546,8 +1694,25 @@ export type Database = {
           suggested_name: string
         }[]
       }
+      suggest_assignment_groups_in_class_group: {
+        Args: { _class_group_id: string }
+        Returns: {
+          assignment_ids: string[]
+          cluster_key: string
+          course_count: number
+          course_ids: string[]
+          course_names: string[]
+          kind: Database["public"]["Enums"]["assignment_kind"]
+          member_count: number
+          suggested_name: string
+        }[]
+      }
       unlink_assignment_from_group: {
         Args: { _assignment_id: string }
+        Returns: boolean
+      }
+      update_class_group: {
+        Args: { _course_ids: string[]; _id: string; _name: string }
         Returns: boolean
       }
     }

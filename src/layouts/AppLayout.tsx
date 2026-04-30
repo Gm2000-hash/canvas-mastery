@@ -13,7 +13,7 @@ const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/app/classes", label: "Classes", icon: GraduationCap },
   { to: "/app/assignments", label: "Assignments", icon: ListChecks },
-  { to: "/app/assignment-groups", label: "Assignment Groups", icon: Layers },
+  { to: "/app/assignment-groups", label: "Class Groups", icon: Layers },
   { to: "/app/review", label: "Tag Review", icon: CheckCheck },
   { to: "/app/standards", label: "Standards", icon: BookMarked },
   { to: "/app/question-bank", label: "Question Bank", icon: Library },
