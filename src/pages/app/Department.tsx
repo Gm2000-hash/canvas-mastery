@@ -483,6 +483,28 @@ export default function Department() {
           </Card>
         </div>
       )}
+
+      <AlertDialog open={!!confirmLeave} onOpenChange={(o) => !o && setConfirmLeave(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave {confirmLeave} department?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll stop seeing collective {confirmLeave} analytics and your classes will no longer
+              be included in peers' department views for this subject. You can rejoin anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!leavingSubject}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!!leavingSubject}
+              onClick={(e) => { e.preventDefault(); if (confirmLeave) leaveDepartment(confirmLeave); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {leavingSubject ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Leaving…</> : "Leave department"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
