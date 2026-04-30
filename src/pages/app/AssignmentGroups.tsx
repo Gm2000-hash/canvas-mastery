@@ -170,6 +170,31 @@ export default function AssignmentGroups() {
     loadAll();
   }
 
+  async function confirmAllSuggestions(cg: ClassGroup) {
+    const list = suggestions[cg.id] ?? [];
+    if (list.length === 0) return;
+    if (!confirm(`Approve all ${list.length} suggested equivalent assessments for "${cg.name}"?`)) return;
+    let ok = 0;
+    let fail = 0;
+    for (const s of list) {
+      const { error } = await supabase.rpc("apply_assignment_group_in_class_group" as any, {
+        _class_group_id: cg.id,
+        _name: s.suggested_name,
+        _assignment_ids: s.assignment_ids,
+        _group_id: null,
+      });
+      if (error) { fail++; continue; }
+      await supabase
+        .from("assessment_match_suggestions")
+        .update({ dismissed_at: new Date().toISOString() })
+        .eq("id", s.id);
+      ok++;
+    }
+    if (ok > 0) toast.success(`Approved ${ok} suggestion${ok === 1 ? "" : "s"}${fail ? ` (${fail} failed)` : ""}`);
+    if (ok === 0 && fail > 0) toast.error("Failed to approve suggestions");
+    loadAll();
+  }
+
   async function deleteAssessmentGroup(groupId: string) {
     if (!confirm("Delete this equivalent-assessment grouping? Member assignments will be ungrouped (no data lost).")) return;
     const { error } = await supabase.from("assignment_groups").delete().eq("id", groupId);
@@ -272,8 +297,13 @@ export default function AssignmentGroups() {
                   {/* Suggestions */}
                   {groupSugs.length > 0 && (
                     <div>
-                      <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-                        <Sparkles className="h-3 w-3" /> AI suggestions
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                          <Sparkles className="h-3 w-3" /> AI suggestions ({groupSugs.length})
+                        </div>
+                        <Button size="sm" variant="outline" className="h-7" onClick={() => confirmAllSuggestions(cg)}>
+                          <Check className="h-3.5 w-3.5 mr-1" /> Approve all
+                        </Button>
                       </div>
                       <ul className="space-y-2">
                         {groupSugs.map((s) => (
