@@ -67,6 +67,7 @@ export default function AssignmentGroups() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ClassGroup | null>(null);
+  const [manualPickerCg, setManualPickerCg] = useState<ClassGroup | null>(null);
 
   async function loadAll() {
     setLoading(true);
