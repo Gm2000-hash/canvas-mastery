@@ -714,7 +714,37 @@ function TreeView({
 
 function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; onClose: () => void }) {
   const [retagging, setRetagging] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [revealLoading, setRevealLoading] = useState(false);
+  const [revealedNames, setRevealedNames] = useState<Record<string, string>>({});
+
+  // Reset reveal state whenever a different question is opened.
+  useEffect(() => {
+    setRevealed(false);
+    setRevealedNames({});
+  }, [question?.id]);
+
   if (!question) return null;
+
+  async function revealNames(reason?: string) {
+    if (!question) return false;
+    setRevealLoading(true);
+    const { data, error } = await supabase.rpc("reveal_question_identities", {
+      _question_id: question.id,
+      _reason: reason ?? null,
+    });
+    setRevealLoading(false);
+    if (error) { toast.error(error.message); return false; }
+    const map: Record<string, string> = {};
+    for (const r of (data as any[]) ?? []) map[r.student_id] = r.real_name;
+    setRevealedNames(map);
+    setRevealed(true);
+    return true;
+  }
+  function hideNames() {
+    setRevealed(false);
+    setRevealedNames({});
+  }
   async function retagAi() {
     if (!question) return;
     setRetagging(true);
