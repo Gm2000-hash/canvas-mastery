@@ -313,13 +313,25 @@ export default function Department() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">Other:</span>
           {rows.filter((r) => !FEATURED.includes(r.subject)).map((r) => (
-            <button
+            <span
               key={r.subject}
-              onClick={() => setSubject(r.subject)}
-              className={`text-xs px-3 py-1 rounded-full border ${subject === r.subject ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+              className={`inline-flex items-center text-xs rounded-full border ${subject === r.subject ? "bg-primary text-primary-foreground border-primary" : "bg-background"}`}
             >
-              {r.subject}
-            </button>
+              <button
+                onClick={() => setSubject(r.subject)}
+                className={`px-3 py-1 rounded-l-full ${subject === r.subject ? "" : "hover:bg-muted"}`}
+              >
+                {r.subject}
+              </button>
+              <button
+                onClick={() => setConfirmLeave(r.subject)}
+                title={`Leave ${r.subject}`}
+                aria-label={`Leave ${r.subject}`}
+                className={`px-2 py-1 rounded-r-full border-l ${subject === r.subject ? "border-primary-foreground/30 hover:bg-primary-foreground/10" : "border-border hover:bg-destructive/10 hover:text-destructive"}`}
+              >
+                ×
+              </button>
+            </span>
           ))}
         </div>
       )}
