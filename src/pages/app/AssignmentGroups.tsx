@@ -343,17 +343,17 @@ export default function AssignmentGroups() {
                   {/* Suggestions */}
                   {groupSugs.length > 0 && (
                     <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                          <Sparkles className="h-3 w-3" /> AI suggestions ({groupSugs.length})
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <div className="text-xs uppercase tracking-wider text-amber-700 dark:text-amber-300 flex items-center gap-1.5 font-semibold">
+                          <Sparkles className="h-3.5 w-3.5" /> AI suggestions · {groupSugs.length}
                         </div>
-                        <Button size="sm" variant="outline" className="h-7" onClick={() => confirmAllSuggestions(cg)}>
+                        <Button size="sm" variant="outline" className="h-7 bg-background" onClick={() => confirmAllSuggestions(cg)}>
                           <Check className="h-3.5 w-3.5 mr-1" /> Approve all
                         </Button>
                       </div>
                       <ul className="space-y-2">
                         {groupSugs.map((s) => (
-                          <li key={s.id} className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                          <li key={s.id} className="rounded-md border bg-background p-3 transition-colors hover:border-amber-500/50">
                             <div className="flex items-start justify-between gap-3 flex-wrap">
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-sm">{s.suggested_name}</div>
