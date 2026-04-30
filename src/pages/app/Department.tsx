@@ -63,6 +63,62 @@ export default function Department() {
   const [standards, setStandards] = useState<StandardRow[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [joiningSubject, setJoiningSubject] = useState<string | null>(null);
+
+  async function reloadSubjects(autoSelect: string | null = null) {
+    setLoadingSubjects(true);
+    const { data } = await supabase.rpc("department_subjects", { _school_year: schoolYear });
+    const list = (data as SubjectRow[]) ?? [];
+    setRows(list);
+    setLoadingSubjects(false);
+    if (autoSelect && list.some((r) => r.subject === autoSelect)) {
+      setSubject(autoSelect);
+    }
+  }
+
+  async function joinDepartment(s: string) {
+    setJoiningSubject(s);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) { toast.error("Please sign in"); return; }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("state, default_grade")
+        .eq("id", u.user.id)
+        .maybeSingle();
+      const grade = profile?.default_grade?.trim() || "";
+      const state = profile?.state?.trim() || "";
+      if (!grade) {
+        toast.error("Set a default grade in Settings first, then try again.");
+        return;
+      }
+      const { data: existing } = await supabase
+        .from("teacher_disciplines")
+        .select("id")
+        .eq("teacher_id", u.user.id)
+        .eq("subject", s)
+        .eq("grade", grade)
+        .eq("state", state)
+        .maybeSingle();
+      if (!existing) {
+        const { error } = await supabase.from("teacher_disciplines").insert({
+          teacher_id: u.user.id,
+          subject: s,
+          grade,
+          state,
+          framework: "CUSTOM",
+          is_default: false,
+        });
+        if (error) { toast.error(error.message); return; }
+      }
+      // Persist as default subject so it carries across the app
+      await supabase.from("profiles").upsert({ id: u.user.id, default_subject: s });
+      toast.success(`Joined ${s} department`);
+      await reloadSubjects(s);
+    } finally {
+      setJoiningSubject(null);
+    }
+  }
 
   // Load subject participation
   useEffect(() => {
