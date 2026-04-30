@@ -33,14 +33,6 @@ export default function Standards() {
   const setTab = (v: string) => {
     setParams((p) => {
       if (v === "library") p.delete("tab"); else p.set("tab", v);
-      p.delete("std");
-      return p;
-    });
-  };
-  const openStandardInQuestions = (standardId: string) => {
-    setParams((p) => {
-      p.set("tab", "questions");
-      p.set("std", standardId);
       return p;
     });
   };
@@ -64,7 +56,7 @@ export default function Standards() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="library" className="mt-0">
-          <StandardsLibraryTab onOpenQuestions={openStandardInQuestions} />
+          <StandardsLibraryTab />
         </TabsContent>
         <TabsContent value="questions" className="mt-0">
           <QuestionsTab />
@@ -74,7 +66,7 @@ export default function Standards() {
   );
 }
 
-function StandardsLibraryTab({ onOpenQuestions }: { onOpenQuestions: (standardId: string) => void }) {
+function StandardsLibraryTab() {
   const [rows, setRows] = useState<Standard[]>([]);
   const [filter, setFilter] = useState("");
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
