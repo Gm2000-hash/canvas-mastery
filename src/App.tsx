@@ -41,7 +41,7 @@ const App = () => (
             <Route path="classes/:courseId/assignments" element={<Assignments />} />
             <Route path="courses" element={<Navigate to="/app/classes" replace />} />
             <Route path="analytics" element={<Navigate to="/app/classes" replace />} />
-            <Route path="assignments" element={<Assignments />} />
+            <Route path="assignments" element={<Navigate to="/app/classes" replace />} />
             <Route path="assignment-groups" element={<AssignmentGroups />} />
             <Route path="review" element={<Review />} />
             <Route path="standards" element={<Standards />} />
