@@ -721,7 +721,7 @@ function TreeView({
   );
 }
 
-function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; onClose: () => void }) {
+export function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; onClose: () => void }) {
   const [retagging, setRetagging] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [revealLoading, setRevealLoading] = useState(false);
