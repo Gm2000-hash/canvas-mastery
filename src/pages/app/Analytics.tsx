@@ -1610,3 +1610,92 @@ export function CompareView({ courses }: { courses: Course[] }) {
     </Card>
   );
 }
+
+// Custom tooltip for the Compare classes bar chart. When hovering a band bar
+// (Basic / Proficient / Advanced), it lists the students that fall in that band
+// for the hovered class. For "by_level" / "all" splits it lists across all
+// selected classes. For the "by_class" Avg % bar it just shows the value.
+function CompareBandTooltip({
+  active,
+  payload,
+  label,
+  namesByCourseBand,
+  split,
+}: any) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const MAX_NAMES = 12;
+  const bandFromKey = (k: string) => BANDS.find((b) => b.key === k);
+  const bandFromLabel = (lbl: string) => BANDS.find((b) => b.label === lbl);
+
+  const renderNames = (names: string[]) => {
+    const sorted = [...names].sort((a, b) => a.localeCompare(b));
+    const shown = sorted.slice(0, MAX_NAMES);
+    const extra = sorted.length - shown.length;
+    return (
+      <ul className="mt-1 space-y-0.5 max-w-[260px]">
+        {shown.map((n, i) => (
+          <li key={i} className="text-xs leading-tight truncate">• {n}</li>
+        ))}
+        {extra > 0 && <li className="text-xs text-muted-foreground">+{extra} more</li>}
+      </ul>
+    );
+  };
+
+  return (
+    <div className="rounded-md border bg-popover/95 backdrop-blur px-3 py-2 shadow-md text-popover-foreground">
+      <div className="text-xs font-semibold mb-1">{label}</div>
+      {payload.map((p: any, idx: number) => {
+        const dataKey = p.dataKey as string;
+        const value = p.value;
+
+        // Avg % bar
+        if (dataKey === "avg_pct") {
+          return (
+            <div key={idx} className="text-xs">
+              <span className="inline-block w-2 h-2 rounded-sm mr-1.5 align-middle" style={{ background: p.color || p.fill }} />
+              Avg %: <span className="tabular-nums font-medium">{value}%</span>
+            </div>
+          );
+        }
+
+        // by_level: x-axis label is band label, dataKey is "count"
+        if (dataKey === "count") {
+          const band = bandFromLabel(label);
+          const names = band ? namesByCourseBand.byBand[band.key] : [];
+          return (
+            <div key={idx}>
+              <div className="text-xs">
+                <span className="inline-block w-2 h-2 rounded-sm mr-1.5 align-middle" style={{ background: band?.color || p.color }} />
+                <span className="font-medium" style={{ color: band?.color }}>{band?.short ?? label}</span>
+                : <span className="tabular-nums">{value}</span>
+              </div>
+              {names && names.length > 0 && renderNames(names)}
+            </div>
+          );
+        }
+
+        // band bar: dataKey = below/approaching/mastered
+        const band = bandFromKey(dataKey);
+        if (!band) return null;
+        let names: string[] = [];
+        if (split === "all") {
+          names = namesByCourseBand.byBand[band.key] ?? [];
+        } else {
+          // by_class is rendered as Avg %, so we only get here for class_x_level
+          names = namesByCourseBand.byCourse.get(label)?.[band.key] ?? [];
+        }
+        return (
+          <div key={idx} className="mt-1 first:mt-0">
+            <div className="text-xs">
+              <span className="inline-block w-2 h-2 rounded-sm mr-1.5 align-middle" style={{ background: band.color }} />
+              <span className="font-medium" style={{ color: band.color }}>{band.short}</span>
+              : <span className="tabular-nums">{value}</span>
+            </div>
+            {names.length > 0 && renderNames(names)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
