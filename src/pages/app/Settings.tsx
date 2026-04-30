@@ -154,8 +154,16 @@ export default function Settings() {
     }
 
     setSavingProfile(false);
-    // Notify other pages (e.g. Dashboard) to refresh their cached profile.
-    window.dispatchEvent(new Event("profile:updated"));
+    // Push the new values into the shared profile store so every subscribed
+    // page (Dashboard, future pages, etc.) re-renders immediately.
+    patchProfile({
+      display_name: displayName.trim() || null,
+      state: state || null,
+      default_subject: subject || null,
+      default_grade: grade || null,
+    });
+    // Re-fetch in the background to confirm what the server stored.
+    refreshProfile();
     toast.success(deptJoined ? `Profile saved · joined ${subject} department` : "Profile saved");
   }
 
