@@ -313,12 +313,14 @@ function StandardsTab({ teacherId, standards, maps, onChange, subjectFilter }: {
 }
 
 /* ---------- Assessments ---------- */
-function AssessmentsTab({ teacherId, assignments, courses, maps, onChange }: {
+function AssessmentsTab({ teacherId, assignments, courses, maps, onChange, subjectFilter, assignmentSubjects }: {
   teacherId: string;
   assignments: Assignment[];
   courses: Course[];
   maps: Record<string, AssessMap>;
   onChange: (m: Record<string, AssessMap>) => void;
+  subjectFilter: string;
+  assignmentSubjects: Record<string, string[]>;
 }) {
   const [courseFilter, setCourseFilter] = useState<string>("all");
   const save = useDebouncedSave<any>("mc_assessment_mappings", ["teacher_id", "assignment_id"]);
@@ -333,17 +335,24 @@ function AssessmentsTab({ teacherId, assignments, courses, maps, onChange }: {
     });
   };
 
-  const filtered = courseFilter === "all" ? assignments : assignments.filter(a => a.course_id === courseFilter);
+  const subjectScoped = subjectFilter === "all"
+    ? assignments
+    : assignments.filter(a => (assignmentSubjects[a.id] ?? []).includes(subjectFilter));
+  const filtered = courseFilter === "all" ? subjectScoped : subjectScoped.filter(a => a.course_id === courseFilter);
   const courseName = (id: string) => courses.find(c => c.id === id)?.name ?? "—";
   const mapped = Object.values(maps).filter(m => m.mc_assessment_id).length;
+  const subjLabel = subjectFilter === "all" ? "" : ` (${subjectFilter})`;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <CardTitle>Assessment mappings</CardTitle>
-            <CardDescription>{mapped} of {assignments.length} Canvas assignments mapped.</CardDescription>
+            <CardTitle>Assessment mappings{subjLabel}</CardTitle>
+            <CardDescription>
+              Showing {filtered.length} of {assignments.length} assignments · {mapped} mapped overall.
+              {subjectFilter !== "all" && " Only assignments tagged to standards in this subject are shown."}
+            </CardDescription>
           </div>
           <Select value={courseFilter} onValueChange={setCourseFilter}>
             <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
