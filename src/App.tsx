@@ -46,7 +46,7 @@ const App = () => (
             <Route path="review" element={<Review />} />
             <Route path="standards" element={<Standards />} />
             <Route path="question-bank" element={<Navigate to="/app/standards?tab=questions" replace />} />
-            <Route path="question-bank" element={<QuestionBank />} />
+            
             <Route path="mastery/debug" element={<MasteryDebug />} />
             <Route path="student-history" element={<StudentHistory />} />
             <Route path="settings" element={<Settings />} />
