@@ -207,15 +207,18 @@ export default function Department() {
           const Icon = ICONS[s] ?? Atom;
           const enabled = !!r;
           const active = subject === s;
+          const joining = joiningSubject === s;
           return (
-            <button
+            <div
               key={s}
+              role={enabled ? "button" : undefined}
+              tabIndex={enabled ? 0 : -1}
               onClick={() => enabled && setSubject(s)}
-              disabled={!enabled}
+              onKeyDown={(e) => { if (enabled && (e.key === "Enter" || e.key === " ")) setSubject(s); }}
               className={`text-left rounded-xl border p-4 transition-all ${
                 active ? "border-primary ring-2 ring-primary/30 bg-primary/5"
-                       : enabled ? "hover:border-primary/50 hover:shadow-soft"
-                                 : "opacity-50 cursor-not-allowed"
+                       : enabled ? "hover:border-primary/50 hover:shadow-soft cursor-pointer"
+                                 : "bg-muted/30"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -231,11 +234,24 @@ export default function Department() {
                   <Stat n={r!.student_count} l="Students" />
                 </div>
               ) : (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Add this subject in <Link to="/app/settings" className="text-primary underline">Settings</Link>.
-                </p>
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    You're not in this department yet.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full rounded-full"
+                    disabled={joining}
+                    onClick={(e) => { e.stopPropagation(); joinDepartment(s); }}
+                  >
+                    {joining
+                      ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Joining…</>
+                      : <><Plus className="h-3.5 w-3.5 mr-1" /> Join {s}</>}
+                  </Button>
+                </div>
               )}
-            </button>
+            </div>
           );
         })}
       </div>
