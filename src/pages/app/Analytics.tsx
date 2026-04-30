@@ -1372,7 +1372,7 @@ export function CompareView({ courses }: { courses: Course[] }) {
   }, [studentRows]);
 
   function exportCsv() {
-    const header = ["Class", "n", "Avg %", "Below", "Approaching", "Mastered"];
+    const header = ["Class", "n", "Avg %", "Basic", "Proficient", "Advanced"];
     const lines = [header.join(",")];
     perCourse.forEach((c) => {
       lines.push([
