@@ -226,7 +226,7 @@ function AssignmentsList({
             <h2 className="font-display text-xl text-primary">{title}</h2>
           </div>
         </div>
-        <Link to="/app/assignments">
+        <Link to="/app/classes">
           <Button variant="ghost" size="sm" className="h-8 -mr-2 rounded-full">
             All <ArrowRight className="h-3 w-3 ml-1" />
           </Button>
@@ -242,7 +242,7 @@ function AssignmentsList({
             <li key={a.id} className="py-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <Link
-                  to={`/app/assignments?course=${a.course_id}`}
+                  to={`/app/classes/${a.course_id}/assignments`}
                   className="text-sm font-medium truncate block hover:underline"
                 >
                   {a.name}

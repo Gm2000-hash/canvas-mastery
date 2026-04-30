@@ -154,7 +154,7 @@ export default function MasteryDebug() {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <Button asChild variant="ghost" size="sm" className="-ml-2">
-              <Link to="/app/mastery"><ArrowLeft className="h-4 w-4 mr-1" /> Mastery</Link>
+              <Link to="/app/standards"><ArrowLeft className="h-4 w-4 mr-1" /> Standards</Link>
             </Button>
           </div>
           <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2 flex items-center gap-3">
