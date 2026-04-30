@@ -19,8 +19,10 @@ import InvitationsCard from "@/components/InvitationsCard";
 import MergeStudentsCard from "@/components/MergeStudentsCard";
 import { Switch } from "@/components/ui/switch";
 import { Archive } from "lucide-react";
+import { useProfile } from "@/contexts/ProfileContext";
 
 export default function Settings() {
+  const { patch: patchProfile, refresh: refreshProfile } = useProfile();
   const location = useLocation();
   // Profile
   const [displayName, setDisplayName] = useState("");
