@@ -144,13 +144,10 @@ function StandardsLibraryTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Standards library</h1>
-          <p className="text-muted-foreground">
-            Mix state-specific standards (e.g. Idaho Science) and national frameworks (e.g. NGSS, Common Core) per subject.
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <p className="text-sm text-muted-foreground">
+          Mix state-specific standards (e.g. Idaho Science) and national frameworks (e.g. NGSS, Common Core) per subject.
+        </p>
         <AddStandardDialog defaults={profile} onAdded={load} />
       </div>
 
