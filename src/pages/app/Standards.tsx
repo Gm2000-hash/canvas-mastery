@@ -74,13 +74,33 @@ function StandardsLibraryTab() {
   const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
   const [gradeFilter, setGradeFilter] = useState<string>("ALL");
   const [profile, setProfile] = useState<{ state: string | null; default_subject: string | null; default_grade: string | null } | null>(null);
+  // Inline expansion state — only one standard expands at a time so the page
+  // doesn't turn into a wall of nested panels.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Per-standard tagged-question counts so each row can show "Nq" without
+  // having to expand it first.
+  const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({});
 
   async function load() {
     const { data } = await supabase.from("standards").select("*").order("code");
     setRows((data as any) ?? []);
   }
+  async function loadQuestionCounts() {
+    // Pull all tag rows the teacher can see and aggregate distinct questions
+    // per standard. RLS keeps this scoped to the current teacher's data.
+    const { data } = await supabase.from("question_standards").select("standard_id, question_id");
+    const map: Record<string, Set<string>> = {};
+    for (const r of (data as any[]) ?? []) {
+      if (!map[r.standard_id]) map[r.standard_id] = new Set();
+      map[r.standard_id].add(r.question_id);
+    }
+    const counts: Record<string, number> = {};
+    for (const k of Object.keys(map)) counts[k] = map[k].size;
+    setQuestionCounts(counts);
+  }
   useEffect(() => {
     load();
+    loadQuestionCounts();
     supabase.from("profiles").select("state, default_subject, default_grade").maybeSingle().then(({ data }) => setProfile(data as any));
   }, []);
 
