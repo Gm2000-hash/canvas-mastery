@@ -641,7 +641,7 @@ function collectStandardIds(node: TreeNode | null): string[] {
   return out;
 }
 
-function bandColor(v: number) {
+export function bandColor(v: number) {
   if (v >= 0.8) return "hsl(var(--mastery-high))";
   if (v >= 0.6) return "hsl(var(--mastery-mid))";
   return "hsl(var(--mastery-low))";
