@@ -20,6 +20,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, Cell } from "recharts";
+import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 
 type BankRow = {
   standard_id: string;
@@ -714,7 +715,37 @@ function TreeView({
 
 function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; onClose: () => void }) {
   const [retagging, setRetagging] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [revealLoading, setRevealLoading] = useState(false);
+  const [revealedNames, setRevealedNames] = useState<Record<string, string>>({});
+
+  // Reset reveal state whenever a different question is opened.
+  useEffect(() => {
+    setRevealed(false);
+    setRevealedNames({});
+  }, [question?.id]);
+
   if (!question) return null;
+
+  async function revealNames(reason?: string) {
+    if (!question) return false;
+    setRevealLoading(true);
+    const { data, error } = await supabase.rpc("reveal_question_identities", {
+      _question_id: question.id,
+      _reason: reason ?? null,
+    });
+    setRevealLoading(false);
+    if (error) { toast.error(error.message); return false; }
+    const map: Record<string, string> = {};
+    for (const r of (data as any[]) ?? []) map[r.student_id] = r.real_name;
+    setRevealedNames(map);
+    setRevealed(true);
+    return true;
+  }
+  function hideNames() {
+    setRevealed(false);
+    setRevealedNames({});
+  }
   async function retagAi() {
     if (!question) return;
     setRetagging(true);
@@ -728,7 +759,7 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
   }
   return (
     <Sheet open={!!question} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-2xl">
+      <SheetContent className="sm:max-w-2xl overflow-y-auto max-h-screen">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             Question {question.position ?? "?"}
@@ -741,6 +772,14 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
               From <span className="font-medium">{question.assignments.name}</span>
             </SheetDescription>
           )}
+          <div className="pt-2">
+            <RevealNamesToggle
+              revealed={revealed}
+              loading={revealLoading}
+              onReveal={revealNames}
+              onHide={hideNames}
+            />
+          </div>
         </SheetHeader>
         <div className="mt-6 space-y-5">
           <div>
@@ -797,7 +836,7 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
               </div>
             )}
           </div>
-          <QuestionPerformanceChart questionId={question.id} />
+          <QuestionPerformanceChart questionId={question.id} revealedNames={revealedNames} />
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-md border p-3">
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Class average</div>
@@ -851,9 +890,12 @@ const QB_BANDS = [
 ];
 type QBBandKey = "basic" | "proficient" | "advanced";
 
-function QuestionPerformanceChart({ questionId }: { questionId: string }) {
+function QuestionPerformanceChart({ questionId, revealedNames }: { questionId: string; revealedNames: Record<string, string> }) {
   const [loading, setLoading] = useState(true);
-  const [namesByBand, setNamesByBand] = useState<Record<QBBandKey, string[]>>({ basic: [], proficient: [], advanced: [] });
+  // Store student IDs + pseudonyms per band so we can resolve real names dynamically
+  // when the teacher toggles "reveal real names".
+  type Entry = { id: string; pseudonym: string };
+  const [idsByBand, setIdsByBand] = useState<Record<QBBandKey, Entry[]>>({ basic: [], proficient: [], advanced: [] });
 
   useEffect(() => {
     let cancelled = false;
@@ -865,7 +907,7 @@ function QuestionPerformanceChart({ questionId }: { questionId: string }) {
         .eq("question_id", questionId);
       if (cancelled) return;
       if (error || !data) {
-        setNamesByBand({ basic: [], proficient: [], advanced: [] });
+        setIdsByBand({ basic: [], proficient: [], advanced: [] });
         setLoading(false);
         return;
       }
@@ -880,24 +922,31 @@ function QuestionPerformanceChart({ questionId }: { questionId: string }) {
           .in("id", studentIds);
         for (const s of (studs as any[] | null) ?? []) nameById.set(s.id, s.name);
       }
-      const buckets: Record<QBBandKey, string[]> = { basic: [], proficient: [], advanced: [] };
+      const buckets: Record<QBBandKey, Entry[]> = { basic: [], proficient: [], advanced: [] };
       for (const r of data as any[]) {
         const pp = Number(r.points_possible ?? 0);
         const pts = Number(r.points ?? 0);
         if (!pp || pp <= 0) continue;
         const pct = pts / pp;
         const band: QBBandKey = pct < 0.6 ? "basic" : pct < 0.8 ? "proficient" : "advanced";
-        const name = nameById.get(r.student_id) ?? "Unknown";
-        buckets[band].push(name);
+        buckets[band].push({ id: r.student_id, pseudonym: nameById.get(r.student_id) ?? "Unknown" });
       }
-      for (const k of Object.keys(buckets) as QBBandKey[]) {
-        buckets[k].sort((a, b) => a.localeCompare(b));
-      }
-      setNamesByBand(buckets);
+      setIdsByBand(buckets);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [questionId]);
+
+  // Resolve display names per band, sorting alphabetically by the visible name.
+  const namesByBand = useMemo(() => {
+    const out: Record<QBBandKey, string[]> = { basic: [], proficient: [], advanced: [] };
+    for (const k of Object.keys(idsByBand) as QBBandKey[]) {
+      out[k] = idsByBand[k]
+        .map((e) => revealedNames[e.id] ?? e.pseudonym)
+        .sort((a, b) => a.localeCompare(b));
+    }
+    return out;
+  }, [idsByBand, revealedNames]);
 
   const data = QB_BANDS.map((b) => ({
     name: b.short,
