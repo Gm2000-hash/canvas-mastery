@@ -268,42 +268,48 @@ export default function AssignmentGroups() {
       )}
 
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {classGroups?.map((cg) => {
           const isOpen = expanded[cg.id] ?? true;
           const groupAGs = assessmentGroups[cg.id] ?? [];
           const groupSugs = suggestions[cg.id] ?? [];
           return (
-            <Card key={cg.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
+            <Card key={cg.id} className="overflow-hidden transition-shadow hover:shadow-md">
+              <CardHeader className="pb-4 bg-muted/30 border-b">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <button
                       onClick={() => setExpanded((e) => ({ ...e, [cg.id]: !isOpen }))}
-                      className="flex items-center gap-1.5 text-left"
+                      className="flex items-center gap-2 text-left group"
                     >
-                      {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      <CardTitle className="text-base">{cg.name}</CardTitle>
+                      {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      <CardTitle className="text-lg font-semibold tracking-tight group-hover:text-primary transition-colors">
+                        {cg.name}
+                      </CardTitle>
                     </button>
-                    <CardDescription className="mt-1 flex flex-wrap gap-1.5 ml-5">
-                      <Badge variant="outline">{cg.course_count} {cg.course_count === 1 ? "class" : "classes"}</Badge>
-                      <Badge variant="outline">{cg.assessment_group_count} confirmed</Badge>
+                    <CardDescription className="mt-2 flex flex-wrap gap-1.5 ml-6">
+                      <Badge variant="outline" className="font-normal">
+                        {cg.course_count} {cg.course_count === 1 ? "class" : "classes"}
+                      </Badge>
+                      <Badge variant="outline" className="font-normal">
+                        {cg.assessment_group_count} confirmed
+                      </Badge>
                       {cg.pending_suggestion_count > 0 && (
-                        <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30" variant="outline">
+                        <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 font-normal" variant="outline">
+                          <Sparkles className="h-3 w-3 mr-1" />
                           {cg.pending_suggestion_count} suggested
                         </Badge>
                       )}
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-1.5 flex-wrap">
                     <Button
                       size="sm"
-                      variant="secondary"
                       onClick={() => findMatches(cg)}
                       disabled={matchingId === cg.id || cg.course_count < 2}
                     >
                       <Sparkles className={`h-3.5 w-3.5 mr-1.5 ${matchingId === cg.id ? "animate-pulse" : ""}`} />
-                      {matchingId === cg.id ? "Finding…" : "Find equivalent assessments"}
+                      {matchingId === cg.id ? "Finding…" : "Find equivalents"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setManualPickerCg(cg)} disabled={cg.course_count < 1}>
                       <Plus className="h-3.5 w-3.5 mr-1" /> Add manually
@@ -319,10 +325,19 @@ export default function AssignmentGroups() {
               </CardHeader>
 
               {isOpen && (
-                <CardContent className="space-y-4">
-                  <div className="text-xs text-muted-foreground">
-                    <span className="font-medium">Classes:</span>{" "}
-                    {cg.course_names.length > 0 ? cg.course_names.join(" · ") : <em>none yet</em>}
+                <CardContent className="space-y-6 pt-6">
+                  <div className="text-sm">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Classes</span>
+                    <div className="mt-1.5 text-foreground">
+                      {cg.course_names.length > 0
+                        ? cg.course_names.map((n, i) => (
+                            <span key={i}>
+                              {i > 0 && <span className="text-muted-foreground/50 mx-2">·</span>}
+                              {n}
+                            </span>
+                          ))
+                        : <em className="text-muted-foreground">none yet</em>}
+                    </div>
                   </div>
 
                   {/* Suggestions */}
