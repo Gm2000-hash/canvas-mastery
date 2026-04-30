@@ -54,6 +54,20 @@ export default function MasteryConnect() {
   const [studentMaps, setStudentMaps] = useState<Record<string, StudentMap>>({});
   const [courseMaps, setCourseMaps] = useState<Record<string, CourseMap>>({});
 
+  // Map: assignment_id -> Set<subject> (derived from tagged standards)
+  const [assignmentSubjects, setAssignmentSubjects] = useState<Record<string, string[]>>({});
+
+  const [subjectFilter, setSubjectFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "all";
+    return window.localStorage.getItem(SUBJECT_FILTER_KEY) ?? "all";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SUBJECT_FILTER_KEY, subjectFilter);
+    }
+  }, [subjectFilter]);
+
   useEffect(() => {
     document.title = "Mastery Connect Integration";
     (async () => {
@@ -62,7 +76,7 @@ export default function MasteryConnect() {
       setTeacherId(user.id);
 
       // Standards used (referenced by assignments or question tags), plus all owned/shared
-      const [stdRes, crsRes, stuRes, asgRes, smRes, amRes, smnRes, cmRes] = await Promise.all([
+      const [stdRes, crsRes, stuRes, asgRes, smRes, amRes, smnRes, cmRes, asRes] = await Promise.all([
         supabase.from("standards").select("id,code,description,subject,grade").order("code"),
         supabase.from("courses").select("id,name").order("name"),
         supabase.from("students").select("id,name,course_id").order("sortable_name"),
@@ -71,8 +85,10 @@ export default function MasteryConnect() {
         supabase.from("mc_assessment_mappings").select("assignment_id,mc_assessment_id,mc_assessment_name").not("assignment_id", "is", null),
         supabase.from("mc_student_mappings").select("student_id,mc_student_id,mc_sis_id"),
         supabase.from("mc_course_mappings").select("course_id,mc_tracker_id,mc_tracker_name"),
+        supabase.from("assignment_standards").select("assignment_id,standard_id"),
       ]);
-      setStandards((stdRes.data ?? []) as Standard[]);
+      const stds = (stdRes.data ?? []) as Standard[];
+      setStandards(stds);
       setCourses((crsRes.data ?? []) as Course[]);
       setStudents((stuRes.data ?? []) as Student[]);
       setAssignments((asgRes.data ?? []) as Assignment[]);
@@ -80,9 +96,27 @@ export default function MasteryConnect() {
       setAssessMaps(Object.fromEntries(((amRes.data ?? []) as AssessMap[]).map(m => [m.assignment_id!, m])));
       setStudentMaps(Object.fromEntries(((smnRes.data ?? []) as StudentMap[]).map(m => [m.student_id, m])));
       setCourseMaps(Object.fromEntries(((cmRes.data ?? []) as CourseMap[]).map(m => [m.course_id, m])));
+
+      // Build assignment -> subjects map via tagged standards
+      const stdSubject = new Map(stds.map(s => [s.id, s.subject]));
+      const aSubs: Record<string, Set<string>> = {};
+      for (const row of (asRes.data ?? []) as { assignment_id: string; standard_id: string }[]) {
+        const subj = stdSubject.get(row.standard_id);
+        if (!subj) continue;
+        (aSubs[row.assignment_id] ||= new Set()).add(subj);
+      }
+      setAssignmentSubjects(
+        Object.fromEntries(Object.entries(aSubs).map(([k, v]) => [k, Array.from(v)]))
+      );
       setLoading(false);
     })();
   }, []);
+
+  const subjectOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of standards) if (s.subject) set.add(s.subject);
+    return Array.from(set).sort();
+  }, [standards]);
 
   if (loading || !teacherId) {
     return <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>;
