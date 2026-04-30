@@ -124,13 +124,25 @@ export default function MasteryConnect() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-3xl flex items-center gap-2">
-          <ArrowRightLeft className="h-7 w-7" /> Mastery Connect
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Map standards, assessments, students, and classes between this app and Mastery Connect, then export CSV files you can upload to MC (or hand to your district for SFTP ingest).
-        </p>
+      <header className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="font-display text-3xl flex items-center gap-2">
+            <ArrowRightLeft className="h-7 w-7" /> Mastery Connect
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Map standards, assessments, students, and classes between this app and Mastery Connect, then export CSV files you can upload to MC (or hand to your district for SFTP ingest).
+          </p>
+        </div>
+        <div className="min-w-56">
+          <Label className="text-xs text-muted-foreground">Subject area</Label>
+          <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+            <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All subjects</SelectItem>
+              {subjectOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </header>
 
       <Tabs defaultValue="standards" className="w-full">
@@ -148,6 +160,7 @@ export default function MasteryConnect() {
             standards={standards}
             maps={stdMaps}
             onChange={setStdMaps}
+            subjectFilter={subjectFilter}
           />
         </TabsContent>
         <TabsContent value="assessments" className="mt-4">
@@ -157,6 +170,8 @@ export default function MasteryConnect() {
             courses={courses}
             maps={assessMaps}
             onChange={setAssessMaps}
+            subjectFilter={subjectFilter}
+            assignmentSubjects={assignmentSubjects}
           />
         </TabsContent>
         <TabsContent value="students" className="mt-4">
