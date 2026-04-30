@@ -554,3 +554,151 @@ function ClassGroupDialog({
     </DialogContent>
   );
 }
+
+function ManualAssignmentPicker({
+  classGroup,
+  onClose,
+  onSaved,
+}: {
+  classGroup: { id: string; name: string; course_ids: string[] };
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  type Item = {
+    id: string;
+    name: string;
+    kind: "assignment" | "quiz";
+    course_id: string;
+    course_name?: string;
+    in_other_group: boolean;
+  };
+  const [items, setItems] = useState<Item[] | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [name, setName] = useState("");
+  const [search, setSearch] = useState("");
+  const [showInOtherGroups, setShowInOtherGroups] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if (classGroup.course_ids.length === 0) { setItems([]); return; }
+      const { data, error } = await supabase
+        .from("assignments")
+        .select("id, name, kind, course_id, assignment_group_id, courses:course_id(name)")
+        .in("course_id", classGroup.course_ids)
+        .order("name");
+      if (error) { toast.error(error.message); setItems([]); return; }
+      const list: Item[] = (data ?? []).map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        kind: a.kind,
+        course_id: a.course_id,
+        course_name: a.courses?.name,
+        in_other_group: !!a.assignment_group_id,
+      }));
+      setItems(list);
+    })();
+  }, [classGroup.id]);
+
+  const filtered = useMemo(() => {
+    if (!items) return [];
+    const q = search.trim().toLowerCase();
+    return items.filter((i) => {
+      if (i.in_other_group && !showInOtherGroups) return false;
+      if (q && !i.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [items, search, showInOtherGroups]);
+
+  function toggle(id: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  async function save() {
+    if (selected.size < 2) { toast.error("Pick at least 2 assignments to group as one equivalent assessment."); return; }
+    if (!name.trim()) { toast.error("Name required"); return; }
+    const ids = [...selected];
+    const courses = new Set((items ?? []).filter((i) => selected.has(i.id)).map((i) => i.course_id));
+    if (courses.size < 2) {
+      if (!confirm("These assignments are all from the same class. Group anyway?")) return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.rpc("apply_assignment_group_in_class_group" as any, {
+        _class_group_id: classGroup.id,
+        _name: name.trim(),
+        _assignment_ids: ids,
+        _group_id: null,
+      });
+      if (error) throw error;
+      toast.success("Equivalent assessment created");
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <DialogContent className="max-w-xl">
+      <DialogHeader>
+        <DialogTitle>Add equivalent assessment manually</DialogTitle>
+        <DialogDescription>
+          Pick assignments across <strong>{classGroup.name}</strong>'s classes that represent the same assessment.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-3">
+        <Input
+          placeholder="Equivalent assessment name (e.g. Pre-ECA Unit 1)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <div className="flex gap-2 items-center">
+          <Input placeholder="Search assignments…" value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+          <label className="text-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+            <Checkbox checked={showInOtherGroups} onCheckedChange={(v) => setShowInOtherGroups(!!v)} />
+            Show already grouped
+          </label>
+        </div>
+        {!items ? (
+          <Skeleton className="h-48" />
+        ) : filtered.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-6 text-center">No matching assignments.</div>
+        ) : (
+          <ScrollArea className="h-72 border rounded-md p-1">
+            <ul className="space-y-0.5">
+              {filtered.map((it) => (
+                <li key={it.id}>
+                  <label className={cn(
+                    "flex items-start gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm",
+                    selected.has(it.id) && "bg-muted/50",
+                  )}>
+                    <Checkbox checked={selected.has(it.id)} onCheckedChange={() => toggle(it.id)} className="mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate">{it.name}</div>
+                      <div className="text-xs text-muted-foreground flex flex-wrap gap-1.5">
+                        <Badge variant="outline" className="text-[10px] py-0 h-4">{it.kind}</Badge>
+                        <span className="truncate">{it.course_name}</span>
+                        {it.in_other_group && <span className="text-amber-600 dark:text-amber-400">already grouped</span>}
+                      </div>
+                    </div>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </ScrollArea>
+        )}
+        <div className="text-xs text-muted-foreground">{selected.size} selected</div>
+      </div>
+      <DialogFooter>
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button onClick={save} disabled={saving || selected.size < 2}>{saving ? "Saving…" : "Create equivalent assessment"}</Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+}
