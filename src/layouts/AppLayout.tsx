@@ -7,6 +7,7 @@ import { ArrowRightLeft, BarChart3, BookMarked, Building2, CheckCheck, Graduatio
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
+import { ProfileProvider } from "@/contexts/ProfileContext";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
 const nav = [
