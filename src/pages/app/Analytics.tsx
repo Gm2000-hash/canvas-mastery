@@ -1164,10 +1164,13 @@ type CompareRow = {
 };
 
 const BANDS = [
-  { key: "below" as const,       label: "Below (<60%)",         color: "hsl(0 72% 51%)" },
-  { key: "approaching" as const, label: "Approaching (60–80%)", color: "hsl(38 92% 50%)" },
-  { key: "mastered" as const,    label: "Mastered (≥80%)",      color: "hsl(160 84% 39%)" },
+  { key: "below" as const,       label: "Basic (<60%)",          short: "Basic",      color: "hsl(0 72% 51%)" },
+  { key: "approaching" as const, label: "Proficient (60–80%)",   short: "Proficient", color: "hsl(38 92% 50%)" },
+  { key: "mastered" as const,    label: "Advanced (≥80%)",       short: "Advanced",   color: "hsl(160 84% 39%)" },
 ];
+
+type BandKey = "below" | "approaching" | "mastered";
+type StudentBandRow = { course_id: string; course_name: string; student_id: string; student_name: string; band: BandKey };
 
 type ScopeKind = "assignment" | "standard";
 type SplitMode = "all" | "by_class" | "by_level" | "class_x_level";
