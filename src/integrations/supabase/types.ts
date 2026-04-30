@@ -1258,6 +1258,22 @@ export type Database = {
           total_n: number
         }[]
       }
+      analytics_compare_classes_students: {
+        Args: {
+          _assignment_group_id?: string
+          _assignment_id?: string
+          _course_ids: string[]
+          _standard_id?: string
+        }
+        Returns: {
+          band: string
+          course_id: string
+          course_name: string
+          score: number
+          student_id: string
+          student_name: string
+        }[]
+      }
       analytics_mastery_distribution: {
         Args: { _course_id?: string; _subject?: string }
         Returns: {

@@ -1,97 +1,68 @@
-# Revamp Assignment Groups: Class Groups First, AI Matching Second
+## Goal
 
-## Concept change
+In the "Compare classes" pop-out (opened from the Classes page), update the mastery distribution bar chart so that:
 
-**Today:** the page scans across ALL of a teacher's assignments and uses fuzzy name matching to suggest groupings. A teacher with two preps (Science A + Science B) can get false positives across preps, and there is no way to scope the AI.
+1. The three bands are labeled **Basic**, **Proficient**, **Advanced** (instead of Below / Approaching / Mastered).
+2. Each band keeps a distinct color (already 3 bars — keep red / amber / green).
+3. Hovering a bar segment lists the student names that fall into that band for that class.
 
-**New flow:**
-1. Teacher creates a **Class Group** (e.g. "8th Grade Science A", "8th Grade Science B") and adds 2+ classes to it.
-2. Within a single Class Group, the teacher clicks **"Find equivalent assessments"** — AI matches assignments/quizzes that represent the same assessment across just those classes.
-3. Teacher confirms / edits / rejects each suggested assessment match. Confirmed matches become assignment groups (the existing concept) but scoped to that Class Group's classes.
+The chart already renders exactly 3 stacked/grouped bars per class via the `BANDS` constant, so no extra bars need to be removed — just relabeling and tooltip enrichment.
 
-This is a UX inversion: the teacher defines the *boundary* first, AI matches *within* it.
+## Changes
 
-## What the user sees
+### 1. SQL — return per-student names alongside the aggregates
 
-### `/app/assignment-groups` (renamed in nav to "Class groups")
+Add a new RPC `analytics_compare_classes_students` (security definer, teacher‑scoped) that mirrors `analytics_compare_classes` but returns one row per student:
 
-```text
-┌─ Class groups ─────────────────────────────────────────┐
-│  [+ New class group]                                   │
-│                                                        │
-│  ▾ 8th Grade Science A                          [edit] │
-│      Classes: Period 1 Sci A · Period 3 Sci A · …      │
-│      Equivalent assessments: 4 confirmed, 2 suggested  │
-│      [Find equivalent assessments]                     │
-│                                                        │
-│      ── Confirmed assessments ─────────────────        │
-│      • Pre-ECA Unit 1   (3 classes, 78 subs)  [edit]   │
-│      • Quiz: Cells       (3 classes, 75 subs) [edit]   │
-│                                                        │
-│      ── AI suggestions ────────────────────────        │
-│      • "Lab Safety Quiz" ↔ "Safety Quiz (Lab)"         │
-│        2 classes  · 88% match   [Confirm] [Reject]     │
-│      …                                                 │
-│                                                        │
-│  ▾ 8th Grade Science B  …                              │
-└────────────────────────────────────────────────────────┘
+```
+course_id, course_name, student_id, student_name, band, score
 ```
 
-Creating a class group: dialog with name + multi-select of the teacher's classes (reuse `CourseMultiSelect`). Editing lets you rename and add/remove classes.
+The `student_name` comes from `public.students.name` (already the pseudonym after import, so no privacy regression). Same source CTE as the existing function (submissions for assignment / group, latest mastery snapshot for standard) and the same band thresholds — except the threshold logic stays numeric; only the front-end label changes.
 
-"Find equivalent assessments" runs the AI matcher against assignments in the group's classes that aren't already in a confirmed assessment-group. Results render inline with Confirm / Reject buttons. Confirming creates/extends an `assignment_groups` row scoped to that class group.
+We keep the existing aggregate RPC unchanged so other callers/tables don't break.
 
-### Where class groups are used elsewhere
+### 2. Front-end — `src/pages/app/Analytics.tsx`
 
-- **Analytics → Compare classes**: add a "Class group" picker that pre-selects the group's classes (and, when an assessment is also chosen, lets you pick a confirmed assessment inside that class group).
-- **Assignments page** suggestion banner: keep it but only fire suggestions for assignments whose course belongs to a class group.
+**Relabel `BANDS`** (keep keys, colors, and thresholds — only labels change):
 
-## Database changes
+```text
+below       → "Basic (<60%)"
+approaching → "Proficient (60–80%)"
+mastered    → "Advanced (≥80%)"
+```
 
-**New table** `class_groups`
-- `id uuid pk`, `teacher_id uuid`, `name text`, `created_at`, `updated_at`
-- RLS: teacher owns
+Also update the table column headers (`Below` / `Approaching` / `Mastered` → `Basic` / `Proficient` / `Advanced`) and the CSV header row to match.
 
-**New table** `class_group_courses` (membership)
-- `class_group_id uuid`, `course_id uuid`, `teacher_id uuid`
-- PK `(class_group_id, course_id)`, RLS: teacher owns
+**Fetch per-student rows in `CompareView`**: in the same `useEffect` that calls `analytics_compare_classes`, also call `analytics_compare_classes_students` with the same args, and store a map:
 
-**Alter** `assignment_groups`
-- Add `class_group_id uuid` (nullable for back-compat, but new groups will set it).
+```text
+studentsByCourseBand: Map<courseId, { below: string[], approaching: string[], mastered: string[] }>
+```
 
-**RPCs (new / replace):**
-- `create_class_group(_name, _course_ids[])` → uuid
-- `update_class_group(_id, _name, _course_ids[])`
-- `delete_class_group(_id)` — sets `assignment_groups.class_group_id = NULL` for its assessment groups (configurable; see open Q below)
-- `list_class_groups()` → groups with course names, assessment-group counts, suggestion counts
-- **Replace** `suggest_assignment_groups()` with `suggest_assignment_groups_in_class_group(_class_group_id uuid)` — same fuzzy / similarity logic but restricted to assignments belonging to that class group's courses, excluding any already in a confirmed `assignment_groups` row.
-- `apply_assignment_group(...)` gains a `_class_group_id` parameter so new assessment groups are scoped.
+For the `split === "all"` and `split === "by_level"` modes we'll merge across courses into a single bucket per band.
 
-The existing trigram-based candidate generation stays as the cheap first pass. AI only runs on borderline pairs (similarity 0.45–0.85) within a class group, via a new edge function:
+**Custom Recharts tooltip**: replace `<ChartTooltip content={<ChartTooltipContent />} />` with a custom tooltip that, when the hovered payload corresponds to a band bar, renders:
 
-**Edge function** `match-assessments-in-group`
-- Input: `class_group_id`
-- Pulls candidate assignment pairs (trigram similarity in the borderline band) from the group's classes.
-- Calls Lovable AI Gateway (`google/gemini-2.5-flash`) with each pair's name + first ~10 question stems to decide "same assessment / different / unsure".
-- Writes high-confidence matches as suggestions the user can confirm. (Persisted in a lightweight `assessment_match_suggestions` table so they survive page reloads, with `dismissed_at` for rejection.)
+```text
+{ClassName} — {BandLabel}: {count}
+• Student A
+• Student B
+…
+```
 
-## Migration / back-compat
+Capped at ~12 names with "+N more" to keep the tooltip compact. For the `by_class` split (Avg %) we keep the existing simple tooltip behavior.
 
-- Existing `assignment_groups` rows stay; their `class_group_id` is NULL until the user assigns them. The page surfaces these under a "Ungrouped legacy assessments" section with a "Move to class group →" action.
-- Old RPC names kept as thin wrappers calling the new ones (so `Analytics.tsx` and `Assignments.tsx` keep working) until the next pass cleans them up.
+No changes needed to the dialog wrapper in `ClassesHub.tsx` — the chart lives inside `CompareView`.
 
-## Files to add / edit
+## Technical notes
 
-- **New** `supabase/migrations/<ts>_class_groups.sql` — tables, RLS, indexes, new RPCs, alter `assignment_groups`, suggestion table.
-- **New** `supabase/functions/match-assessments-in-group/index.ts` — AI matcher (uses `LOVABLE_API_KEY`).
-- **Rewrite** `src/pages/app/AssignmentGroups.tsx` — new two-level UI (class groups → assessments).
-- **New** `src/components/ClassGroupDialog.tsx` — create/edit dialog.
-- **Edit** `src/layouts/AppLayout.tsx` — rename nav label "Assignment groups" → "Class groups".
-- **Edit** `src/pages/app/Analytics.tsx` — add Class-group picker to Compare-classes; keep current behavior when none is selected.
-- **Edit** `src/pages/app/Assignments.tsx` — gate the suggestion banner on class-group membership.
+- Pseudonyms: `students.name` already reflects the user's pseudonymization preference, so no extra reveal logic is needed in the tooltip.
+- RLS: new RPC is `SECURITY DEFINER` and filters every CTE by `auth.uid()`, matching the existing function.
+- Performance: the student-level query is small (only the selected courses + one assignment/standard/group). One extra round-trip per chart render, gated by the same `canQuery` check.
+- Backwards compatible: the old `analytics_compare_classes` RPC and `BANDS` keys (`below`/`approaching`/`mastered`) are preserved internally — only display strings change, so the CSV export and table reflow naturally.
 
-## Open questions
+## Files touched
 
-1. When a teacher deletes a class group, should the assessment groups inside it be **deleted** too, or just **detached** (set `class_group_id = NULL`)? Detach is safer; I'll default to that unless you say otherwise.
-2. Can a single class belong to **multiple** class groups? Useful if you split a course into "by period" and "by curriculum unit." I'll allow it (the membership table is many-to-many) — say the word if you'd rather enforce one-group-per-class.
-3. AI matcher: run automatically when the teacher creates the class group, or only on explicit "Find equivalent assessments" click? Plan above assumes explicit click (cheaper, more transparent).
+- `supabase/migrations/<new>.sql` — add `analytics_compare_classes_students` RPC.
+- `src/pages/app/Analytics.tsx` — relabel `BANDS`, table headers, CSV headers; fetch per-student rows; custom tooltip with student names.
