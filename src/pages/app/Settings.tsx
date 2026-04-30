@@ -322,8 +322,17 @@ export default function Settings() {
           <form onSubmit={saveProfile} className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="dn">Display name</Label>
-                <Input id="dn" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={80} />
+                <Label htmlFor="dn">Preferred name</Label>
+                <Input
+                  id="dn"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  maxLength={80}
+                  placeholder="What should we call you?"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shown on your dashboard greeting. If left blank, we'll use your email.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>State</Label>
