@@ -27,6 +27,45 @@ type Standard = {
 };
 
 export default function Standards() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "questions" ? "questions" : "library";
+  const setTab = (v: string) => {
+    setParams((p) => {
+      if (v === "library") p.delete("tab"); else p.set("tab", v);
+      return p;
+    }, { replace: true });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Standards library</h1>
+        <p className="text-muted-foreground">
+          Browse standards by framework and explore the quiz questions tagged to each one.
+        </p>
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="library" className="gap-2">
+            <BookMarked className="h-4 w-4" /> Library
+          </TabsTrigger>
+          <TabsTrigger value="questions" className="gap-2">
+            <Library className="h-4 w-4" /> Questions
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="library" className="mt-0">
+          <StandardsLibraryTab />
+        </TabsContent>
+        <TabsContent value="questions" className="mt-0">
+          <QuestionsTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function StandardsLibraryTab() {
   const [rows, setRows] = useState<Standard[]>([]);
   const [filter, setFilter] = useState("");
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
