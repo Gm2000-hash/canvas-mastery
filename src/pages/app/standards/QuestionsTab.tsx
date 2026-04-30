@@ -64,7 +64,7 @@ type TreeNode = {
 
 type StatusFilter = "ALL" | "SUGGESTED" | "CONFIRMED";
 
-export default function QuestionBank() {
+export default function QuestionsTab() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseId, setCourseId] = useState<string>("ALL");
   const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
