@@ -1208,15 +1208,20 @@ export function CompareView({ courses }: { courses: Course[] }) {
     [courseSubjects]
   );
 
-  // Only show classes that match the chosen content area.
+  // Only show classes that match the chosen content area. When no subject (or
+  // "all") is picked, show every class so Compare works even when teachers
+  // haven't tagged disciplines yet.
   const subjectCourses = useMemo(
-    () => (subject ? courses.filter((c) => courseSubjects[c.id] === subject) : []),
+    () => (subject && subject !== "__all"
+      ? courses.filter((c) => courseSubjects[c.id] === subject)
+      : courses),
     [courses, courseSubjects, subject]
   );
 
-  // If subject changes, drop any selected classes that no longer match.
+  // If a real subject is picked, drop selected classes that don't match.
+  // When subject is empty / "__all", keep the user's selection intact.
   useEffect(() => {
-    if (!subject) { setSelected([]); return; }
+    if (!subject || subject === "__all") return;
     const allowed = new Set(subjectCourses.map((c) => c.id));
     setSelected((prev) => prev.filter((id) => allowed.has(id)));
   }, [subject, subjectCourses]);
