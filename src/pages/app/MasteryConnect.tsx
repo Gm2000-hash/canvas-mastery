@@ -207,12 +207,16 @@ export default function MasteryConnect() {
 }
 
 /* ---------- Standards ---------- */
-function StandardsTab({ teacherId, standards, maps, onChange }: {
+function StandardsTab({ teacherId, standards, maps, onChange, subjectFilter }: {
   teacherId: string;
   standards: Standard[];
   maps: Record<string, StdMap>;
   onChange: (m: Record<string, StdMap>) => void;
+  subjectFilter: string;
 }) {
+  const visibleStandards = subjectFilter === "all"
+    ? standards
+    : standards.filter(s => s.subject === subjectFilter);
   const save = useDebouncedSave<{ teacher_id: string; standard_id: string; mc_code: string; mc_name: string | null }>(
     "mc_standard_mappings", ["teacher_id", "standard_id"]
   );
