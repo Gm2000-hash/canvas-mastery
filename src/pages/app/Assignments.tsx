@@ -136,6 +136,43 @@ export default function Assignments() {
     toast.success(`Mastery recomputed (${(data as any).snapshots} entries)`);
   }
 
+  const [regenAll, setRegenAll] = useState(false);
+  async function regenerateAll() {
+    if (!courseId || !assignments || assignments.length === 0) return;
+    if (!confirm(`Clear all unconfirmed AI suggestions for ${assignments.length} assignment${assignments.length === 1 ? "" : "s"} and regenerate them?`)) return;
+    setRegenAll(true);
+    try {
+      const ids = assignments.map((a) => a.id);
+      const { error: delErr } = await supabase
+        .from("assignment_standards")
+        .delete()
+        .in("assignment_id", ids)
+        .eq("confirmed", false);
+      if (delErr) { toast.error(delErr.message); return; }
+      await loadAssignments(courseId);
+      toast.message(`Regenerating suggestions for ${ids.length} assignment${ids.length === 1 ? "" : "s"}…`);
+      // Fire in background (small concurrency to avoid rate limits)
+      let done = 0;
+      let failed = 0;
+      const BATCH = 3;
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const slice = ids.slice(i, i + BATCH);
+        await Promise.all(
+          slice.map(async (id) => {
+            const { error } = await supabase.functions.invoke("tag-standards", { body: { assignment_id: id } });
+            if (error) failed++; else done++;
+          }),
+        );
+      }
+      await loadAssignments(courseId);
+      if (failed === 0) toast.success(`Regenerated suggestions for ${done} assignment${done === 1 ? "" : "s"}`);
+      else toast.warning(`Regenerated ${done}, ${failed} failed`);
+    } finally {
+      setRegenAll(false);
+    }
+  }
+
+
   return (
     <div className="space-y-8">
       <div className="flex items-end justify-between gap-4 flex-wrap">
