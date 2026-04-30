@@ -116,8 +116,43 @@ export default function Settings() {
       default_subject: subject || null,
       default_grade: grade || null,
     });
+    if (error) {
+      setSavingProfile(false);
+      toast.error(error.message);
+      return;
+    }
+
+    // Auto-enroll the teacher in the matching subject "department" by ensuring
+    // a teacher_disciplines row exists. This is what powers /app/department.
+    let deptJoined = false;
+    if (subject && grade) {
+      const { data: existing } = await supabase
+        .from("teacher_disciplines")
+        .select("id")
+        .eq("teacher_id", u.user.id)
+        .eq("subject", subject)
+        .eq("grade", grade)
+        .eq("state", state || "")
+        .maybeSingle();
+      if (!existing) {
+        const isFirst = disciplines.length === 0;
+        const { error: discErr } = await supabase.from("teacher_disciplines").insert({
+          teacher_id: u.user.id,
+          state: state || "",
+          subject,
+          grade,
+          framework: "CUSTOM",
+          is_default: isFirst,
+        });
+        if (!discErr) {
+          deptJoined = true;
+          load();
+        }
+      }
+    }
+
     setSavingProfile(false);
-    if (error) toast.error(error.message); else toast.success("Profile saved");
+    toast.success(deptJoined ? `Profile saved · joined ${subject} department` : "Profile saved");
   }
 
   async function saveCanvas(e: React.FormEvent) {
