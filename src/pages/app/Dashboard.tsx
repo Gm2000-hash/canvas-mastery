@@ -88,11 +88,10 @@ export default function Dashboard() {
     const cc = Array.isArray(ccRows) ? ccRows[0] : null;
     setCanvasConnected(!!cc?.connected);
 
-    // Greet by first name: prefer profile.display_name, fall back to email local-part.
-    const display = (profile as any)?.display_name as string | undefined;
+    // Greet by preferred name from Settings; if blank, fall back to the user's email.
+    const display = ((profile as any)?.display_name as string | undefined)?.trim();
     const email = userData?.user?.email ?? "";
-    const candidate = (display && display.trim()) || email.split("@")[0] || "";
-    setFirstName(candidate.split(/\s+/)[0] || "");
+    setFirstName(display && display.length > 0 ? display : email);
 
     const filterVisible = (rows: any[] | null) =>
       ((rows ?? []) as AssignmentItem[]).filter((a) => a.course && !a.course.hidden && !a.course.archived_at).slice(0, 5);
