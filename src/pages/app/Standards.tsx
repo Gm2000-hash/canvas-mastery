@@ -73,7 +73,7 @@ export default function Standards() {
   );
 }
 
-function StandardsLibraryTab() {
+function StandardsLibraryTab({ onOpenQuestions }: { onOpenQuestions: (standardId: string) => void }) {
   const [rows, setRows] = useState<Standard[]>([]);
   const [filter, setFilter] = useState("");
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
