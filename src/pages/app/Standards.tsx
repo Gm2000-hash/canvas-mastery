@@ -32,6 +32,14 @@ export default function Standards() {
   const setTab = (v: string) => {
     setParams((p) => {
       if (v === "library") p.delete("tab"); else p.set("tab", v);
+      p.delete("std");
+      return p;
+    });
+  };
+  const openStandardInQuestions = (standardId: string) => {
+    setParams((p) => {
+      p.set("tab", "questions");
+      p.set("std", standardId);
       return p;
     });
   };
@@ -55,7 +63,7 @@ export default function Standards() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="library" className="mt-0">
-          <StandardsLibraryTab />
+          <StandardsLibraryTab onOpenQuestions={openStandardInQuestions} />
         </TabsContent>
         <TabsContent value="questions" className="mt-0">
           <QuestionsTab />
@@ -65,7 +73,7 @@ export default function Standards() {
   );
 }
 
-function StandardsLibraryTab() {
+function StandardsLibraryTab({ onOpenQuestions }: { onOpenQuestions: (standardId: string) => void }) {
   const [rows, setRows] = useState<Standard[]>([]);
   const [filter, setFilter] = useState("");
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
@@ -276,7 +284,15 @@ function StandardsLibraryTab() {
             const fwId = s.framework ?? "STATE";
             const fw = getFramework(fwId);
             return (
-              <div key={s.id} className="p-4 flex items-start gap-3 hover:bg-muted/30">
+              <div
+                key={s.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onOpenQuestions(s.id)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenQuestions(s.id); } }}
+                className="p-4 flex items-start gap-3 hover:bg-muted/40 cursor-pointer transition-colors"
+                title="View questions tagged to this standard"
+              >
                 <Badge
                   variant="outline"
                   className={`text-[11px] shrink-0 mt-0.5 ${fwBadgeClass(fwId)}`}
@@ -294,7 +310,8 @@ function StandardsLibraryTab() {
                   <span>{s.state || "—"} · {s.subject} · G{s.grade}</span>
                 </div>
                 {s.teacher_id !== null && (
-                  <Button size="sm" variant="ghost" onClick={async () => {
+                  <Button size="sm" variant="ghost" onClick={async (e) => {
+                    e.stopPropagation();
                     const { error } = await supabase.from("standards").delete().eq("id", s.id);
                     if (error) toast.error(error.message); else { toast.success("Deleted"); load(); }
                   }}><Trash2 className="h-3 w-3" /></Button>
