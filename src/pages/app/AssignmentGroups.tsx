@@ -170,6 +170,31 @@ export default function AssignmentGroups() {
     loadAll();
   }
 
+  async function confirmAllSuggestions(cg: ClassGroup) {
+    const list = suggestions[cg.id] ?? [];
+    if (list.length === 0) return;
+    if (!confirm(`Approve all ${list.length} suggested equivalent assessments for "${cg.name}"?`)) return;
+    let ok = 0;
+    let fail = 0;
+    for (const s of list) {
+      const { error } = await supabase.rpc("apply_assignment_group_in_class_group" as any, {
+        _class_group_id: cg.id,
+        _name: s.suggested_name,
+        _assignment_ids: s.assignment_ids,
+        _group_id: null,
+      });
+      if (error) { fail++; continue; }
+      await supabase
+        .from("assessment_match_suggestions")
+        .update({ dismissed_at: new Date().toISOString() })
+        .eq("id", s.id);
+      ok++;
+    }
+    if (ok > 0) toast.success(`Approved ${ok} suggestion${ok === 1 ? "" : "s"}${fail ? ` (${fail} failed)` : ""}`);
+    if (ok === 0 && fail > 0) toast.error("Failed to approve suggestions");
+    loadAll();
+  }
+
   async function deleteAssessmentGroup(groupId: string) {
     if (!confirm("Delete this equivalent-assessment grouping? Member assignments will be ungrouped (no data lost).")) return;
     const { error } = await supabase.from("assignment_groups").delete().eq("id", groupId);
