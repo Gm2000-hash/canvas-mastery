@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { GraduationCap, ListChecks, BookMarked, Sparkles, RefreshCw, CalendarClock, CalendarCheck, ArrowRight } from "lucide-react";
 import { useSync } from "@/contexts/SyncContext";
+import { useProfile } from "@/contexts/ProfileContext";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { cn } from "@/lib/utils";
 
@@ -20,10 +21,10 @@ type AssignmentItem = {
 export default function Dashboard() {
   const [stats, setStats] = useState({ courses: 0, students: 0, assignments: 0, taggedAssignments: 0, standards: 0 });
   const [canvasConnected, setCanvasConnected] = useState<boolean | null>(null);
-  const [firstName, setFirstName] = useState<string>("");
   const [upcoming, setUpcoming] = useState<AssignmentItem[] | null>(null);
   const [recent, setRecent] = useState<AssignmentItem[] | null>(null);
   const { syncing, runCanvasSync } = useSync();
+  const { preferredName } = useProfile();
 
   async function load() {
     const nowIso = new Date().toISOString();
@@ -53,8 +54,6 @@ export default function Dashboard() {
       { count: tagged },
       { count: standards },
       { data: ccRows },
-      { data: profile },
-      { data: userData },
       { data: up },
       { data: rc },
     ] = await Promise.all([
@@ -63,8 +62,6 @@ export default function Dashboard() {
       taggedQ,
       supabase.from("standards").select("id", { count: "exact", head: true }),
       supabase.rpc("get_canvas_connection_status"),
-      supabase.from("profiles").select("display_name").maybeSingle(),
-      supabase.auth.getUser(),
       supabase
         .from("assignments")
         .select("id, name, kind, due_at, course_id, course:courses!inner(name, hidden, archived_at)")
@@ -88,11 +85,6 @@ export default function Dashboard() {
     const cc = Array.isArray(ccRows) ? ccRows[0] : null;
     setCanvasConnected(!!cc?.connected);
 
-    // Greet by preferred name from Settings; if blank, fall back to the user's email.
-    const display = ((profile as any)?.display_name as string | undefined)?.trim();
-    const email = userData?.user?.email ?? "";
-    setFirstName(display && display.length > 0 ? display : email);
-
     const filterVisible = (rows: any[] | null) =>
       ((rows ?? []) as AssignmentItem[]).filter((a) => a.course && !a.course.hidden && !a.course.archived_at).slice(0, 5);
     setUpcoming(filterVisible(up));
@@ -104,11 +96,9 @@ export default function Dashboard() {
     const onDone = () => load();
     const onFocus = () => load();
     window.addEventListener("canvas-sync:done", onDone);
-    window.addEventListener("profile:updated", onDone);
     window.addEventListener("focus", onFocus);
     return () => {
       window.removeEventListener("canvas-sync:done", onDone);
-      window.removeEventListener("profile:updated", onDone);
       window.removeEventListener("focus", onFocus);
     };
   }, []);
