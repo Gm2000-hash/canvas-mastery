@@ -102,8 +102,15 @@ export default function Dashboard() {
   useEffect(() => {
     load();
     const onDone = () => load();
+    const onFocus = () => load();
     window.addEventListener("canvas-sync:done", onDone);
-    return () => window.removeEventListener("canvas-sync:done", onDone);
+    window.addEventListener("profile:updated", onDone);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("canvas-sync:done", onDone);
+      window.removeEventListener("profile:updated", onDone);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
   return (

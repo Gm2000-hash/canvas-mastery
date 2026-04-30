@@ -152,6 +152,8 @@ export default function Settings() {
     }
 
     setSavingProfile(false);
+    // Notify other pages (e.g. Dashboard) to refresh their cached profile.
+    window.dispatchEvent(new Event("profile:updated"));
     toast.success(deptJoined ? `Profile saved · joined ${subject} department` : "Profile saved");
   }
 
