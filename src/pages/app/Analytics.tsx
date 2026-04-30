@@ -1582,9 +1582,9 @@ export function CompareView({ courses }: { courses: Course[] }) {
                 <TableHead>Class</TableHead>
                 <TableHead className="text-right">n</TableHead>
                 <TableHead className="text-right">Avg</TableHead>
-                <TableHead className="text-right" style={{ color: BANDS[0].color }}>Below</TableHead>
-                <TableHead className="text-right" style={{ color: BANDS[1].color }}>Approaching</TableHead>
-                <TableHead className="text-right" style={{ color: BANDS[2].color }}>Mastered</TableHead>
+                <TableHead className="text-right" style={{ color: BANDS[0].color }}>Basic</TableHead>
+                <TableHead className="text-right" style={{ color: BANDS[1].color }}>Proficient</TableHead>
+                <TableHead className="text-right" style={{ color: BANDS[2].color }}>Advanced</TableHead>
                 <TableHead className="text-right">% mastered</TableHead>
               </TableRow></TableHeader>
               <TableBody>
