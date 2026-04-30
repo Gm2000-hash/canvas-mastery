@@ -1639,6 +1639,15 @@ export type Database = {
           student_id: string
         }[]
       }
+      reveal_question_identities: {
+        Args: { _question_id: string; _reason?: string }
+        Returns: {
+          email: string
+          real_name: string
+          real_sortable_name: string
+          student_id: string
+        }[]
+      }
       reveal_student_identities: {
         Args: { _course_id: string; _reason?: string }
         Returns: {
