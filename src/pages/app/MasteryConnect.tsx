@@ -22,6 +22,8 @@ type AssessMap = { assignment_id: string | null; mc_assessment_id: string; mc_as
 type StudentMap = { student_id: string; mc_student_id: string | null; mc_sis_id: string | null };
 type CourseMap = { course_id: string; mc_tracker_id: string; mc_tracker_name: string | null };
 
+const SUBJECT_FILTER_KEY = "mc.subjectFilter";
+
 function useDebouncedSave<T extends Record<string, any>>(
   table: string,
   conflictKeys: string[],
