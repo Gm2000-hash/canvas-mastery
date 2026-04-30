@@ -204,6 +204,16 @@ export default function AssignmentGroups() {
     loadAll();
   }
 
+  async function attachLegacyToClassGroup(groupId: string, classGroupId: string) {
+    const { error } = await supabase
+      .from("assignment_groups")
+      .update({ class_group_id: classGroupId })
+      .eq("id", groupId);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Attached to class group");
+    loadAll();
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
