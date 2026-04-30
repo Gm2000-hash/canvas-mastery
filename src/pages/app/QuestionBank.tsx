@@ -20,6 +20,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, Cell } from "recharts";
+import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 
 type BankRow = {
   standard_id: string;
