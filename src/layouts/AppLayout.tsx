@@ -179,44 +179,46 @@ export default function AppLayout() {
   };
 
   return (
-    <SyncProvider>
-      <div className="min-h-screen md:flex bg-paper p-2 sm:p-4 gap-4">
-        <SyncStatusPill />
+    <ProfileProvider>
+      <SyncProvider>
+        <div className="min-h-screen md:flex bg-paper p-2 sm:p-4 gap-4">
+          <SyncStatusPill />
 
-        {/* Mobile top bar */}
-        <header className="md:hidden flex items-center justify-between bg-sidebar text-sidebar-foreground rounded-2xl border border-sidebar-border shadow-soft px-3 py-2 mb-2">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open navigation" className="text-sidebar-foreground">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0 bg-sidebar text-sidebar-foreground border-sidebar-border flex flex-col">
-              <SheetTitle className="sr-only">Navigation</SheetTitle>
-              <SheetDescription className="sr-only">Main app navigation</SheetDescription>
-              <NavList
-                items={items}
-                onNavigate={() => setMobileOpen(false)}
-                userEmail={user.email ?? ""}
-                onSignOut={handleSignOut}
-              />
-            </SheetContent>
-          </Sheet>
-          <Link to="/app" className="font-display text-lg">StandardsTrack</Link>
-          <div className="w-9" aria-hidden />
-        </header>
+          {/* Mobile top bar */}
+          <header className="md:hidden flex items-center justify-between bg-sidebar text-sidebar-foreground rounded-2xl border border-sidebar-border shadow-soft px-3 py-2 mb-2">
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Open navigation" className="text-sidebar-foreground">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72 p-0 bg-sidebar text-sidebar-foreground border-sidebar-border flex flex-col">
+                <SheetTitle className="sr-only">Navigation</SheetTitle>
+                <SheetDescription className="sr-only">Main app navigation</SheetDescription>
+                <NavList
+                  items={items}
+                  onNavigate={() => setMobileOpen(false)}
+                  userEmail={user.email ?? ""}
+                  onSignOut={handleSignOut}
+                />
+              </SheetContent>
+            </Sheet>
+            <Link to="/app" className="font-display text-lg">StandardsTrack</Link>
+            <div className="w-9" aria-hidden />
+          </header>
 
-        {/* Desktop sidebar */}
-        <aside className="hidden md:flex w-64 shrink-0 bg-sidebar text-sidebar-foreground flex-col rounded-[1.75rem] shadow-soft border border-sidebar-border">
-          <NavList items={items} userEmail={user.email ?? ""} onSignOut={handleSignOut} draggable onReorder={handleReorder} />
-        </aside>
+          {/* Desktop sidebar */}
+          <aside className="hidden md:flex w-64 shrink-0 bg-sidebar text-sidebar-foreground flex-col rounded-[1.75rem] shadow-soft border border-sidebar-border">
+            <NavList items={items} userEmail={user.email ?? ""} onSignOut={handleSignOut} draggable onReorder={handleReorder} />
+          </aside>
 
-        <main className="flex-1 min-w-0 bg-card rounded-[1.75rem] shadow-soft border overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 py-6 sm:px-8 sm:py-10">
-            <Outlet />
-          </div>
-        </main>
-      </div>
-    </SyncProvider>
+          <main className="flex-1 min-w-0 bg-card rounded-[1.75rem] shadow-soft border overflow-hidden">
+            <div className="max-w-6xl mx-auto px-4 py-6 sm:px-8 sm:py-10">
+              <Outlet />
+            </div>
+          </main>
+        </div>
+      </SyncProvider>
+    </ProfileProvider>
   );
 }
