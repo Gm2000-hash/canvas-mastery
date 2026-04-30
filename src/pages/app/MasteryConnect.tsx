@@ -293,7 +293,7 @@ function StandardsTab({ teacherId, standards, maps, onChange, subjectFilter }: {
               </tr>
             </thead>
             <tbody>
-              {standards.map(s => {
+              {visibleStandards.map(s => {
                 const m = maps[s.id];
                 return (
                   <tr key={s.id} className="border-t">
