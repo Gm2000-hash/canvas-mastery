@@ -338,23 +338,15 @@ export default function QuestionsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Question Bank</h1>
-          <p className="text-muted-foreground">
-            Every imported quiz question, organized by the standards (and substandards) it assesses.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setCsvOpen(true)}>
-            <FileUp className="h-4 w-4 mr-2" />
-            Import CSV
-          </Button>
-          <Button onClick={importAllScores} disabled={importing}>
-            {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-            Import quiz scores
-          </Button>
-        </div>
+      <div className="flex items-center justify-end gap-2 flex-wrap">
+        <Button variant="outline" onClick={() => setCsvOpen(true)}>
+          <FileUp className="h-4 w-4 mr-2" />
+          Import CSV
+        </Button>
+        <Button onClick={importAllScores} disabled={importing}>
+          {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+          Import quiz scores
+        </Button>
       </div>
 
       <ImportQuizCsvDialog
