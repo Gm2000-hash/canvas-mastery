@@ -1380,13 +1380,18 @@ export function CompareView({ courses }: { courses: Course[] }) {
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Content area</Label>
-            <Select value={subject || undefined} onValueChange={setSubject}>
-              <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Pick a subject…" /></SelectTrigger>
+            <Select value={subject || "__all"} onValueChange={(v) => setSubject(v === "__all" ? "" : v)}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="All subjects" /></SelectTrigger>
               <SelectContent>
-                {compareSubjects.length === 0 && <SelectItem value="__none" disabled>No subjects</SelectItem>}
+                <SelectItem value="__all">All subjects</SelectItem>
                 {compareSubjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            {compareSubjects.length === 0 && (
+              <p className="text-[11px] text-muted-foreground max-w-[220px] leading-snug">
+                Tip: tag disciplines on the Classes page to filter by subject.
+              </p>
+            )}
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Classes</Label>
@@ -1394,7 +1399,7 @@ export function CompareView({ courses }: { courses: Course[] }) {
               courses={subjectCourses}
               selected={selected}
               onChange={setSelected}
-              placeholder={subject ? "Pick classes…" : "Pick a content area first"}
+              placeholder="Pick classes…"
             />
           </div>
           <div className="space-y-1">
