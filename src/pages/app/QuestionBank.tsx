@@ -840,3 +840,118 @@ function EmptyState() {
     </Card>
   );
 }
+
+// ──────────────────────── Question performance chart ────────────────────────
+// Loads per-student responses for a single question and renders a 3-band
+// distribution (Basic / Proficient / Advanced) with student names on hover.
+const QB_BANDS = [
+  { key: "basic"      as const, label: "Basic (<60%)",        short: "Basic",      color: "hsl(0 72% 51%)" },
+  { key: "proficient" as const, label: "Proficient (60–80%)", short: "Proficient", color: "hsl(38 92% 50%)" },
+  { key: "advanced"   as const, label: "Advanced (≥80%)",     short: "Advanced",   color: "hsl(160 84% 39%)" },
+];
+type QBBandKey = "basic" | "proficient" | "advanced";
+
+function QuestionPerformanceChart({ questionId }: { questionId: string }) {
+  const [loading, setLoading] = useState(true);
+  const [namesByBand, setNamesByBand] = useState<Record<QBBandKey, string[]>>({ basic: [], proficient: [], advanced: [] });
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await supabase
+        .from("question_responses")
+        .select("points, points_possible, student_id, students(name)")
+        .eq("question_id", questionId);
+      if (cancelled) return;
+      if (error || !data) {
+        setNamesByBand({ basic: [], proficient: [], advanced: [] });
+        setLoading(false);
+        return;
+      }
+      const buckets: Record<QBBandKey, string[]> = { basic: [], proficient: [], advanced: [] };
+      for (const r of data as any[]) {
+        const pp = Number(r.points_possible ?? 0);
+        const pts = Number(r.points ?? 0);
+        if (!pp || pp <= 0) continue;
+        const pct = pts / pp;
+        const band: QBBandKey = pct < 0.6 ? "basic" : pct < 0.8 ? "proficient" : "advanced";
+        const name = r.students?.name ?? "Unknown";
+        buckets[band].push(name);
+      }
+      for (const k of Object.keys(buckets) as QBBandKey[]) {
+        buckets[k].sort((a, b) => a.localeCompare(b));
+      }
+      setNamesByBand(buckets);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [questionId]);
+
+  const data = QB_BANDS.map((b) => ({
+    name: b.short,
+    band: b.key,
+    color: b.color,
+    count: namesByBand[b.key].length,
+  }));
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+
+  return (
+    <div className="rounded-md border p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">Student performance</div>
+        <div className="text-[11px] text-muted-foreground">{total} student{total === 1 ? "" : "s"}</div>
+      </div>
+      {loading ? (
+        <Skeleton className="h-40 w-full" />
+      ) : total === 0 ? (
+        <div className="text-xs text-muted-foreground italic py-6 text-center">No scored responses yet.</div>
+      ) : (
+        <div className="h-40">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={28} />
+              <RechartsTooltip
+                cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+                content={(props: any) => {
+                  const { active, payload } = props;
+                  if (!active || !payload || payload.length === 0) return null;
+                  const row = payload[0].payload as { name: string; band: QBBandKey; color: string; count: number };
+                  const names = namesByBand[row.band];
+                  const MAX = 12;
+                  const shown = names.slice(0, MAX);
+                  const extra = names.length - shown.length;
+                  return (
+                    <div className="rounded-md border bg-popover/95 backdrop-blur px-3 py-2 shadow-md text-popover-foreground">
+                      <div className="text-xs font-semibold mb-1" style={{ color: row.color }}>
+                        {row.name}: {row.count}
+                      </div>
+                      {names.length === 0 ? (
+                        <div className="text-[11px] text-muted-foreground italic">No students</div>
+                      ) : (
+                        <ul className="space-y-0.5 max-w-[240px]">
+                          {shown.map((n, i) => (
+                            <li key={i} className="text-xs leading-tight truncate">• {n}</li>
+                          ))}
+                          {extra > 0 && <li className="text-[11px] text-muted-foreground">+{extra} more</li>}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                {data.map((d, i) => (
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  <Bar key={i} dataKey="count" fill={d.color} />
+                )) as any}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
