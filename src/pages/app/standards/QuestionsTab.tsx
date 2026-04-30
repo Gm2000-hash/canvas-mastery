@@ -65,6 +65,8 @@ type TreeNode = {
 type StatusFilter = "ALL" | "SUGGESTED" | "CONFIRMED";
 
 export default function QuestionsTab() {
+  const [urlParams, setUrlParams] = useSearchParams();
+  const urlStd = urlParams.get("std");
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseId, setCourseId] = useState<string>("ALL");
   const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
@@ -73,7 +75,7 @@ export default function QuestionsTab() {
   const [search, setSearch] = useState("");
   const [bank, setBank] = useState<BankRow[] | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [selectedStandardId, setSelectedStandardId] = useState<string | null>(null);
+  const [selectedStandardId, setSelectedStandardId] = useState<string | null>(urlStd);
   const [questions, setQuestions] = useState<QuestionRow[] | null>(null);
   const [loadingQs, setLoadingQs] = useState(false);
   const [openQuestion, setOpenQuestion] = useState<QuestionRow | null>(null);
@@ -82,6 +84,20 @@ export default function QuestionsTab() {
     { name: string; status: "ok" | "skipped" | "error"; responses: number; reason?: string }[] | null
   >(null);
   const [csvOpen, setCsvOpen] = useState(false);
+
+  // Sync external URL param changes (e.g., navigating from Library tab) into selection.
+  useEffect(() => {
+    if (urlStd && urlStd !== selectedStandardId) setSelectedStandardId(urlStd);
+    // eslint-disable-next-line
+  }, [urlStd]);
+
+  // When the dialog closes, drop the std param from the URL.
+  function clearSelectedStandard() {
+    setSelectedStandardId(null);
+    if (urlParams.get("std")) {
+      setUrlParams((p) => { p.delete("std"); return p; });
+    }
+  }
 
   // --- Load courses ---
   useEffect(() => {
