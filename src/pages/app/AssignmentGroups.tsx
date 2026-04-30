@@ -288,7 +288,9 @@ export default function AssignmentGroups() {
                       <Sparkles className={`h-3.5 w-3.5 mr-1.5 ${matchingId === cg.id ? "animate-pulse" : ""}`} />
                       {matchingId === cg.id ? "Finding…" : "Find equivalent assessments"}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditing(cg)}>
+                    <Button size="sm" variant="outline" onClick={() => setManualPickerCg(cg)} disabled={cg.course_count < 1}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add manually
+                    </Button>
                       <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => deleteClassGroup(cg.id)}>
