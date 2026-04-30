@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 
 type BankRow = {
   standard_id: string;
