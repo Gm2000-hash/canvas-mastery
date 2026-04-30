@@ -1164,10 +1164,13 @@ type CompareRow = {
 };
 
 const BANDS = [
-  { key: "below" as const,       label: "Below (<60%)",         color: "hsl(0 72% 51%)" },
-  { key: "approaching" as const, label: "Approaching (60–80%)", color: "hsl(38 92% 50%)" },
-  { key: "mastered" as const,    label: "Mastered (≥80%)",      color: "hsl(160 84% 39%)" },
+  { key: "below" as const,       label: "Basic (<60%)",          short: "Basic",      color: "hsl(0 72% 51%)" },
+  { key: "approaching" as const, label: "Proficient (60–80%)",   short: "Proficient", color: "hsl(38 92% 50%)" },
+  { key: "mastered" as const,    label: "Advanced (≥80%)",       short: "Advanced",   color: "hsl(160 84% 39%)" },
 ];
+
+type BandKey = "below" | "approaching" | "mastered";
+type StudentBandRow = { course_id: string; course_name: string; student_id: string; student_name: string; band: BandKey };
 
 type ScopeKind = "assignment" | "standard";
 type SplitMode = "all" | "by_class" | "by_level" | "class_x_level";
@@ -1188,6 +1191,7 @@ export function CompareView({ courses }: { courses: Course[] }) {
   const [groupOptions, setGroupOptions] = useState<{ id: string; name: string; course_count: number; member_count: number }[]>([]);
   const [standardOptions, setStandardOptions] = useState<{ id: string; code: string; description: string }[]>([]);
   const [rows, setRows] = useState<CompareRow[] | null>(null);
+  const [studentRows, setStudentRows] = useState<StudentBandRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Build a map of course_id → subject from teacher_disciplines (via courses.discipline_id).
@@ -1281,7 +1285,7 @@ export function CompareView({ courses }: { courses: Course[] }) {
   const canQuery = selected.length > 0 && !!targetId;
 
   useEffect(() => {
-    if (!canQuery) { setRows(null); return; }
+    if (!canQuery) { setRows(null); setStudentRows([]); return; }
     setLoading(true);
     // assignmentId is encoded as "assignment:<uuid>" or "group:<uuid>"
     let _assignment_id: string | null = null;
@@ -1291,15 +1295,19 @@ export function CompareView({ courses }: { courses: Course[] }) {
       else if (assignmentId.startsWith("assignment:")) _assignment_id = assignmentId.slice("assignment:".length);
       else _assignment_id = assignmentId; // fallback
     }
-    supabase.rpc("analytics_compare_classes" as any, {
+    const args = {
       _course_ids: selected,
       _assignment_id,
       _standard_id: scope === "standard" ? standardId : null,
       _assignment_group_id,
-    }).then(({ data, error }) => {
+    };
+    Promise.all([
+      supabase.rpc("analytics_compare_classes" as any, args),
+      supabase.rpc("analytics_compare_classes_students" as any, args),
+    ]).then(([agg, students]) => {
       setLoading(false);
-      if (error) { setRows([]); return; }
-      setRows(((data as any) ?? []) as CompareRow[]);
+      if (agg.error) { setRows([]); } else { setRows(((agg.data as any) ?? []) as CompareRow[]); }
+      if (students.error) { setStudentRows([]); } else { setStudentRows(((students.data as any) ?? []) as StudentBandRow[]); }
     });
   }, [canQuery, selected, scope, assignmentId, standardId]);
 
@@ -1349,8 +1357,22 @@ export function CompareView({ courses }: { courses: Course[] }) {
     }));
   }, [perCourse, split]);
 
+  // Lookup: students grouped by course_name → band → names[].
+  // Also a global "by band only" map for the by_level / all splits.
+  const namesByCourseBand = useMemo(() => {
+    const byCourse = new Map<string, Record<BandKey, string[]>>();
+    const byBand: Record<BandKey, string[]> = { below: [], approaching: [], mastered: [] };
+    for (const s of studentRows) {
+      const cur = byCourse.get(s.course_name) ?? { below: [], approaching: [], mastered: [] };
+      cur[s.band].push(s.student_name);
+      byCourse.set(s.course_name, cur);
+      byBand[s.band].push(s.student_name);
+    }
+    return { byCourse, byBand };
+  }, [studentRows]);
+
   function exportCsv() {
-    const header = ["Class", "n", "Avg %", "Below", "Approaching", "Mastered"];
+    const header = ["Class", "n", "Avg %", "Basic", "Proficient", "Advanced"];
     const lines = [header.join(",")];
     perCourse.forEach((c) => {
       lines.push([
@@ -1533,7 +1555,7 @@ export function CompareView({ courses }: { courses: Course[] }) {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartTooltip content={<CompareBandTooltip namesByCourseBand={namesByCourseBand} split={split} />} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {split === "by_level" ? (
                   <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" />
@@ -1560,9 +1582,9 @@ export function CompareView({ courses }: { courses: Course[] }) {
                 <TableHead>Class</TableHead>
                 <TableHead className="text-right">n</TableHead>
                 <TableHead className="text-right">Avg</TableHead>
-                <TableHead className="text-right" style={{ color: BANDS[0].color }}>Below</TableHead>
-                <TableHead className="text-right" style={{ color: BANDS[1].color }}>Approaching</TableHead>
-                <TableHead className="text-right" style={{ color: BANDS[2].color }}>Mastered</TableHead>
+                <TableHead className="text-right" style={{ color: BANDS[0].color }}>Basic</TableHead>
+                <TableHead className="text-right" style={{ color: BANDS[1].color }}>Proficient</TableHead>
+                <TableHead className="text-right" style={{ color: BANDS[2].color }}>Advanced</TableHead>
                 <TableHead className="text-right">% mastered</TableHead>
               </TableRow></TableHeader>
               <TableBody>
@@ -1586,5 +1608,94 @@ export function CompareView({ courses }: { courses: Course[] }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// Custom tooltip for the Compare classes bar chart. When hovering a band bar
+// (Basic / Proficient / Advanced), it lists the students that fall in that band
+// for the hovered class. For "by_level" / "all" splits it lists across all
+// selected classes. For the "by_class" Avg % bar it just shows the value.
+function CompareBandTooltip({
+  active,
+  payload,
+  label,
+  namesByCourseBand,
+  split,
+}: any) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const MAX_NAMES = 12;
+  const bandFromKey = (k: string) => BANDS.find((b) => b.key === k);
+  const bandFromLabel = (lbl: string) => BANDS.find((b) => b.label === lbl);
+
+  const renderNames = (names: string[]) => {
+    const sorted = [...names].sort((a, b) => a.localeCompare(b));
+    const shown = sorted.slice(0, MAX_NAMES);
+    const extra = sorted.length - shown.length;
+    return (
+      <ul className="mt-1 space-y-0.5 max-w-[260px]">
+        {shown.map((n, i) => (
+          <li key={i} className="text-xs leading-tight truncate">• {n}</li>
+        ))}
+        {extra > 0 && <li className="text-xs text-muted-foreground">+{extra} more</li>}
+      </ul>
+    );
+  };
+
+  return (
+    <div className="rounded-md border bg-popover/95 backdrop-blur px-3 py-2 shadow-md text-popover-foreground">
+      <div className="text-xs font-semibold mb-1">{label}</div>
+      {payload.map((p: any, idx: number) => {
+        const dataKey = p.dataKey as string;
+        const value = p.value;
+
+        // Avg % bar
+        if (dataKey === "avg_pct") {
+          return (
+            <div key={idx} className="text-xs">
+              <span className="inline-block w-2 h-2 rounded-sm mr-1.5 align-middle" style={{ background: p.color || p.fill }} />
+              Avg %: <span className="tabular-nums font-medium">{value}%</span>
+            </div>
+          );
+        }
+
+        // by_level: x-axis label is band label, dataKey is "count"
+        if (dataKey === "count") {
+          const band = bandFromLabel(label);
+          const names = band ? namesByCourseBand.byBand[band.key] : [];
+          return (
+            <div key={idx}>
+              <div className="text-xs">
+                <span className="inline-block w-2 h-2 rounded-sm mr-1.5 align-middle" style={{ background: band?.color || p.color }} />
+                <span className="font-medium" style={{ color: band?.color }}>{band?.short ?? label}</span>
+                : <span className="tabular-nums">{value}</span>
+              </div>
+              {names && names.length > 0 && renderNames(names)}
+            </div>
+          );
+        }
+
+        // band bar: dataKey = below/approaching/mastered
+        const band = bandFromKey(dataKey);
+        if (!band) return null;
+        let names: string[] = [];
+        if (split === "all") {
+          names = namesByCourseBand.byBand[band.key] ?? [];
+        } else {
+          // by_class is rendered as Avg %, so we only get here for class_x_level
+          names = namesByCourseBand.byCourse.get(label)?.[band.key] ?? [];
+        }
+        return (
+          <div key={idx} className="mt-1 first:mt-0">
+            <div className="text-xs">
+              <span className="inline-block w-2 h-2 rounded-sm mr-1.5 align-middle" style={{ background: band.color }} />
+              <span className="font-medium" style={{ color: band.color }}>{band.short}</span>
+              : <span className="tabular-nums">{value}</span>
+            </div>
+            {names.length > 0 && renderNames(names)}
+          </div>
+        );
+      })}
+    </div>
   );
 }
