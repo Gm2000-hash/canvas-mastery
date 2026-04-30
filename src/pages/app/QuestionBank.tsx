@@ -836,7 +836,7 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
               </div>
             )}
           </div>
-          <QuestionPerformanceChart questionId={question.id} />
+          <QuestionPerformanceChart questionId={question.id} revealedNames={revealedNames} />
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-md border p-3">
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Class average</div>
