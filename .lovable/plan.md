@@ -1,78 +1,65 @@
-# Department Analytics
+# Why classes aren't showing up in Compare Classes
 
-Add a Department area where teachers can see collective data across all teachers who teach the same subject + grade in the same school year. Real student names are visible only for the viewer's own students; all other students appear with pseudonyms.
+## Root cause
 
-## What gets built
+The Compare Classes dialog (`CompareView` in `src/pages/app/Analytics.tsx`) gates the **Classes** dropdown behind a **Content area** (subject) selector. The Classes list is computed as:
 
-### Navigation
-- New top-level sidebar item **"Department"** (icon: Users), in `src/layouts/AppLayout.tsx`.
-- Routes in `src/App.tsx`:
-  - `/app/department` — landing page that lists the user's available departments (Science, Social Studies, Math, ELA) inferred from their `teacher_disciplines` rows.
-  - `/app/department/:subject` — the department dashboard.
+```text
+subjectCourses = courses where courseSubjects[course.id] === selectedSubject
+```
 
-### Department landing (`/app/department`)
-- Cards for each of the four subjects the teacher participates in (based on `teacher_disciplines.subject`). Subjects without a discipline row are shown disabled with a "Add this subject in Settings" hint.
-- Each card shows: number of peer teachers, number of concurrent classes, total students, current school-year label.
+`courseSubjects` is built by joining `courses.discipline_id → teacher_disciplines.subject`. So a class only shows up if:
 
-### Department dashboard (`/app/department/:subject`)
-Filter bar:
-- **Grade** (multi) — defaults to all grades the viewer teaches in this subject.
-- **School year** — defaults to current; uses existing `recentSchoolYears()` helper.
-- **Framework** (auto-resolved from selected grade/subject; same logic as Analytics).
+1. The user has picked a **Content area** at the top of the dialog, AND
+2. The class has a **discipline tagged** on it (the little dashed "Set discipline" chip on the class card), AND
+3. That discipline has a `subject` matching the picked content area.
 
-Tabs (mirrors existing Analytics page so it feels native):
-1. **Overview** — KPIs (teachers, classes, students, avg mastery, % students mastered ≥ threshold), mastery distribution histogram, mastery trend line by week.
-2. **Standards** — table of standards covered in the department: # students assessed, # mastered, avg mastery, % mastered, with drill-down to per-class numbers (class names anonymized as "Class A, B, C…" for non-owners; viewer's own classes show real names).
-3. **Classes** — comparison table of all concurrent classes in the department: class label (real name if own, "Teacher #N · Period A" pseudonym otherwise), student count, avg mastery, % mastered. Sortable.
-4. **Students** — list of all students across the department. Viewer's own students show real names; peers' students show stable pseudonyms (`S-1`, `S-2`, …) per teacher. Columns: student label, class label, standards assessed, standards mastered, avg mastery, last activity. Search restricted to own students.
-5. **Assessments** — common assessments (matched by `assignments.name_normalized` across teachers in the department). Shows # teachers using it, # responses, avg %, standards tagged. Helpful for spotting de-facto common assessments.
+Your friend almost certainly hasn't tagged disciplines on his classes yet, so the **Content area** dropdown shows "No subjects" and the **Classes** picker stays disabled with the placeholder *"Pick a content area first."* Importing the same assessment into both classes has no effect on this — the gate is purely about disciplines.
 
-All tables export to CSV using the same pattern as the existing Analytics page; peer rows in the CSV use pseudonyms.
+This is a poor UX: the dialog gives no hint about *why* nothing appears, and forces a workflow (tag disciplines first) that isn't obvious.
 
-## Technical implementation
+## Fix
 
-### Database (one migration)
-Add a column + four security-definer RPCs. No new tables required — we use existing `teacher_disciplines`, `courses`, `students`, `mastery_snapshots`, `submissions`, `question_responses`, `assignments`.
+Make Compare Classes work out-of-the-box, and only use the subject filter as an *optional* narrowing tool.
 
-1. **Add school-year helper**: `public.school_year_for(ts timestamptz) returns text` (matches the JS `schoolYearLabelFor` Aug→Jul logic). Used inside RPCs to filter by year.
+### 1. Don't gate the Classes picker on subject
 
-2. **`department_membership(_subject text, _school_year text)`** *(security definer)* — returns the set of `teacher_id`s who have a `teacher_disciplines` row matching `_subject` AND have at least one non-archived course active in `_school_year`. Used both for permission checks and aggregations.
+In `CompareView`:
+- Default the **Content area** to "All subjects" (no filter).
+- Compute `subjectCourses` as: if no subject is picked, show all `courses`; otherwise filter by subject as today.
+- Update placeholder for the Classes multi-select to just "Pick classes…".
 
-3. **`department_overview(_subject text, _grade text[], _school_year text)`** — KPIs + distribution + weekly trend. Aggregates `mastery_snapshots` joined to `students.course_id → courses.discipline_id → teacher_disciplines` filtered by subject/grade and the membership set. **The caller must be in the membership set or the function returns empty.**
+### 2. Show a helpful empty state when no subjects exist
 
-4. **`department_standards(...)`**, **`department_classes(...)`**, **`department_students(...)`**, **`department_assessments(...)`** — same pattern. Each returns a `is_own boolean` flag per row plus a stable `pseudo_label text` for non-own rows so the client can render correctly without ever seeing peers' real names.
+When `compareSubjects.length === 0`, instead of a disabled "No subjects" item, render a small inline hint under the Content area dropdown:
 
-   Pseudonym generation:
-   - Teachers: `'Teacher #' || dense_rank() over (order by teacher_id)` scoped to the result set, deterministic per call.
-   - Students: `'S-' || dense_rank() over (partition by teacher_id order by student_id)` for non-own rows; own rows pass through real `students.name`.
-   - Classes: `'Class ' || chr(64 + dense_rank() over (...))` for non-own rows.
+> *Tag disciplines on your classes (Classes page → "Set discipline") to filter by content area.*
 
-   Critically: real `students.name`, `students.email`, and `student_identities.real_name` are **never** returned for non-own rows — the SQL only selects them when `students.teacher_id = auth.uid()`.
+Keep the dropdown usable with just an "All subjects" option.
 
-5. **RLS**: no table changes. All cross-teacher access is funneled through these security-definer RPCs, which enforce membership and column-level masking. No new direct SELECT policies are added.
+### 3. Standards picker fallback
 
-### Frontend
-- `src/pages/app/Department.tsx` — landing page (subject cards).
-- `src/pages/app/DepartmentDashboard.tsx` — tabbed dashboard. Reuses existing UI primitives (`Card`, `Tabs`, `Table`, `ChartContainer`, recharts) and `CourseMultiSelect`-style components for grade selection.
-- Add an info banner: *"You see real names only for your own students. Peer students appear as S-1, S-2…"*
-- The existing per-page `RevealNamesToggle` is **not** added on department pages — there is no path to reveal peer students.
-- Routes wired in `src/App.tsx`; nav entry added in `src/layouts/AppLayout.tsx`.
+`standardOptions` currently filters by `subject` when one is selected. When subject is empty, it already loads all standards — that path stays. No change needed beyond the subject default.
 
-### Pseudonym stability
-Per-call dense_rank gives stable labels within a single response. Across separate calls (e.g. the Classes tab vs the Students tab) labels may differ, which is acceptable because each tab is self-contained. We document this in a code comment.
+### 4. Don't drop selected classes when subject changes to empty
 
-## Out of scope
-- Cross-school-year department views (single year at a time).
-- Inviting peers / school admin role (uses existing teacher accounts only — any teacher with a matching discipline row sees the data).
-- Editing peer data — read-only across the board.
+The effect at lines 1218–1222 wipes `selected` when `subject` is empty. Change it to only prune selections when a subject is *actively chosen* and some selected classes don't match.
 
-## Files
+## Technical details
 
-Created:
-- `supabase/migrations/<ts>_department_analytics.sql`
-- `src/pages/app/Department.tsx`
-- `src/pages/app/DepartmentDashboard.tsx`
+**File:** `src/pages/app/Analytics.tsx` (`CompareView`, ~lines 1176–1410)
 
-Edited:
-- `src/App.tsx` (routes)
-- `src/layouts/AppLayout.tsx` (nav entry)
+- Add an explicit `"__all"` SelectItem labeled "All subjects" and treat it as no filter.
+- `subjectCourses` becomes `subject && subject !== "__all" ? courses.filter(...) : courses`.
+- Adjust the placeholder on `<CourseMultiSelect>` to "Pick classes…" unconditionally.
+- Add a one-line muted hint below the subject Select when `compareSubjects.length === 0`.
+- Remove the `if (!subject) { setSelected([]); return; }` line so changing subject back to "All" doesn't blow away the user's selection.
+
+No database, RLS, or edge function changes are required.
+
+## What your friend can do *right now* (no code change needed)
+
+As an immediate workaround until this ships:
+1. Go to **Classes**.
+2. On each of the two class cards, click the dashed **"Set discipline"** chip and pick (or create) a discipline (e.g. *Science · 8 · IN*). Both classes need the **same subject**.
+3. Reopen **Compare classes** — the subject will appear in *Content area*, and the two classes will show up in the *Classes* picker.
