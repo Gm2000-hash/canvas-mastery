@@ -1459,6 +1459,15 @@ export type Database = {
           trend: Json
         }[]
       }
+      department_scope_courses: {
+        Args: { _grades?: string[]; _school_year?: string; _subject: string }
+        Returns: {
+          course_id: string
+          grade: string
+          name: string
+          teacher_id: string
+        }[]
+      }
       department_standard_class_matrix: {
         Args: { _grades?: string[]; _school_year?: string; _subject: string }
         Returns: {
