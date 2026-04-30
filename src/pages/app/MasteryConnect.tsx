@@ -263,14 +263,15 @@ function StandardsTab({ teacherId, standards, maps, onChange, subjectFilter }: {
   };
 
   const mapped = Object.values(maps).filter(m => m.mc_code).length;
+  const subjLabel = subjectFilter === "all" ? "" : ` (${subjectFilter})`;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <CardTitle>Standard mappings</CardTitle>
-            <CardDescription>{mapped} of {standards.length} standards mapped to Mastery Connect codes.</CardDescription>
+            <CardTitle>Standard mappings{subjLabel}</CardTitle>
+            <CardDescription>Showing {visibleStandards.length} of {standards.length} standards · {mapped} mapped overall.</CardDescription>
           </div>
           <div className="flex gap-2">
             <input ref={fileRef} type="file" accept=".csv" hidden onChange={e => e.target.files?.[0] && handleImport(e.target.files[0])} />
