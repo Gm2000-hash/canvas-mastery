@@ -342,7 +342,7 @@ export default function AssignmentGroups() {
 
                   {/* Suggestions */}
                   {groupSugs.length > 0 && (
-                    <div>
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                           <Sparkles className="h-3 w-3" /> AI suggestions ({groupSugs.length})
