@@ -944,9 +944,8 @@ function QuestionPerformanceChart({ questionId }: { questionId: string }) {
               />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {data.map((d, i) => (
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  <Bar key={i} dataKey="count" fill={d.color} />
-                )) as any}
+                  <Cell key={i} fill={d.color} />
+                ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
