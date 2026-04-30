@@ -15,9 +15,10 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Layers, Sparkles, Check, Trash2, RefreshCw, Edit2, Plus, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Layers, Sparkles, Check, Trash2, RefreshCw, Edit2, Plus, X, ChevronDown, ChevronRight, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +68,7 @@ export default function AssignmentGroups() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ClassGroup | null>(null);
+  const [manualPickerCg, setManualPickerCg] = useState<ClassGroup | null>(null);
 
   async function loadAll() {
     setLoading(true);
@@ -203,6 +205,16 @@ export default function AssignmentGroups() {
     loadAll();
   }
 
+  async function attachLegacyToClassGroup(groupId: string, classGroupId: string) {
+    const { error } = await supabase
+      .from("assignment_groups")
+      .update({ class_group_id: classGroupId })
+      .eq("id", groupId);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Attached to class group");
+    loadAll();
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -276,6 +288,9 @@ export default function AssignmentGroups() {
                     >
                       <Sparkles className={`h-3.5 w-3.5 mr-1.5 ${matchingId === cg.id ? "animate-pulse" : ""}`} />
                       {matchingId === cg.id ? "Finding…" : "Find equivalent assessments"}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setManualPickerCg(cg)} disabled={cg.course_count < 1}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add manually
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setEditing(cg)}>
                       <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
@@ -387,9 +402,26 @@ export default function AssignmentGroups() {
                     <div className="text-sm truncate">{g.name}</div>
                     <div className="text-xs text-muted-foreground">{g.course_count} classes · {g.member_count} assignments</div>
                   </div>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteAssessmentGroup(g.group_id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-7" disabled={!classGroups || classGroups.length === 0}>
+                          <Link2 className="h-3.5 w-3.5 mr-1" /> Attach to…
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel className="text-xs">Move into class group</DropdownMenuLabel>
+                        {(classGroups ?? []).map((cg) => (
+                          <DropdownMenuItem key={cg.id} onClick={() => attachLegacyToClassGroup(g.group_id, cg.id)}>
+                            {cg.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteAssessmentGroup(g.group_id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -405,6 +437,17 @@ export default function AssignmentGroups() {
             existing={editing}
             onClose={() => setEditing(null)}
             onSaved={() => { setEditing(null); loadAll(); }}
+          />
+        )}
+      </Dialog>
+
+      {/* Manual picker */}
+      <Dialog open={!!manualPickerCg} onOpenChange={(o) => !o && setManualPickerCg(null)}>
+        {manualPickerCg && (
+          <ManualAssignmentPicker
+            classGroup={manualPickerCg}
+            onClose={() => setManualPickerCg(null)}
+            onSaved={() => { setManualPickerCg(null); loadAll(); }}
           />
         )}
       </Dialog>
@@ -507,6 +550,154 @@ function ClassGroupDialog({
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+}
+
+function ManualAssignmentPicker({
+  classGroup,
+  onClose,
+  onSaved,
+}: {
+  classGroup: { id: string; name: string; course_ids: string[] };
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  type Item = {
+    id: string;
+    name: string;
+    kind: "assignment" | "quiz";
+    course_id: string;
+    course_name?: string;
+    in_other_group: boolean;
+  };
+  const [items, setItems] = useState<Item[] | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [name, setName] = useState("");
+  const [search, setSearch] = useState("");
+  const [showInOtherGroups, setShowInOtherGroups] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if (classGroup.course_ids.length === 0) { setItems([]); return; }
+      const { data, error } = await supabase
+        .from("assignments")
+        .select("id, name, kind, course_id, assignment_group_id, courses:course_id(name)")
+        .in("course_id", classGroup.course_ids)
+        .order("name");
+      if (error) { toast.error(error.message); setItems([]); return; }
+      const list: Item[] = (data ?? []).map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        kind: a.kind,
+        course_id: a.course_id,
+        course_name: a.courses?.name,
+        in_other_group: !!a.assignment_group_id,
+      }));
+      setItems(list);
+    })();
+  }, [classGroup.id]);
+
+  const filtered = useMemo(() => {
+    if (!items) return [];
+    const q = search.trim().toLowerCase();
+    return items.filter((i) => {
+      if (i.in_other_group && !showInOtherGroups) return false;
+      if (q && !i.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [items, search, showInOtherGroups]);
+
+  function toggle(id: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  async function save() {
+    if (selected.size < 2) { toast.error("Pick at least 2 assignments to group as one equivalent assessment."); return; }
+    if (!name.trim()) { toast.error("Name required"); return; }
+    const ids = [...selected];
+    const courses = new Set((items ?? []).filter((i) => selected.has(i.id)).map((i) => i.course_id));
+    if (courses.size < 2) {
+      if (!confirm("These assignments are all from the same class. Group anyway?")) return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.rpc("apply_assignment_group_in_class_group" as any, {
+        _class_group_id: classGroup.id,
+        _name: name.trim(),
+        _assignment_ids: ids,
+        _group_id: null,
+      });
+      if (error) throw error;
+      toast.success("Equivalent assessment created");
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <DialogContent className="max-w-xl">
+      <DialogHeader>
+        <DialogTitle>Add equivalent assessment manually</DialogTitle>
+        <DialogDescription>
+          Pick assignments across <strong>{classGroup.name}</strong>'s classes that represent the same assessment.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-3">
+        <Input
+          placeholder="Equivalent assessment name (e.g. Pre-ECA Unit 1)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <div className="flex gap-2 items-center">
+          <Input placeholder="Search assignments…" value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+          <label className="text-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+            <Checkbox checked={showInOtherGroups} onCheckedChange={(v) => setShowInOtherGroups(!!v)} />
+            Show already grouped
+          </label>
+        </div>
+        {!items ? (
+          <Skeleton className="h-48" />
+        ) : filtered.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-6 text-center">No matching assignments.</div>
+        ) : (
+          <ScrollArea className="h-72 border rounded-md p-1">
+            <ul className="space-y-0.5">
+              {filtered.map((it) => (
+                <li key={it.id}>
+                  <label className={cn(
+                    "flex items-start gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm",
+                    selected.has(it.id) && "bg-muted/50",
+                  )}>
+                    <Checkbox checked={selected.has(it.id)} onCheckedChange={() => toggle(it.id)} className="mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate">{it.name}</div>
+                      <div className="text-xs text-muted-foreground flex flex-wrap gap-1.5">
+                        <Badge variant="outline" className="text-[10px] py-0 h-4">{it.kind}</Badge>
+                        <span className="truncate">{it.course_name}</span>
+                        {it.in_other_group && <span className="text-amber-600 dark:text-amber-400">already grouped</span>}
+                      </div>
+                    </div>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </ScrollArea>
+        )}
+        <div className="text-xs text-muted-foreground">{selected.size} selected</div>
+      </div>
+      <DialogFooter>
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button onClick={save} disabled={saving || selected.size < 2}>{saving ? "Saving…" : "Create equivalent assessment"}</Button>
       </DialogFooter>
     </DialogContent>
   );
