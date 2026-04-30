@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Trash2, BookMarked, Library } from "lucide-react";
+import { Plus, Trash2, BookMarked, Library, ChevronDown, ChevronRight } from "lucide-react";
 import { FRAMEWORKS, getFramework, SUBJECTS, GRADES, STATES, type FrameworkId } from "@/lib/frameworks";
 import QuestionsTab from "./standards/QuestionsTab";
+import StandardQuestionsAccordion from "./standards/StandardQuestionsAccordion";
 
 type Standard = {
   id: string;
