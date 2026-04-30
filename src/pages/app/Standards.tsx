@@ -33,7 +33,7 @@ export default function Standards() {
     setParams((p) => {
       if (v === "library") p.delete("tab"); else p.set("tab", v);
       return p;
-    }, { replace: true });
+    });
   };
 
   return (
