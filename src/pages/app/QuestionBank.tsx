@@ -758,7 +758,7 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
   }
   return (
     <Sheet open={!!question} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-2xl">
+      <SheetContent className="sm:max-w-2xl overflow-y-auto max-h-screen">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             Question {question.position ?? "?"}
@@ -771,6 +771,14 @@ function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; o
               From <span className="font-medium">{question.assignments.name}</span>
             </SheetDescription>
           )}
+          <div className="pt-2">
+            <RevealNamesToggle
+              revealed={revealed}
+              loading={revealLoading}
+              onReveal={revealNames}
+              onHide={hideNames}
+            />
+          </div>
         </SheetHeader>
         <div className="mt-6 space-y-5">
           <div>
