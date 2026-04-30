@@ -400,6 +400,25 @@ function AssignmentRow({ assignment, tags, onChange }: { assignment: Assignment;
               {tagging ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
               AI suggest
             </Button>
+            {tags.some((t) => !t.confirmed) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={async () => {
+                  const ids = tags.filter((t) => !t.confirmed).map((t) => t.id);
+                  if (ids.length > 0) {
+                    const { error } = await supabase.from("assignment_standards").delete().in("id", ids);
+                    if (error) { toast.error(error.message); return; }
+                  }
+                  await aiSuggest();
+                }}
+                disabled={tagging}
+                title="Clear unconfirmed suggestions and ask AI again"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${tagging ? "animate-spin" : ""}`} />
+                Regenerate
+              </Button>
+            )}
             {assignment.kind === "quiz" && (
               <Button
                 size="sm"
