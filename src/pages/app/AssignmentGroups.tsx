@@ -297,8 +297,13 @@ export default function AssignmentGroups() {
                   {/* Suggestions */}
                   {groupSugs.length > 0 && (
                     <div>
-                      <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-                        <Sparkles className="h-3 w-3" /> AI suggestions
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                          <Sparkles className="h-3 w-3" /> AI suggestions ({groupSugs.length})
+                        </div>
+                        <Button size="sm" variant="outline" className="h-7" onClick={() => confirmAllSuggestions(cg)}>
+                          <Check className="h-3.5 w-3.5 mr-1" /> Approve all
+                        </Button>
                       </div>
                       <ul className="space-y-2">
                         {groupSugs.map((s) => (
