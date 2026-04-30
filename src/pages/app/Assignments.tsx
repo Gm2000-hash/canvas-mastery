@@ -178,12 +178,28 @@ export default function Assignments() {
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           {lockedCourseId && (
-            <Link
-              to="/app/classes"
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2"
-            >
-              <ArrowLeft className="h-3 w-3" /> All classes
-            </Link>
+            <nav aria-label="Breadcrumb" className="mb-3">
+              <ol className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <li>
+                  <Link to="/app" className="hover:text-foreground transition-colors">Dashboard</Link>
+                </li>
+                <li aria-hidden className="text-muted-foreground/50">/</li>
+                <li>
+                  <Link to="/app/classes" className="hover:text-foreground transition-colors">Classes</Link>
+                </li>
+                <li aria-hidden className="text-muted-foreground/50">/</li>
+                <li>
+                  <Link
+                    to={`/app/classes/${lockedCourseId}`}
+                    className="hover:text-foreground transition-colors"
+                  >
+                    {currentCourse?.name ?? "Class"}
+                  </Link>
+                </li>
+                <li aria-hidden className="text-muted-foreground/50">/</li>
+                <li aria-current="page" className="text-foreground font-medium">Assignments</li>
+              </ol>
+            </nav>
           )}
           <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">
             {lockedCourseId && currentCourse ? `${currentCourse.name} — Assignments` : "Assignments"}
