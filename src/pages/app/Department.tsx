@@ -11,7 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Beaker, BookOpen, Calculator, Globe2, Atom, ArrowRight, Info, Plus, Loader2 } from "lucide-react";
+import { Beaker, BookOpen, Calculator, Globe2, Atom, ArrowRight, Info, Plus, Loader2, LogOut } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { currentSchoolYearLabel, recentSchoolYears } from "@/lib/schoolYear";
 import { GRADES } from "@/lib/frameworks";
 import { toast } from "sonner";
@@ -64,6 +74,37 @@ export default function Department() {
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [joiningSubject, setJoiningSubject] = useState<string | null>(null);
+  const [leavingSubject, setLeavingSubject] = useState<string | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState<string | null>(null);
+
+  async function leaveDepartment(s: string) {
+    setLeavingSubject(s);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) { toast.error("Please sign in"); return; }
+      const { error } = await supabase
+        .from("teacher_disciplines")
+        .delete()
+        .eq("teacher_id", u.user.id)
+        .eq("subject", s);
+      if (error) { toast.error(error.message); return; }
+      // Clear default subject if it matches
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("default_subject")
+        .eq("id", u.user.id)
+        .maybeSingle();
+      if (profile?.default_subject === s) {
+        await supabase.from("profiles").update({ default_subject: null }).eq("id", u.user.id);
+      }
+      toast.success(`Left ${s} department`);
+      if (subject === s) setSubject("");
+      await reloadSubjects();
+    } finally {
+      setLeavingSubject(null);
+      setConfirmLeave(null);
+    }
+  }
 
   async function reloadSubjects(autoSelect: string | null = null) {
     setLoadingSubjects(true);
@@ -228,11 +269,22 @@ export default function Department() {
               {loadingSubjects ? (
                 <Skeleton className="h-12 w-full mt-3" />
               ) : enabled ? (
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                  <Stat n={r!.teacher_count} l="Teachers" />
-                  <Stat n={r!.class_count} l="Classes" />
-                  <Stat n={r!.student_count} l="Students" />
-                </div>
+                <>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                    <Stat n={r!.teacher_count} l="Teachers" />
+                    <Stat n={r!.class_count} l="Classes" />
+                    <Stat n={r!.student_count} l="Students" />
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="w-full rounded-full mt-3 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => { e.stopPropagation(); setConfirmLeave(s); }}
+                  >
+                    <LogOut className="h-3.5 w-3.5 mr-1" /> Leave
+                  </Button>
+                </>
+
               ) : (
                 <div className="mt-3 space-y-2">
                   <p className="text-xs text-muted-foreground">
@@ -261,13 +313,25 @@ export default function Department() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">Other:</span>
           {rows.filter((r) => !FEATURED.includes(r.subject)).map((r) => (
-            <button
+            <span
               key={r.subject}
-              onClick={() => setSubject(r.subject)}
-              className={`text-xs px-3 py-1 rounded-full border ${subject === r.subject ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+              className={`inline-flex items-center text-xs rounded-full border ${subject === r.subject ? "bg-primary text-primary-foreground border-primary" : "bg-background"}`}
             >
-              {r.subject}
-            </button>
+              <button
+                onClick={() => setSubject(r.subject)}
+                className={`px-3 py-1 rounded-l-full ${subject === r.subject ? "" : "hover:bg-muted"}`}
+              >
+                {r.subject}
+              </button>
+              <button
+                onClick={() => setConfirmLeave(r.subject)}
+                title={`Leave ${r.subject}`}
+                aria-label={`Leave ${r.subject}`}
+                className={`px-2 py-1 rounded-r-full border-l ${subject === r.subject ? "border-primary-foreground/30 hover:bg-primary-foreground/10" : "border-border hover:bg-destructive/10 hover:text-destructive"}`}
+              >
+                ×
+              </button>
+            </span>
           ))}
         </div>
       )}
@@ -419,6 +483,28 @@ export default function Department() {
           </Card>
         </div>
       )}
+
+      <AlertDialog open={!!confirmLeave} onOpenChange={(o) => !o && setConfirmLeave(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave {confirmLeave} department?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll stop seeing collective {confirmLeave} analytics and your classes will no longer
+              be included in peers' department views for this subject. You can rejoin anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!leavingSubject}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!!leavingSubject}
+              onClick={(e) => { e.preventDefault(); if (confirmLeave) leaveDepartment(confirmLeave); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {leavingSubject ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Leaving…</> : "Leave department"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
