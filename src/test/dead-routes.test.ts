@@ -52,13 +52,28 @@ function extractRoutes(): RoutePattern[] {
   for (const raw of lines) {
     const line = raw.trim();
 
-    // <Route path="…" …/> or <Route path="…" …>
-    const routeMatch = line.match(/<Route\s+([^>]*?)(\/?)>/);
-    if (routeMatch) {
-      const attrs = routeMatch[1];
-      const selfClosing = routeMatch[2] === "/";
-      const pathAttr = attrs.match(/path="([^"]*)"/);
-      const isIndex = /\bindex\b/.test(attrs);
+    // </Route> — pop a parent (handle first so a line containing both an
+    // opening tag and a closing tag updates state correctly).
+    if (/^<\/Route>/.test(line)) {
+      if (stack.length > 1) stack.pop();
+      continue;
+    }
+
+    // <Route …> on this line. We only care about `path` and whether the tag
+    // is the *outer* JSX element on this line — i.e. whether the line ends
+    // with a closing `>` for the Route, not for an inner element like
+    // `element={<Foo />}`. A simple, robust heuristic: the line does NOT
+    // self-close the Route when it ends in `>` and the last non-whitespace
+    // chars before that `>` are not `/`. Inner self-closing tags like
+    // `<AppLayout />` end with `/>` *before* the final `>` of the Route,
+    // so the very last two chars of the line decide it.
+    const routeOpen = line.match(/<Route\b([^>]*?path="([^"]*)"[^>]*)?/);
+    const isRouteLine = /<Route\b/.test(line);
+    if (isRouteLine) {
+      const pathAttr = line.match(/<Route\b[^>]*?\bpath="([^"]*)"/);
+      const isIndex = /<Route\b[^>]*?\bindex\b/.test(line);
+      const lastTwo = line.slice(-2);
+      const isParent = lastTwo === "})>" || (line.endsWith(">") && !line.endsWith("/>"));
 
       // Determine this route's full path.
       let full = stack[stack.length - 1];
@@ -72,22 +87,15 @@ function extractRoutes(): RoutePattern[] {
         }
         paths.add(full || "/");
       } else if (isIndex) {
-        // <Route index> reuses parent path
         paths.add(stack[stack.length - 1] || "/");
       }
 
-      // Push a new parent if this Route may contain children.
-      if (pathAttr && !selfClosing) {
+      if (pathAttr && isParent) {
         stack.push(full);
       }
       continue;
     }
-
-    // </Route> — pop a parent.
-    if (line.startsWith("</Route>")) {
-      if (stack.length > 1) stack.pop();
-      continue;
-    }
+    void routeOpen;
 
     // <Navigate to="/some/path" …/> — also a valid destination.
     const navMatch = line.match(/<Navigate\s+[^>]*to="([^"]+)"/);
