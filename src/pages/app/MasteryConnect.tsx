@@ -22,6 +22,8 @@ type AssessMap = { assignment_id: string | null; mc_assessment_id: string; mc_as
 type StudentMap = { student_id: string; mc_student_id: string | null; mc_sis_id: string | null };
 type CourseMap = { course_id: string; mc_tracker_id: string; mc_tracker_name: string | null };
 
+const SUBJECT_FILTER_KEY = "mc.subjectFilter";
+
 function useDebouncedSave<T extends Record<string, any>>(
   table: string,
   conflictKeys: string[],
@@ -52,6 +54,20 @@ export default function MasteryConnect() {
   const [studentMaps, setStudentMaps] = useState<Record<string, StudentMap>>({});
   const [courseMaps, setCourseMaps] = useState<Record<string, CourseMap>>({});
 
+  // Map: assignment_id -> Set<subject> (derived from tagged standards)
+  const [assignmentSubjects, setAssignmentSubjects] = useState<Record<string, string[]>>({});
+
+  const [subjectFilter, setSubjectFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "all";
+    return window.localStorage.getItem(SUBJECT_FILTER_KEY) ?? "all";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SUBJECT_FILTER_KEY, subjectFilter);
+    }
+  }, [subjectFilter]);
+
   useEffect(() => {
     document.title = "Mastery Connect Integration";
     (async () => {
@@ -60,7 +76,7 @@ export default function MasteryConnect() {
       setTeacherId(user.id);
 
       // Standards used (referenced by assignments or question tags), plus all owned/shared
-      const [stdRes, crsRes, stuRes, asgRes, smRes, amRes, smnRes, cmRes] = await Promise.all([
+      const [stdRes, crsRes, stuRes, asgRes, smRes, amRes, smnRes, cmRes, asRes] = await Promise.all([
         supabase.from("standards").select("id,code,description,subject,grade").order("code"),
         supabase.from("courses").select("id,name").order("name"),
         supabase.from("students").select("id,name,course_id").order("sortable_name"),
@@ -69,8 +85,10 @@ export default function MasteryConnect() {
         supabase.from("mc_assessment_mappings").select("assignment_id,mc_assessment_id,mc_assessment_name").not("assignment_id", "is", null),
         supabase.from("mc_student_mappings").select("student_id,mc_student_id,mc_sis_id"),
         supabase.from("mc_course_mappings").select("course_id,mc_tracker_id,mc_tracker_name"),
+        supabase.from("assignment_standards").select("assignment_id,standard_id"),
       ]);
-      setStandards((stdRes.data ?? []) as Standard[]);
+      const stds = (stdRes.data ?? []) as Standard[];
+      setStandards(stds);
       setCourses((crsRes.data ?? []) as Course[]);
       setStudents((stuRes.data ?? []) as Student[]);
       setAssignments((asgRes.data ?? []) as Assignment[]);
@@ -78,9 +96,27 @@ export default function MasteryConnect() {
       setAssessMaps(Object.fromEntries(((amRes.data ?? []) as AssessMap[]).map(m => [m.assignment_id!, m])));
       setStudentMaps(Object.fromEntries(((smnRes.data ?? []) as StudentMap[]).map(m => [m.student_id, m])));
       setCourseMaps(Object.fromEntries(((cmRes.data ?? []) as CourseMap[]).map(m => [m.course_id, m])));
+
+      // Build assignment -> subjects map via tagged standards
+      const stdSubject = new Map(stds.map(s => [s.id, s.subject]));
+      const aSubs: Record<string, Set<string>> = {};
+      for (const row of (asRes.data ?? []) as { assignment_id: string; standard_id: string }[]) {
+        const subj = stdSubject.get(row.standard_id);
+        if (!subj) continue;
+        (aSubs[row.assignment_id] ||= new Set()).add(subj);
+      }
+      setAssignmentSubjects(
+        Object.fromEntries(Object.entries(aSubs).map(([k, v]) => [k, Array.from(v)]))
+      );
       setLoading(false);
     })();
   }, []);
+
+  const subjectOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of standards) if (s.subject) set.add(s.subject);
+    return Array.from(set).sort();
+  }, [standards]);
 
   if (loading || !teacherId) {
     return <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>;
@@ -88,13 +124,25 @@ export default function MasteryConnect() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-3xl flex items-center gap-2">
-          <ArrowRightLeft className="h-7 w-7" /> Mastery Connect
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Map standards, assessments, students, and classes between this app and Mastery Connect, then export CSV files you can upload to MC (or hand to your district for SFTP ingest).
-        </p>
+      <header className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="font-display text-3xl flex items-center gap-2">
+            <ArrowRightLeft className="h-7 w-7" /> Mastery Connect
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Map standards, assessments, students, and classes between this app and Mastery Connect, then export CSV files you can upload to MC (or hand to your district for SFTP ingest).
+          </p>
+        </div>
+        <div className="min-w-56">
+          <Label className="text-xs text-muted-foreground">Subject area</Label>
+          <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+            <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All subjects</SelectItem>
+              {subjectOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </header>
 
       <Tabs defaultValue="standards" className="w-full">
@@ -112,6 +160,7 @@ export default function MasteryConnect() {
             standards={standards}
             maps={stdMaps}
             onChange={setStdMaps}
+            subjectFilter={subjectFilter}
           />
         </TabsContent>
         <TabsContent value="assessments" className="mt-4">
@@ -121,6 +170,8 @@ export default function MasteryConnect() {
             courses={courses}
             maps={assessMaps}
             onChange={setAssessMaps}
+            subjectFilter={subjectFilter}
+            assignmentSubjects={assignmentSubjects}
           />
         </TabsContent>
         <TabsContent value="students" className="mt-4">
@@ -156,12 +207,16 @@ export default function MasteryConnect() {
 }
 
 /* ---------- Standards ---------- */
-function StandardsTab({ teacherId, standards, maps, onChange }: {
+function StandardsTab({ teacherId, standards, maps, onChange, subjectFilter }: {
   teacherId: string;
   standards: Standard[];
   maps: Record<string, StdMap>;
   onChange: (m: Record<string, StdMap>) => void;
+  subjectFilter: string;
 }) {
+  const visibleStandards = subjectFilter === "all"
+    ? standards
+    : standards.filter(s => s.subject === subjectFilter);
   const save = useDebouncedSave<{ teacher_id: string; standard_id: string; mc_code: string; mc_name: string | null }>(
     "mc_standard_mappings", ["teacher_id", "standard_id"]
   );
@@ -208,14 +263,15 @@ function StandardsTab({ teacherId, standards, maps, onChange }: {
   };
 
   const mapped = Object.values(maps).filter(m => m.mc_code).length;
+  const subjLabel = subjectFilter === "all" ? "" : ` (${subjectFilter})`;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <CardTitle>Standard mappings</CardTitle>
-            <CardDescription>{mapped} of {standards.length} standards mapped to Mastery Connect codes.</CardDescription>
+            <CardTitle>Standard mappings{subjLabel}</CardTitle>
+            <CardDescription>Showing {visibleStandards.length} of {standards.length} standards · {mapped} mapped overall.</CardDescription>
           </div>
           <div className="flex gap-2">
             <input ref={fileRef} type="file" accept=".csv" hidden onChange={e => e.target.files?.[0] && handleImport(e.target.files[0])} />
@@ -237,7 +293,7 @@ function StandardsTab({ teacherId, standards, maps, onChange }: {
               </tr>
             </thead>
             <tbody>
-              {standards.map(s => {
+              {visibleStandards.map(s => {
                 const m = maps[s.id];
                 return (
                   <tr key={s.id} className="border-t">
@@ -257,12 +313,14 @@ function StandardsTab({ teacherId, standards, maps, onChange }: {
 }
 
 /* ---------- Assessments ---------- */
-function AssessmentsTab({ teacherId, assignments, courses, maps, onChange }: {
+function AssessmentsTab({ teacherId, assignments, courses, maps, onChange, subjectFilter, assignmentSubjects }: {
   teacherId: string;
   assignments: Assignment[];
   courses: Course[];
   maps: Record<string, AssessMap>;
   onChange: (m: Record<string, AssessMap>) => void;
+  subjectFilter: string;
+  assignmentSubjects: Record<string, string[]>;
 }) {
   const [courseFilter, setCourseFilter] = useState<string>("all");
   const save = useDebouncedSave<any>("mc_assessment_mappings", ["teacher_id", "assignment_id"]);
@@ -277,17 +335,24 @@ function AssessmentsTab({ teacherId, assignments, courses, maps, onChange }: {
     });
   };
 
-  const filtered = courseFilter === "all" ? assignments : assignments.filter(a => a.course_id === courseFilter);
+  const subjectScoped = subjectFilter === "all"
+    ? assignments
+    : assignments.filter(a => (assignmentSubjects[a.id] ?? []).includes(subjectFilter));
+  const filtered = courseFilter === "all" ? subjectScoped : subjectScoped.filter(a => a.course_id === courseFilter);
   const courseName = (id: string) => courses.find(c => c.id === id)?.name ?? "—";
   const mapped = Object.values(maps).filter(m => m.mc_assessment_id).length;
+  const subjLabel = subjectFilter === "all" ? "" : ` (${subjectFilter})`;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <CardTitle>Assessment mappings</CardTitle>
-            <CardDescription>{mapped} of {assignments.length} Canvas assignments mapped.</CardDescription>
+            <CardTitle>Assessment mappings{subjLabel}</CardTitle>
+            <CardDescription>
+              Showing {filtered.length} of {assignments.length} assignments · {mapped} mapped overall.
+              {subjectFilter !== "all" && " Only assignments tagged to standards in this subject are shown."}
+            </CardDescription>
           </div>
           <Select value={courseFilter} onValueChange={setCourseFilter}>
             <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
