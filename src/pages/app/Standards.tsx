@@ -32,6 +32,14 @@ export default function Standards() {
   const setTab = (v: string) => {
     setParams((p) => {
       if (v === "library") p.delete("tab"); else p.set("tab", v);
+      p.delete("std");
+      return p;
+    });
+  };
+  const openStandardInQuestions = (standardId: string) => {
+    setParams((p) => {
+      p.set("tab", "questions");
+      p.set("std", standardId);
       return p;
     });
   };
