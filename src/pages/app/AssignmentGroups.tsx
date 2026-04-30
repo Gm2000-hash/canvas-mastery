@@ -441,6 +441,17 @@ export default function AssignmentGroups() {
         )}
       </Dialog>
 
+      {/* Manual picker */}
+      <Dialog open={!!manualPickerCg} onOpenChange={(o) => !o && setManualPickerCg(null)}>
+        {manualPickerCg && (
+          <ManualAssignmentPicker
+            classGroup={manualPickerCg}
+            onClose={() => setManualPickerCg(null)}
+            onSaved={() => { setManualPickerCg(null); loadAll(); }}
+          />
+        )}
+      </Dialog>
+
       <div className="text-xs text-muted-foreground">
         Tip: open the <Link to="/app/classes" className="underline">Compare classes</Link> tab on Analytics to chart a confirmed equivalent assessment across all its sections.
       </div>
