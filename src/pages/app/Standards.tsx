@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Trash2, BookMarked, Library } from "lucide-react";
+import { Plus, Trash2, BookMarked, Library, ChevronDown, ChevronRight } from "lucide-react";
 import { FRAMEWORKS, getFramework, SUBJECTS, GRADES, STATES, type FrameworkId } from "@/lib/frameworks";
 import QuestionsTab from "./standards/QuestionsTab";
+import StandardQuestionsAccordion from "./standards/StandardQuestionsAccordion";
 
 type Standard = {
   id: string;
@@ -32,14 +33,6 @@ export default function Standards() {
   const setTab = (v: string) => {
     setParams((p) => {
       if (v === "library") p.delete("tab"); else p.set("tab", v);
-      p.delete("std");
-      return p;
-    });
-  };
-  const openStandardInQuestions = (standardId: string) => {
-    setParams((p) => {
-      p.set("tab", "questions");
-      p.set("std", standardId);
       return p;
     });
   };
@@ -63,7 +56,7 @@ export default function Standards() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="library" className="mt-0">
-          <StandardsLibraryTab onOpenQuestions={openStandardInQuestions} />
+          <StandardsLibraryTab />
         </TabsContent>
         <TabsContent value="questions" className="mt-0">
           <QuestionsTab />
@@ -73,7 +66,7 @@ export default function Standards() {
   );
 }
 
-function StandardsLibraryTab({ onOpenQuestions }: { onOpenQuestions: (standardId: string) => void }) {
+function StandardsLibraryTab() {
   const [rows, setRows] = useState<Standard[]>([]);
   const [filter, setFilter] = useState("");
   const [frameworkFilter, setFrameworkFilter] = useState<string>("ALL");
@@ -81,13 +74,33 @@ function StandardsLibraryTab({ onOpenQuestions }: { onOpenQuestions: (standardId
   const [subjectFilter, setSubjectFilter] = useState<string>("ALL");
   const [gradeFilter, setGradeFilter] = useState<string>("ALL");
   const [profile, setProfile] = useState<{ state: string | null; default_subject: string | null; default_grade: string | null } | null>(null);
+  // Inline expansion state — only one standard expands at a time so the page
+  // doesn't turn into a wall of nested panels.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Per-standard tagged-question counts so each row can show "Nq" without
+  // having to expand it first.
+  const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({});
 
   async function load() {
     const { data } = await supabase.from("standards").select("*").order("code");
     setRows((data as any) ?? []);
   }
+  async function loadQuestionCounts() {
+    // Pull all tag rows the teacher can see and aggregate distinct questions
+    // per standard. RLS keeps this scoped to the current teacher's data.
+    const { data } = await supabase.from("question_standards").select("standard_id, question_id");
+    const map: Record<string, Set<string>> = {};
+    for (const r of (data as any[]) ?? []) {
+      if (!map[r.standard_id]) map[r.standard_id] = new Set();
+      map[r.standard_id].add(r.question_id);
+    }
+    const counts: Record<string, number> = {};
+    for (const k of Object.keys(map)) counts[k] = map[k].size;
+    setQuestionCounts(counts);
+  }
   useEffect(() => {
     load();
+    loadQuestionCounts();
     supabase.from("profiles").select("state, default_subject, default_grade").maybeSingle().then(({ data }) => setProfile(data as any));
   }, []);
 
@@ -283,39 +296,59 @@ function StandardsLibraryTab({ onOpenQuestions }: { onOpenQuestions: (standardId
           {visible.map((s) => {
             const fwId = s.framework ?? "STATE";
             const fw = getFramework(fwId);
+            const isExpanded = expandedId === s.id;
+            const qCount = questionCounts[s.id] ?? 0;
             return (
-              <div
-                key={s.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => onOpenQuestions(s.id)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenQuestions(s.id); } }}
-                className="p-4 flex items-start gap-3 hover:bg-muted/40 cursor-pointer transition-colors"
-                title="View questions tagged to this standard"
-              >
-                <Badge
-                  variant="outline"
-                  className={`text-[11px] shrink-0 mt-0.5 ${fwBadgeClass(fwId)}`}
-                  title={`${fw.label}${fw.national ? " (national)" : " (state)"} — ${fw.description}`}
+              <div key={s.id}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setExpandedId(isExpanded ? null : s.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setExpandedId(isExpanded ? null : s.id);
+                    }
+                  }}
+                  className="p-4 flex items-start gap-3 hover:bg-muted/40 cursor-pointer transition-colors"
+                  aria-expanded={isExpanded}
+                  title={isExpanded ? "Hide tagged questions" : "Show tagged questions"}
                 >
-                  {fw.shortLabel}
-                </Badge>
-                <div className="font-code text-xs text-muted-foreground w-36 shrink-0 pt-0.5 break-all">{s.code}</div>
-                <div className="flex-1 min-w-0 text-sm">{s.description}</div>
-                <div className="text-xs text-muted-foreground shrink-0 flex items-center gap-1.5">
-                  <span className={fw.national ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
-                    {fw.national ? "National" : "State"}
+                  <span className="shrink-0 mt-0.5 text-muted-foreground" aria-hidden>
+                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </span>
-                  <span>·</span>
-                  <span>{s.state || "—"} · {s.subject} · G{s.grade}</span>
+                  <Badge
+                    variant="outline"
+                    className={`text-[11px] shrink-0 mt-0.5 ${fwBadgeClass(fwId)}`}
+                    title={`${fw.label}${fw.national ? " (national)" : " (state)"} — ${fw.description}`}
+                  >
+                    {fw.shortLabel}
+                  </Badge>
+                  <div className="font-code text-xs text-muted-foreground w-36 shrink-0 pt-0.5 break-all">{s.code}</div>
+                  <div className="flex-1 min-w-0 text-sm">{s.description}</div>
+                  <Badge
+                    variant="outline"
+                    className={`text-[11px] shrink-0 font-code ${qCount > 0 ? "bg-accent/10 border-accent/30 text-accent" : "text-muted-foreground"}`}
+                    title={qCount > 0 ? `${qCount} tagged question${qCount === 1 ? "" : "s"}` : "No questions tagged yet"}
+                  >
+                    {qCount}q
+                  </Badge>
+                  <div className="text-xs text-muted-foreground shrink-0 flex items-center gap-1.5">
+                    <span className={fw.national ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
+                      {fw.national ? "National" : "State"}
+                    </span>
+                    <span>·</span>
+                    <span>{s.state || "—"} · {s.subject} · G{s.grade}</span>
+                  </div>
+                  {s.teacher_id !== null && (
+                    <Button size="sm" variant="ghost" onClick={async (e) => {
+                      e.stopPropagation();
+                      const { error } = await supabase.from("standards").delete().eq("id", s.id);
+                      if (error) toast.error(error.message); else { toast.success("Deleted"); load(); loadQuestionCounts(); }
+                    }}><Trash2 className="h-3 w-3" /></Button>
+                  )}
                 </div>
-                {s.teacher_id !== null && (
-                  <Button size="sm" variant="ghost" onClick={async (e) => {
-                    e.stopPropagation();
-                    const { error } = await supabase.from("standards").delete().eq("id", s.id);
-                    if (error) toast.error(error.message); else { toast.success("Deleted"); load(); }
-                  }}><Trash2 className="h-3 w-3" /></Button>
-                )}
+                {isExpanded && <StandardQuestionsAccordion standardId={s.id} />}
               </div>
             );
           })}

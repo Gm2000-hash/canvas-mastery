@@ -39,7 +39,7 @@ type Course = { id: string; name: string };
 
 type QuestionAnswer = { text: string | null; html: string | null; weight: number | null };
 
-type QuestionRow = {
+export type QuestionRow = {
   id: string;
   position: number | null;
   question_text: string | null;
@@ -641,7 +641,7 @@ function collectStandardIds(node: TreeNode | null): string[] {
   return out;
 }
 
-function bandColor(v: number) {
+export function bandColor(v: number) {
   if (v >= 0.8) return "hsl(var(--mastery-high))";
   if (v >= 0.6) return "hsl(var(--mastery-mid))";
   return "hsl(var(--mastery-low))";
@@ -721,7 +721,7 @@ function TreeView({
   );
 }
 
-function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; onClose: () => void }) {
+export function QuestionDrawer({ question, onClose }: { question: QuestionRow | null; onClose: () => void }) {
   const [retagging, setRetagging] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [revealLoading, setRevealLoading] = useState(false);
