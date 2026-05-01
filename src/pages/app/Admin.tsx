@@ -219,6 +219,15 @@ export default function Admin() {
                               <ShieldOff className="h-4 w-4" /> {r}
                             </Button>
                           ))}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => resetPin(u.user_id, u.display_name)}
+                            disabled={busy === u.user_id + ":pin"}
+                            title="Clear this user's security PIN"
+                          >
+                            <KeyRound className="h-4 w-4" /> Reset PIN
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
