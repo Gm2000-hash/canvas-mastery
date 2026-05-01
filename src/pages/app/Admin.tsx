@@ -88,6 +88,7 @@ export default function Admin() {
       toast.success("Security PIN reset.");
     }
     setBusy(null);
+  }
 
   if (roleLoading) {
     return (
