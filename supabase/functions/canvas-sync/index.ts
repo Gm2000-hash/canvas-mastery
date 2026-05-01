@@ -139,14 +139,6 @@ Deno.serve(async (req) => {
       }
 
       if (students.length) {
-        // Find current max pseudonym_seq for this teacher to assign new ones
-        const { data: maxRow } = await admin
-          .from("students").select("pseudonym_seq")
-          .eq("teacher_id", teacherId)
-          .order("pseudonym_seq", { ascending: false, nullsFirst: false })
-          .limit(1).maybeSingle();
-        let nextSeq = (maxRow?.pseudonym_seq ?? 0) + 1;
-
         // Existing students for this course/teacher (by canvas_user_id) so we
         // preserve their existing pseudonym instead of regenerating it.
         const canvasIds = students.map((s) => Number(s.id));
@@ -165,11 +157,16 @@ Deno.serve(async (req) => {
 
         for (const s of students) {
           const existing = existingByCanvas.get(Number(s.id));
-          let seq = existing?.pseudonym_seq ?? null;
           let pseudo = existing?.pseudonym ?? null;
           if (!pseudo) {
-            seq = nextSeq++;
-            pseudo = `Student ${String(seq).padStart(3, "0")}`;
+            // Generate a globally-unique 6-digit code via the SECURITY DEFINER helper.
+            const { data: codeData, error: codeErr } = await admin
+              .rpc("generate_unique_student_code");
+            if (codeErr || !codeData) {
+              console.error("generate_unique_student_code", codeErr);
+              continue;
+            }
+            pseudo = codeData as string;
           }
           studentRows.push({
             teacher_id: teacherId,
@@ -178,7 +175,7 @@ Deno.serve(async (req) => {
             name: pseudo,
             sortable_name: pseudo,
             pseudonym: pseudo,
-            pseudonym_seq: seq,
+            pseudonym_seq: existing?.pseudonym_seq ?? null,
             email: null,
             // NEW: enrollment state for auto-archive
             enrollment_state: enrollmentByUserId.get(Number(s.id)) ?? "active",
