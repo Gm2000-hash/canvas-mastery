@@ -1,7 +1,7 @@
 // Per-page toggle to reveal real student names. Each reveal is audited
-// server-side and includes an optional reason (e.g. "Parent meeting").
+// server-side, requires the user's security PIN, and includes an optional reason.
 import { useState } from "react";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -12,14 +12,16 @@ import { Label } from "@/components/ui/label";
 type Props = {
   revealed: boolean;
   loading?: boolean;
-  onReveal: (reason?: string) => Promise<boolean> | void;
+  onReveal: (pin: string, reason?: string) => Promise<boolean> | boolean;
   onHide: () => void;
   disabled?: boolean;
 };
 
 export function RevealNamesToggle({ revealed, loading, onReveal, onHide, disabled }: Props) {
   const [open, setOpen] = useState(false);
+  const [pin, setPin] = useState("");
   const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   if (revealed) {
     return (
@@ -50,38 +52,59 @@ export function RevealNamesToggle({ revealed, loading, onReveal, onHide, disable
         Show real names
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setPin(""); setReason(""); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reveal real student names?</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" /> Reveal real student names?
+            </DialogTitle>
             <DialogDescription>
-              Real names will be shown only on this page until you hide them again.
-              Each reveal is recorded in your privacy log along with an optional reason.
+              Enter your security PIN to confirm. Real names will be shown only on this page until you hide them again.
+              Each reveal is recorded in your privacy log.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="reveal-reason">Reason (optional)</Label>
-            <Input
-              id="reveal-reason"
-              value={reason}
-              placeholder="e.g. Parent meeting, IEP review"
-              onChange={(e) => setReason(e.target.value)}
-              maxLength={200}
-            />
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="reveal-pin">Security PIN</Label>
+              <Input
+                id="reveal-pin"
+                type="password"
+                autoComplete="off"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                minLength={6}
+                maxLength={12}
+                placeholder="6–12 characters"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reveal-reason">Reason (optional)</Label>
+              <Input
+                id="reveal-reason"
+                value={reason}
+                placeholder="e.g. Parent meeting, IEP review"
+                onChange={(e) => setReason(e.target.value)}
+                maxLength={200}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
             <Button
               onClick={async () => {
-                const ok = await onReveal(reason.trim() || undefined);
+                if (pin.length < 6) return;
+                setSubmitting(true);
+                const ok = await onReveal(pin, reason.trim() || undefined);
+                setSubmitting(false);
                 if (ok !== false) {
                   setOpen(false);
-                  setReason("");
+                  setPin(""); setReason("");
                 }
               }}
-              disabled={loading}
+              disabled={submitting || loading || pin.length < 6}
             >
-              {loading && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
+              {(submitting || loading) && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
               Reveal
             </Button>
           </DialogFooter>
