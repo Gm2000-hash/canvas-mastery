@@ -367,14 +367,22 @@ export default function DepartmentDashboard() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle className="text-base">Students</CardTitle>
-                  <CardDescription>Your students by name; peers' students pseudonymized</CardDescription>
+                  <CardDescription>Your students by pseudonym; reveal real names with your PIN. Peers always pseudonymized.</CardDescription>
                 </div>
-                <Button size="sm" variant="outline" disabled={!students.length}
-                  onClick={() => exportCsv(`${subject}-department-students.csv`,
-                    ["Student", "Owner", "Class", "Grade", "Standards assessed", "Standards mastered", "Avg", "Last activity"],
-                    students.map((s) => [s.display_name, s.is_own ? "You" : "Peer", s.class_label, s.grade, s.standards_assessed, s.standards_mastered, s.avg_mastery, s.last_activity]))}>
-                  Export CSV
-                </Button>
+                <div className="flex items-center gap-2">
+                  <RevealNamesToggle
+                    revealed={reveal.revealed}
+                    loading={reveal.loading}
+                    onReveal={reveal.reveal}
+                    onHide={reveal.hide}
+                  />
+                  <Button size="sm" variant="outline" disabled={!students.length}
+                    onClick={() => exportCsv(`${subject}-department-students.csv`,
+                      ["Student", "Owner", "Class", "Grade", "Standards assessed", "Standards mastered", "Avg", "Last activity"],
+                      students.map((s) => [s.is_own ? reveal.display(s.student_id, s.display_name) : s.display_name, s.is_own ? "You" : "Peer", s.class_label, s.grade, s.standards_assessed, s.standards_mastered, s.avg_mastery, s.last_activity]))}>
+                    Export CSV
+                  </Button>
+                </div>
               </div>
               <Input
                 placeholder="Search your own students…"
