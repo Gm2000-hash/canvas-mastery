@@ -1574,6 +1574,7 @@ export type Database = {
         Args: { _archive: boolean; _course_id: string }
         Returns: boolean
       }
+      generate_unique_student_code: { Args: never; Returns: string }
       get_canvas_connection_status: {
         Args: never
         Returns: {
