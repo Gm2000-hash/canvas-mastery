@@ -409,7 +409,9 @@ export default function DepartmentDashboard() {
                       <TableRow key={s.student_id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <span className={s.is_own ? "font-medium" : "text-muted-foreground"}>{s.display_name}</span>
+                            <span className={s.is_own ? "font-medium" : "text-muted-foreground"}>
+                              {s.is_own ? reveal.display(s.student_id, s.display_name) : s.display_name}
+                            </span>
                             {s.is_own && <Badge variant="secondary" className="text-xs">Yours</Badge>}
                           </div>
                         </TableCell>
