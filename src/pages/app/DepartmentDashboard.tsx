@@ -18,6 +18,8 @@ import { ArrowLeft, Info, Users, GraduationCap, BookMarked, ListChecks } from "l
 import { recentSchoolYears, currentSchoolYearLabel } from "@/lib/schoolYear";
 import { GRADES } from "@/lib/frameworks";
 import DepartmentReports from "@/components/department/DepartmentReports";
+import { useRevealedNamesAll } from "@/hooks/useRevealedNamesAll";
+import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 
 type Overview = {
   teacher_count: number;
@@ -50,6 +52,7 @@ export default function DepartmentDashboard() {
   const [standards, setStandards] = useState<StandardRow[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
+  const reveal = useRevealedNamesAll();
   const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -364,14 +367,22 @@ export default function DepartmentDashboard() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle className="text-base">Students</CardTitle>
-                  <CardDescription>Your students by name; peers' students pseudonymized</CardDescription>
+                  <CardDescription>Your students by pseudonym; reveal real names with your PIN. Peers always pseudonymized.</CardDescription>
                 </div>
-                <Button size="sm" variant="outline" disabled={!students.length}
-                  onClick={() => exportCsv(`${subject}-department-students.csv`,
-                    ["Student", "Owner", "Class", "Grade", "Standards assessed", "Standards mastered", "Avg", "Last activity"],
-                    students.map((s) => [s.display_name, s.is_own ? "You" : "Peer", s.class_label, s.grade, s.standards_assessed, s.standards_mastered, s.avg_mastery, s.last_activity]))}>
-                  Export CSV
-                </Button>
+                <div className="flex items-center gap-2">
+                  <RevealNamesToggle
+                    revealed={reveal.revealed}
+                    loading={reveal.loading}
+                    onReveal={reveal.reveal}
+                    onHide={reveal.hide}
+                  />
+                  <Button size="sm" variant="outline" disabled={!students.length}
+                    onClick={() => exportCsv(`${subject}-department-students.csv`,
+                      ["Student", "Owner", "Class", "Grade", "Standards assessed", "Standards mastered", "Avg", "Last activity"],
+                      students.map((s) => [s.is_own ? reveal.display(s.student_id, s.display_name) : s.display_name, s.is_own ? "You" : "Peer", s.class_label, s.grade, s.standards_assessed, s.standards_mastered, s.avg_mastery, s.last_activity]))}>
+                    Export CSV
+                  </Button>
+                </div>
               </div>
               <Input
                 placeholder="Search your own students…"
@@ -398,7 +409,9 @@ export default function DepartmentDashboard() {
                       <TableRow key={s.student_id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <span className={s.is_own ? "font-medium" : "text-muted-foreground"}>{s.display_name}</span>
+                            <span className={s.is_own ? "font-medium" : "text-muted-foreground"}>
+                              {s.is_own ? reveal.display(s.student_id, s.display_name) : s.display_name}
+                            </span>
                             {s.is_own && <Badge variant="secondary" className="text-xs">Yours</Badge>}
                           </div>
                         </TableCell>
