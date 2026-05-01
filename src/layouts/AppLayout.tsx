@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { SecurityPinSetup } from "@/components/SecurityPinSetup";
 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -218,6 +219,7 @@ export default function AppLayout() {
             </div>
           </main>
         </div>
+        <SecurityPinSetup />
       </SyncProvider>
     </ProfileProvider>
   );
