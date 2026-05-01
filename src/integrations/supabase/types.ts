@@ -1087,6 +1087,36 @@ export type Database = {
         }
         Relationships: []
       }
+      teacher_security: {
+        Row: {
+          created_at: string
+          pin_hash: string | null
+          pin_reset_at: string | null
+          pin_reset_by: string | null
+          pin_set_at: string | null
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          pin_hash?: string | null
+          pin_reset_at?: string | null
+          pin_reset_by?: string | null
+          pin_set_at?: string | null
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          pin_hash?: string | null
+          pin_reset_at?: string | null
+          pin_reset_by?: string | null
+          pin_set_at?: string | null
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       teacher_settings: {
         Row: {
           attempt_window: number
@@ -1152,6 +1182,10 @@ export type Database = {
           roles: Database["public"]["Enums"]["app_role"][]
           user_id: string
         }[]
+      }
+      admin_reset_security_pin: {
+        Args: { _user_id: string }
+        Returns: undefined
       }
       analytics_active_dimensions: {
         Args: never
@@ -1568,6 +1602,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_security_pin: { Args: never; Returns: boolean }
       is_course_active: { Args: { _course_id: string }; Returns: boolean }
       is_within_active_school_year: {
         Args: { _course_id: string }
@@ -1657,15 +1692,25 @@ export type Database = {
           student_id: string
         }[]
       }
-      reveal_student_identities: {
-        Args: { _course_id: string; _reason?: string }
-        Returns: {
-          email: string
-          real_name: string
-          real_sortable_name: string
-          student_id: string
-        }[]
-      }
+      reveal_student_identities:
+        | {
+            Args: { _course_id: string; _reason?: string }
+            Returns: {
+              email: string
+              real_name: string
+              real_sortable_name: string
+              student_id: string
+            }[]
+          }
+        | {
+            Args: { _course_id: string; _pin?: string; _reason?: string }
+            Returns: {
+              email: string
+              real_name: string
+              real_sortable_name: string
+              student_id: string
+            }[]
+          }
       run_auto_archive: {
         Args: { _teacher_id: string }
         Returns: {
@@ -1711,6 +1756,7 @@ export type Database = {
               term: string
             }[]
           }
+      set_security_pin: { Args: { _pin: string }; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       suggest_assignment_groups: {
@@ -1749,6 +1795,7 @@ export type Database = {
         Args: { _course_ids: string[]; _id: string; _name: string }
         Returns: boolean
       }
+      verify_security_pin: { Args: { _pin: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "teacher"
