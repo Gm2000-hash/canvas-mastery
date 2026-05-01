@@ -52,6 +52,7 @@ export default function DepartmentDashboard() {
   const [standards, setStandards] = useState<StandardRow[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
+  const reveal = useRevealedNamesAll();
   const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
