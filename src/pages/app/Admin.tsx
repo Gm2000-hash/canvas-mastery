@@ -78,6 +78,17 @@ export default function Admin() {
     setBusy(null);
   }
 
+  async function resetPin(userId: string, displayName: string | null) {
+    if (!confirm(`Reset security PIN for ${displayName || "this user"}? They will be prompted to choose a new PIN on next sign-in.`)) return;
+    setBusy(userId + ":pin");
+    const { error } = await supabase.rpc("admin_reset_security_pin", { _user_id: userId });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Security PIN reset.");
+    }
+    setBusy(null);
+
   if (roleLoading) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
