@@ -18,6 +18,8 @@ import { ArrowLeft, Info, Users, GraduationCap, BookMarked, ListChecks } from "l
 import { recentSchoolYears, currentSchoolYearLabel } from "@/lib/schoolYear";
 import { GRADES } from "@/lib/frameworks";
 import DepartmentReports from "@/components/department/DepartmentReports";
+import { useRevealedNamesAll } from "@/hooks/useRevealedNamesAll";
+import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 
 type Overview = {
   teacher_count: number;
