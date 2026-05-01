@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Shield, ShieldOff, RefreshCw, Users, Database, Wrench } from "lucide-react";
+import { Loader2, Shield, ShieldOff, RefreshCw, Users, Database, Wrench, KeyRound } from "lucide-react";
 
 type AdminUser = {
   user_id: string;
