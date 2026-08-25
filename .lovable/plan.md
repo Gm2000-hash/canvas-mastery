@@ -25,14 +25,10 @@ Each will be repointed to `https://openrouter.ai/api/v1/chat/completions` using 
 3. **Update the five functions** to call through that helper. The request shape stays the same — all five use OpenAI-style `messages` + `tools` + `tool_choice` function calling, which OpenRouter supports.
 4. **Keep a Lovable-gateway fallback** — if `OPENROUTER_API_KEY` is missing, fall back to the existing Gemini path via `LOVABLE_API_KEY` so nothing breaks for users mid-rollout.
 5. **Update error handling** — map OpenRouter's 401 (bad key), 402 (out of credits), and 429 (rate limit) to the clear in-app messages the UI already shows, with wording that points at OpenRouter rather than Lovable credits.
-6. **Test each function** with a real request and confirm the tool-call output still parses (this is the key risk — if Ox Alpha's tool-calling output differs, the parsing needs adjusting).
-
-## One thing to confirm
-
-I need the **exact OpenRouter model slug** for Ox Alpha (the `vendor/model` string from its OpenRouter model page, e.g. something like `openrouter/ox-alpha`). Slugs for preview/stealth models change, and a wrong one fails every call with a 400. Reply with the exact slug, or approve and I'll query OpenRouter's model list to find it before wiring anything up.
+6. **Test each function** with a real request and confirm the tool-call output still parses correctly end to end.
 
 ## Technical notes
 
 - No frontend changes; all edits are in `supabase/functions/`.
 - No database changes.
-- If Ox Alpha does not support function/tool calling, the tagging functions will need a JSON-mode rewrite — I'll check the model's capabilities against OpenRouter's model metadata before editing and report back if that's the case.
+- The model slug is a single exported constant, so pointing the app at a different OpenRouter model later is a one-line edit.
