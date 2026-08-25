@@ -16,6 +16,22 @@ const corsHeaders = {
 
 type CanvasCreds = { base_url: string; api_token: string };
 
+class CanvasApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly responseBody: string,
+  ) {
+    super(`Canvas request failed (${status})`);
+  }
+}
+
+function optionalCanvasRequest<T>(request: Promise<T[]>): Promise<T[]> {
+  return request.catch((error) => {
+    if (error instanceof CanvasApiError && (error.status === 401 || error.status === 403)) throw error;
+    return [];
+  });
+}
+
 function parseLinkHeader(header: string | null): Record<string, string> {
   const out: Record<string, string> = {};
   if (!header) return out;
@@ -37,7 +53,7 @@ async function canvasFetchAll<T>(creds: CanvasCreds, path: string, init: Request
     });
     if (!res.ok) {
       const t = await res.text().catch(() => "");
-      throw new Error(`Canvas ${res.status} on ${url}: ${t.slice(0, 200)}`);
+      throw new CanvasApiError(res.status, t.slice(0, 500));
     }
     const page = (await res.json()) as T[];
     items.push(...(Array.isArray(page) ? page : []));
@@ -128,9 +144,9 @@ Deno.serve(async (req) => {
 
       // 2) Students — pseudonymize: real names go ONLY to student_identities;
       // the public students table stores a per-teacher "Student NNN" pseudonym.
-      const students = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/students`).catch(() => []);
+      const students = await optionalCanvasRequest(canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/students`));
       // Also pull enrollments so we can capture each student's enrollment_state for auto-archive.
-      const enrollments = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/enrollments?type[]=StudentEnrollment&state[]=active&state[]=completed&state[]=inactive`).catch(() => []);
+      const enrollments = await optionalCanvasRequest(canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/enrollments?type[]=StudentEnrollment&state[]=active&state[]=completed&state[]=inactive`));
       const enrollmentByUserId = new Map<number, string>();
       for (const e of enrollments) {
         if (e?.user_id != null && typeof e.enrollment_state === "string") {
@@ -213,7 +229,7 @@ Deno.serve(async (req) => {
       }
 
       // 3) Assignments
-      const assignments = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/assignments`).catch(() => []);
+      const assignments = await optionalCanvasRequest(canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/assignments`));
       const aRows = assignments.map((a) => {
         const isClassicQuiz = !!a.quiz_id;
         const isNewQuiz = !!a.is_quiz_lti_assignment && !isClassicQuiz;
@@ -364,7 +380,7 @@ Deno.serve(async (req) => {
       const aById = new Map((assignMap ?? []).map((r) => [Number(r.canvas_assignment_id), r.id as string]));
 
       // 4) Submissions (per assignment, all students)
-      const subs = await canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/students/submissions?student_ids[]=all&per_page=100`).catch(() => []);
+      const subs = await optionalCanvasRequest(canvasFetchAll<any>(creds, `/api/v1/courses/${c.id}/students/submissions?student_ids[]=all&per_page=100`));
       const subRows = subs
         .map((s) => {
           const studentId = sById.get(Number(s.user_id));
@@ -431,6 +447,18 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("canvas-sync error", e);
+    if (e instanceof CanvasApiError && (e.status === 401 || e.status === 403)) {
+      const tokenExpired = /expired access token|expired_at/i.test(e.responseBody);
+      return new Response(JSON.stringify({
+        error: tokenExpired
+          ? "Your Canvas access token has expired. Create a new token in Canvas, then update it in Settings."
+          : "Canvas rejected your access token. Update your Canvas connection in Settings.",
+        code: tokenExpired ? "CANVAS_TOKEN_EXPIRED" : "CANVAS_TOKEN_INVALID",
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

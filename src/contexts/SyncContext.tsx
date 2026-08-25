@@ -92,9 +92,16 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: (error as any).message ?? "Canvas sync failed" };
     }
     if ((data as any)?.error) {
-      toast.error((data as any).error);
+      const message = (data as any).error as string;
+      const needsReconnect = ["CANVAS_TOKEN_EXPIRED", "CANVAS_TOKEN_INVALID"].includes((data as any)?.code);
+      toast.error(message, needsReconnect ? {
+        action: {
+          label: "Update token",
+          onClick: () => { window.location.href = "/app/settings#canvas"; },
+        },
+      } : undefined);
       finish();
-      return { ok: false, error: (data as any).error };
+      return { ok: false, error: message };
     }
     const s = (data as any)?.stats;
     if (s) {

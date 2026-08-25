@@ -10,6 +10,15 @@ const corsHeaders = {
 
 type CanvasCreds = { base_url: string; api_token: string };
 
+class CanvasApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly responseBody: string,
+  ) {
+    super(`Canvas request failed (${status})`);
+  }
+}
+
 function parseLinkHeader(header: string | null): Record<string, string> {
   const out: Record<string, string> = {};
   if (!header) return out;
@@ -28,7 +37,7 @@ async function canvasFetchAll<T>(creds: CanvasCreds, path: string): Promise<T[]>
     const res = await fetch(url, { headers: { Authorization: `Bearer ${creds.api_token}` } });
     if (!res.ok) {
       const t = await res.text().catch(() => "");
-      throw new Error(`Canvas ${res.status}: ${t.slice(0, 200)}`);
+      throw new CanvasApiError(res.status, t.slice(0, 500));
     }
     const page = (await res.json()) as T[];
     items.push(...(Array.isArray(page) ? page : []));
@@ -109,6 +118,21 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("canvas-list-courses error", e);
+    if (e instanceof CanvasApiError && e.status === 401) {
+      const tokenExpired = /expired access token|expired_at/i.test(e.responseBody);
+      return new Response(JSON.stringify({
+        error: tokenExpired
+          ? "Your Canvas access token has expired. Create a new token in Canvas, then update it in Settings."
+          : "Canvas rejected your access token. Update your Canvas connection in Settings.",
+        code: tokenExpired ? "CANVAS_TOKEN_EXPIRED" : "CANVAS_TOKEN_INVALID",
+      }), {
+        // This is an expected, recoverable connection state. Returning JSON with
+        // a 200 lets the client render the recovery action instead of treating it
+        // as an uninspectable edge-function failure.
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

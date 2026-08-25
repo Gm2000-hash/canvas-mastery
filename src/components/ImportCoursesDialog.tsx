@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -45,8 +47,10 @@ type Props = {
 const ANY = "__any__";
 
 export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [courses, setCourses] = useState<CanvasCourse[] | null>(null);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -70,14 +74,24 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
   async function load() {
     setLoading(true);
     setCourses(null);
+    setConnectionError(null);
     const [{ data: ds }, listRes] = await Promise.all([
       supabase.from("teacher_disciplines").select("id, state, subject, grade, is_default").order("created_at"),
       supabase.functions.invoke("canvas-list-courses"),
     ]);
     setDisciplines((ds ?? []) as Discipline[]);
     setLoading(false);
-    if (listRes.error) { toast.error((listRes.error as any).message ?? "Failed to load Canvas courses"); return; }
-    if ((listRes.data as any)?.error) { toast.error((listRes.data as any).error); return; }
+    if (listRes.error) {
+      const message = (listRes.error as any).message ?? "Failed to load Canvas courses";
+      setConnectionError(message);
+      toast.error(message);
+      return;
+    }
+    if ((listRes.data as any)?.error) {
+      const message = (listRes.data as any).error as string;
+      setConnectionError(message);
+      return;
+    }
     const list = ((listRes.data as any)?.courses ?? []) as CanvasCourse[];
     setCourses(list);
     const defaultDisc = (ds ?? []).find((d) => d.is_default)?.id ?? "";
@@ -216,6 +230,27 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
           </div>
         )}
 
+        {connectionError && !loading && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Canvas connection needs attention</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p>{connectionError}</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setOpen(false);
+                  navigate("/app/settings#canvas");
+                }}
+              >
+                Update Canvas token
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -253,8 +288,14 @@ export function ImportCoursesDialog({ onImported, mode = "all", trigger }: Props
         </div>
 
         <div className="max-h-[50vh] overflow-y-auto border rounded-md">
-          {loading || courses === null ? (
+          {loading ? (
             <div className="p-3 space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-12" />)}</div>
+          ) : connectionError ? (
+            <div className="p-6 text-sm text-center text-muted-foreground">
+              Update your Canvas token, then reopen this dialog to load courses.
+            </div>
+          ) : courses === null ? (
+            <div className="p-6 text-sm text-center text-muted-foreground">Courses could not be loaded.</div>
           ) : filtered.length === 0 ? (
             <div className="p-6 text-sm text-center text-muted-foreground">
               {isBackfill
