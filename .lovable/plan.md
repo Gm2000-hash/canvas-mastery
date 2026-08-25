@@ -1,8 +1,8 @@
-# Switch AI calls to OpenRouter (Ox Alpha) with your own API key
+# Switch AI calls to OpenRouter with your own API key
 
-Ox Alpha is not available through Lovable's built-in AI gateway, so the app's AI calls will be pointed at OpenRouter directly using an API key you provide. Usage will be billed to your OpenRouter account instead of your Lovable AI credits.
+The AI calls will be pointed at OpenRouter directly using an API key you provide, instead of Lovable's built-in AI gateway. Usage will be billed to your OpenRouter account instead of your Lovable AI credits.
 
-## What changes
+Since no specific model is required, the default will be OpenRouter's `google/gemini-2.5-flash` — the same model the app uses today, so behavior and tool-calling output stay identical and only the billing path changes. The slug lives in one shared constant, so swapping to any other OpenRouter model later is a one-line change.
 
 All five AI-powered backend functions currently call Lovable's gateway with Google Gemini models:
 
