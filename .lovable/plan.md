@@ -1,31 +1,36 @@
-# Switch AI model to the Lovable default (`openai/gpt-5.6-sol`)
+# Switch AI calls to OpenRouter (Ox Alpha) with your own API key
 
-## Goal
-Move all Lovable AI Gateway calls in the Edge Functions from the current Google Gemini models to the Lovable default server-side chat model `openai/gpt-5.6-sol`, while keeping the existing `/v1/chat/completions` path.
+Ox Alpha is not available through Lovable's built-in AI gateway, so the app's AI calls will be pointed at OpenRouter directly using an API key you provide. Usage will be billed to your OpenRouter account instead of your Lovable AI credits.
 
-## Current state
-All AI calls are in five Supabase Edge Functions:
+## What changes
 
-- `supabase/functions/tag-standards/index.ts` — uses `google/gemini-2.5-flash` (batch + single assignment tagging)
-- `supabase/functions/tag-question-standards/index.ts` — uses `google/gemini-2.5-flash`
-- `supabase/functions/import-standards/index.ts` — uses `google/gemini-2.5-flash`
-- `supabase/functions/match-assessments-in-group/index.ts` — uses `google/gemini-2.5-flash`
-- `supabase/functions/seed-standards/index.ts` — uses `google/gemini-3-flash-preview`
+All five AI-powered backend functions currently call Lovable's gateway with Google Gemini models:
 
-None of these calls currently use `max_tokens`, `temperature`, or `response_format`.
+| Function | Purpose | Current model |
+| --- | --- | --- |
+| `tag-standards` | Tags assignments/questions with standards | `google/gemini-2.5-flash` |
+| `tag-question-standards` | Tags quiz questions with standards | `google/gemini-2.5-flash` |
+| `import-standards` | Extracts standards from a URL or PDF | `google/gemini-2.5-flash` |
+| `match-assessments-in-group` | Finds equivalent assessments in a class group | `google/gemini-2.5-flash` |
+| `seed-standards` | Generates a starter standards library | `google/gemini-3-flash-preview` |
 
-## Plan
+Each will be repointed to `https://openrouter.ai/api/v1/chat/completions` using the Ox Alpha model slug and your key.
 
-1. **Confirm the Lovable API key** is present before deployment.
-2. **Update each Edge Function's request body** for GPT-5.6 compatibility on the chat-completions path:
-   - Replace the `model` field with `"openai/gpt-5.6-sol"`.
-   - Add `reasoning_effort: "none"` (required for GPT-5.6 on `/v1/chat/completions` with function tools).
-   - Add a safe `max_completion_tokens` cap.
-   - Confirm no `temperature` or `max_tokens` keys remain.
-3. **Deploy the updated Edge Functions**.
-4. **Test each function with a real request** to verify a 200 response and that the tool-call output is still parsed correctly.
-5. **Run the build checks** (`dead-routes.test.ts` and the Vite build) to confirm nothing else is broken.
+## Steps
 
-## Note
+1. **Collect the OpenRouter key** — you'll be prompted to add an `OPENROUTER_API_KEY` secret. It stays server-side and is never exposed to the browser.
+2. **Add a shared helper** at `supabase/functions/_shared/openrouter.ts` that builds the request (base URL, `Authorization` header, OpenRouter's `HTTP-Referer` / `X-Title` attribution headers) and centralizes the model slug in one constant so future model swaps are a one-line change.
+3. **Update the five functions** to call through that helper. The request shape stays the same — all five use OpenAI-style `messages` + `tools` + `tool_choice` function calling, which OpenRouter supports.
+4. **Keep a Lovable-gateway fallback** — if `OPENROUTER_API_KEY` is missing, fall back to the existing Gemini path via `LOVABLE_API_KEY` so nothing breaks for users mid-rollout.
+5. **Update error handling** — map OpenRouter's 401 (bad key), 402 (out of credits), and 429 (rate limit) to the clear in-app messages the UI already shows, with wording that points at OpenRouter rather than Lovable credits.
+6. **Test each function** with a real request and confirm the tool-call output still parses (this is the key risk — if Ox Alpha's tool-calling output differs, the parsing needs adjusting).
 
-The AI provider stays Lovable AI Gateway; only the model changes. Since no exact model was named, the plan uses the Lovable default `openai/gpt-5.6-sol`. If you want a different supported model, reject the plan and name the exact identifier.
+## One thing to confirm
+
+I need the **exact OpenRouter model slug** for Ox Alpha (the `vendor/model` string from its OpenRouter model page, e.g. something like `openrouter/ox-alpha`). Slugs for preview/stealth models change, and a wrong one fails every call with a 400. Reply with the exact slug, or approve and I'll query OpenRouter's model list to find it before wiring anything up.
+
+## Technical notes
+
+- No frontend changes; all edits are in `supabase/functions/`.
+- No database changes.
+- If Ox Alpha does not support function/tool calling, the tagging functions will need a JSON-mode rewrite — I'll check the model's capabilities against OpenRouter's model metadata before editing and report back if that's the case.
