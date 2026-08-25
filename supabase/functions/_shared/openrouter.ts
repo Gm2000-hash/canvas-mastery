@@ -54,6 +54,12 @@ export async function fetchChatCompletion(body: Record<string, unknown>): Promis
     ? { ...body, model: config.overrideModel }
     : body;
 
+  // OpenRouter bills against the requested max tokens, so cap it to avoid
+  // exhausting small credit balances on models with very high default limits.
+  if (config.provider === "openrouter" && !requestBody.max_tokens) {
+    requestBody.max_tokens = 4096;
+  }
+
   return fetch(config.baseUrl, {
     method: "POST",
     headers: config.headers,
