@@ -3,6 +3,12 @@
 // before saving. Saving happens client-side via a normal supabase insert
 // (RLS allows teachers to insert their own standards rows).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  aiProviderErrorMessage,
+  fetchChatCompletion,
+  getAiProviderConfig,
+  isAiProviderHardError,
+} from "../_shared/openrouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,8 +40,7 @@ Deno.serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const { provider } = getAiProviderConfig();
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -147,58 +152,49 @@ Context (use as a hint, but trust the document):
 
     userContent.unshift({ type: "text", text: userInstruction });
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: userContent },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "return_standards",
-            description: "Return an array of standards extracted from the source.",
-            parameters: {
-              type: "object",
-              properties: {
-                standards: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      code: { type: "string" },
-                      description: { type: "string" },
-                    },
-                    required: ["code", "description"],
-                    additionalProperties: false,
+    const aiRes = await fetchChatCompletion({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: userContent },
+      ],
+      tools: [{
+        type: "function",
+        function: {
+          name: "return_standards",
+          description: "Return an array of standards extracted from the source.",
+          parameters: {
+            type: "object",
+            properties: {
+              standards: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    code: { type: "string" },
+                    description: { type: "string" },
                   },
+                  required: ["code", "description"],
+                  additionalProperties: false,
                 },
               },
-              required: ["standards"],
-              additionalProperties: false,
             },
+            required: ["standards"],
+            additionalProperties: false,
           },
-        }],
-        tool_choice: { type: "function", function: { name: "return_standards" } },
-      }),
+        },
+      }],
+      tool_choice: { type: "function", function: { name: "return_standards" } },
     });
 
     if (!aiRes.ok) {
-      if (aiRes.status === 429) {
-        return new Response(JSON.stringify({ error: "AI rate limit. Try again shortly." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiRes.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (isAiProviderHardError(aiRes.status)) {
+        return new Response(JSON.stringify({ error: aiProviderErrorMessage(aiRes.status, provider) }), {
+          status: aiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await aiRes.text();
-      console.error("AI gateway error", aiRes.status, t.slice(0, 400));
+      console.error("AI provider error", aiRes.status, t.slice(0, 400));
       throw new Error(`AI ${aiRes.status}`);
     }
 

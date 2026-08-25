@@ -6,6 +6,12 @@
 //   4. Persist results in assessment_match_suggestions.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  aiProviderErrorMessage,
+  fetchChatCompletion,
+  getAiProviderConfig,
+  isAiProviderHardError,
+} from "../_shared/openrouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -190,7 +196,6 @@ Deno.serve(async (req) => {
     }
 
     // Ask LLM to confirm/refine each cluster
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     type Verdict = {
       cluster_id: number;
       decision: "same" | "different" | "split";
@@ -207,97 +212,91 @@ Deno.serve(async (req) => {
     }));
 
     let verdicts: Verdict[] = [];
-    if (LOVABLE_API_KEY) {
-      try {
-        const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
+    try {
+      const { provider } = getAiProviderConfig();
+      const res = await fetchChatCompletion({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You help teachers identify when assignments from different class sections represent the SAME assessment (e.g. a Pre-ECA given in two periods). For each candidate cluster, decide whether the assignments are equivalent assessments. If yes, return ONE group with all ids and a clean canonical name. If only some match, split them into groups (each requires 2+ ids). If none match, return no groups. Ignore section/period markers and minor formatting differences.",
           },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You help teachers identify when assignments from different class sections represent the SAME assessment (e.g. a Pre-ECA given in two periods). For each candidate cluster, decide whether the assignments are equivalent assessments. If yes, return ONE group with all ids and a clean canonical name. If only some match, split them into groups (each requires 2+ ids). If none match, return no groups. Ignore section/period markers and minor formatting differences.",
-              },
-              {
-                role: "user",
-                content: JSON.stringify({ clusters: llmPayload }),
-              },
-            ],
-            tools: [
-              {
-                type: "function",
-                function: {
-                  name: "report_clusters",
-                  description: "Report verdicts on candidate clusters",
-                  parameters: {
-                    type: "object",
-                    properties: {
-                      results: {
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            cluster_id: { type: "number" },
-                            decision: {
-                              type: "string",
-                              enum: ["same", "different", "split"],
-                            },
-                            groups: {
-                              type: "array",
-                              items: {
-                                type: "object",
-                                properties: {
-                                  name: { type: "string" },
-                                  assignment_ids: {
-                                    type: "array",
-                                    items: { type: "string" },
-                                  },
-                                  confidence: { type: "number" },
-                                  rationale: { type: "string" },
-                                },
-                                required: [
-                                  "name",
-                                  "assignment_ids",
-                                  "confidence",
-                                  "rationale",
-                                ],
+          {
+            role: "user",
+            content: JSON.stringify({ clusters: llmPayload }),
+          },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "report_clusters",
+              description: "Report verdicts on candidate clusters",
+              parameters: {
+                type: "object",
+                properties: {
+                  results: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        cluster_id: { type: "number" },
+                        decision: {
+                          type: "string",
+                          enum: ["same", "different", "split"],
+                        },
+                        groups: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              name: { type: "string" },
+                              assignment_ids: {
+                                type: "array",
+                                items: { type: "string" },
                               },
+                              confidence: { type: "number" },
+                              rationale: { type: "string" },
                             },
+                            required: [
+                              "name",
+                              "assignment_ids",
+                              "confidence",
+                              "rationale",
+                            ],
                           },
-                          required: ["cluster_id", "decision", "groups"],
                         },
                       },
+                      required: ["cluster_id", "decision", "groups"],
                     },
-                    required: ["results"],
                   },
                 },
+                required: ["results"],
               },
-            ],
-            tool_choice: { type: "function", function: { name: "report_clusters" } },
-          }),
-        });
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "report_clusters" } },
+      });
 
-        if (res.status === 429 || res.status === 402) {
-          // Surface but degrade gracefully — fall back to local clusters
-          console.warn("AI rate-limit/credits:", res.status);
-        } else if (res.ok) {
-          const data = await res.json();
-          const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-          if (args) {
-            const parsed = JSON.parse(args);
-            verdicts = parsed?.results ?? [];
-          }
-        } else {
-          console.warn("AI gateway error:", res.status, await res.text());
+      if (!res.ok) {
+        if (isAiProviderHardError(res.status)) {
+          return new Response(JSON.stringify({ error: aiProviderErrorMessage(res.status, provider) }), {
+            status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
-      } catch (e) {
-        console.warn("AI call failed", e);
+        console.warn("AI provider error:", res.status, await res.text());
+      } else {
+        const data = await res.json();
+        const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+        if (args) {
+          const parsed = JSON.parse(args);
+          verdicts = parsed?.results ?? [];
+        }
       }
+    } catch (e) {
+      console.warn("AI call failed", e);
     }
 
     // Build suggestions to persist. If AI failed, fall back to local clusters as 'same'.
