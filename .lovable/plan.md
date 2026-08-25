@@ -16,7 +16,7 @@ All five AI-powered backend functions currently call Lovable's gateway with Goog
 | `match-assessments-in-group` | Finds equivalent assessments in a class group | `google/gemini-2.5-flash` |
 | `seed-standards` | Generates a starter standards library | `google/gemini-3-flash-preview` |
 
-Each will be repointed to `https://openrouter.ai/api/v1/chat/completions` using the Ox Alpha model slug and your key.
+Each will be repointed to `https://openrouter.ai/api/v1/chat/completions` using your key.
 
 ## Steps
 
