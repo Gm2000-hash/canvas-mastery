@@ -4,6 +4,8 @@ The AI calls will be pointed at OpenRouter directly using an API key you provide
 
 Since no specific model is required, the default will be OpenRouter's `google/gemini-2.5-flash` — the same model the app uses today, so behavior and tool-calling output stay identical and only the billing path changes. The slug lives in one shared constant, so swapping to any other OpenRouter model later is a one-line change.
 
+## What changes
+
 All five AI-powered backend functions currently call Lovable's gateway with Google Gemini models:
 
 | Function | Purpose | Current model |
