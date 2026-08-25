@@ -9,6 +9,12 @@
 // For non-quiz assignments: falls back to a single-call assignment-level
 // match using the assignment description.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  aiProviderErrorMessage,
+  fetchChatCompletion,
+  getAiProviderConfig,
+  isAiProviderHardError,
+} from "../_shared/openrouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,8 +83,7 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const { provider } = getAiProviderConfig();
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -230,7 +235,7 @@ Use the tool provided.`;
 
       const allResults: { question_id: string; tags: Tag[] }[] = [];
       let batchesRun = 0;
-      let aiHardError: { status: number; body: string } | null = null;
+      const state: { aiHardError: { status: number; body: string } | null } = { aiHardError: null };
 
       const totalSlices = Math.min(
         Math.ceil(questions.length / BATCH_SIZE),
@@ -240,72 +245,68 @@ Use the tool provided.`;
         questions.slice(i * BATCH_SIZE, i * BATCH_SIZE + BATCH_SIZE)
       );
 
-      async function runBatch(slice: typeof questions) {
+      async function runBatch(slice: NonNullable<typeof questions>) {
         const questionListText = slice.map((q, idx) =>
           `Question ${idx}: "${buildTaggerText(q)}"`
         ).join("\n\n");
 
-        const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              { role: "system", content: sysPrompt },
-              { role: "user", content: `Tag these quiz questions with standards:\n\n${questionListText}` },
-            ],
-            tools: [{
-              type: "function",
-              function: {
-                name: "tag_standards",
-                description: "Tag quiz questions with matching standards.",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    tags: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          question_id: { type: "number" },
-                          standards: {
-                            type: "array",
-                            items: {
-                              type: "object",
-                              properties: {
-                                code: { type: "string", enum: codes },
-                                description: { type: "string" },
-                                matched_terms: {
-                                  type: "array",
-                                  items: { type: "string", minLength: 2 },
-                                },
+        const aiRes = await fetchChatCompletion({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: sysPrompt },
+            { role: "user", content: `Tag these quiz questions with standards:\n\n${questionListText}` },
+          ],
+          tools: [{
+            type: "function",
+            function: {
+              name: "tag_standards",
+              description: "Tag quiz questions with matching standards.",
+              parameters: {
+                type: "object",
+                properties: {
+                  tags: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        question_id: { type: "number" },
+                        standards: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              code: { type: "string", enum: codes },
+                              description: { type: "string" },
+                              matched_terms: {
+                                type: "array",
+                                items: { type: "string", minLength: 2 },
                               },
-                              required: ["code", "description", "matched_terms"],
-                              additionalProperties: false,
                             },
-                            maxItems: 3,
+                            required: ["code", "description", "matched_terms"],
+                            additionalProperties: false,
                           },
+                          maxItems: 3,
                         },
-                        required: ["question_id", "standards"],
-                        additionalProperties: false,
                       },
+                      required: ["question_id", "standards"],
+                      additionalProperties: false,
                     },
                   },
-                  required: ["tags"],
-                  additionalProperties: false,
                 },
+                required: ["tags"],
+                additionalProperties: false,
               },
-            }],
-            tool_choice: { type: "function", function: { name: "tag_standards" } },
-          }),
+            },
+          }],
+          tool_choice: { type: "function", function: { name: "tag_standards" } },
         });
 
         if (!aiRes.ok) {
           const t = await aiRes.text().catch(() => "");
-          if (aiRes.status === 429 || aiRes.status === 402) {
-            aiHardError = { status: aiRes.status, body: t };
+          if (isAiProviderHardError(aiRes.status)) {
+            state.aiHardError = { status: aiRes.status, body: t };
           } else {
-            console.error(`AI gateway ${aiRes.status}: ${t.slice(0, 200)}`);
+            console.error(`AI provider ${aiRes.status}: ${t.slice(0, 200)}`);
           }
           return;
         }
@@ -327,18 +328,16 @@ Use the tool provided.`;
 
       // Execute batches with bounded concurrency
       for (let i = 0; i < slices.length; i += PARALLELISM) {
-        if (aiHardError) break;
+        if (state.aiHardError) break;
         const group = slices.slice(i, i + PARALLELISM);
         await Promise.all(group.map((s) => runBatch(s)));
         batchesRun += group.length;
       }
 
-      if (aiHardError) {
-        const msg = aiHardError.status === 429
-          ? "AI rate limit reached. Try again in a moment."
-          : "AI credits exhausted. Add credits in Workspace Settings.";
+      if (state.aiHardError) {
+        const msg = aiProviderErrorMessage(state.aiHardError.status, provider);
         return new Response(JSON.stringify({ error: msg }), {
-          status: aiHardError.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: state.aiHardError.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -434,64 +433,55 @@ Use the tool provided.`;
     const userPrompt = `ASSIGNMENT NAME: ${assignment.name}
 ASSIGNMENT DESCRIPTION: ${stripHtmlForTagger(assignment.description ?? "") || "(none)"}`;
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: sysPromptSingle },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "tag_standards",
-            description: "Return matching standards from the candidate list.",
-            parameters: {
-              type: "object",
-              properties: {
-                matches: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      standard_code: { type: "string", enum: codes },
-                      confidence: { type: "number", minimum: 0, maximum: 1 },
-                      rationale: { type: "string" },
-                      matched_terms: {
-                        type: "array",
-                        items: { type: "string", minLength: 2 },
-                      },
+    const aiRes = await fetchChatCompletion({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: sysPromptSingle },
+        { role: "user", content: userPrompt },
+      ],
+      tools: [{
+        type: "function",
+        function: {
+          name: "tag_standards",
+          description: "Return matching standards from the candidate list.",
+          parameters: {
+            type: "object",
+            properties: {
+              matches: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    standard_code: { type: "string", enum: codes },
+                    confidence: { type: "number", minimum: 0, maximum: 1 },
+                    rationale: { type: "string" },
+                    matched_terms: {
+                      type: "array",
+                      items: { type: "string", minLength: 2 },
                     },
-                    required: ["standard_code", "confidence", "rationale", "matched_terms"],
-                    additionalProperties: false,
                   },
-                  maxItems: 3,
+                  required: ["standard_code", "confidence", "rationale", "matched_terms"],
+                  additionalProperties: false,
                 },
+                maxItems: 3,
               },
-              required: ["matches"],
-              additionalProperties: false,
             },
+            required: ["matches"],
+            additionalProperties: false,
           },
-        }],
-        tool_choice: { type: "function", function: { name: "tag_standards" } },
-      }),
+        },
+      }],
+      tool_choice: { type: "function", function: { name: "tag_standards" } },
     });
 
     if (!aiRes.ok) {
-      if (aiRes.status === 429) {
-        return new Response(JSON.stringify({ error: "AI rate limit reached. Try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiRes.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add credits in Workspace Settings." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (isAiProviderHardError(aiRes.status)) {
+        return new Response(JSON.stringify({ error: aiProviderErrorMessage(aiRes.status, provider) }), {
+          status: aiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await aiRes.text();
-      throw new Error(`AI gateway ${aiRes.status}: ${t.slice(0, 200)}`);
+      throw new Error(`AI provider ${aiRes.status}: ${t.slice(0, 200)}`);
     }
 
     const aiJson = await aiRes.json();
