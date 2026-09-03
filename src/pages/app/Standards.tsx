@@ -27,7 +27,7 @@ type Standard = {
   framework: string | null;
 };
 
-export default function Standards() {
+export default function Standards({ embedded = false }: { embedded?: boolean } = {}) {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "questions" ? "questions" : "library";
   const setTab = (v: string) => {
@@ -39,17 +39,19 @@ export default function Standards() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Standards library</h1>
-        <p className="text-muted-foreground">
-          Browse standards by framework and explore the quiz questions tagged to each one.
-        </p>
-      </div>
+      {!embedded && (
+        <div>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Standards library</h1>
+          <p className="text-muted-foreground">
+            Browse standards by framework and explore the quiz questions tagged to each one.
+          </p>
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="library" className="gap-2">
-            <BookMarked className="h-4 w-4" /> Library
+            <BookMarked className="h-4 w-4" /> {embedded ? "Browse standards" : "Library"}
           </TabsTrigger>
           <TabsTrigger value="questions" className="gap-2">
             <Library className="h-4 w-4" /> Questions

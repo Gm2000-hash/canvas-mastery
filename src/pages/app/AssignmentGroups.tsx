@@ -57,7 +57,7 @@ type Suggestion = {
   rationale: string | null;
 };
 
-export default function AssignmentGroups() {
+export default function AssignmentGroups({ embedded = false }: { embedded?: boolean } = {}) {
   const [classGroups, setClassGroups] = useState<ClassGroup[] | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [assessmentGroups, setAssessmentGroups] = useState<Record<string, AssessmentGroup[]>>({});
@@ -216,17 +216,21 @@ export default function AssignmentGroups() {
   }
 
   return (
-    <div className="space-y-10 pb-12">
-      <header className="border-b pb-8">
+    <div className={embedded ? "space-y-8 pb-12" : "space-y-10 pb-12"}>
+      <header className={embedded ? "" : "border-b pb-8"}>
         <div className="flex items-start justify-between gap-6 flex-wrap">
           <div className="max-w-2xl space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium tracking-wide uppercase">
-              <Layers className="h-3.5 w-3.5" /> Class Groups
-            </div>
-            <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">
-              Group sections.<br />
-              <span className="text-muted-foreground">Match assessments.</span>
-            </h1>
+            {!embedded && (
+              <>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium tracking-wide uppercase">
+                  <Layers className="h-3.5 w-3.5" /> Class Groups
+                </div>
+                <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">
+                  Group sections.<br />
+                  <span className="text-muted-foreground">Match assessments.</span>
+                </h1>
+              </>
+            )}
             <p className="text-muted-foreground text-base leading-relaxed">
               Bundle your class sections (e.g. all periods of <span className="text-foreground font-medium">8th Grade Science A</span>),
               then let AI find equivalent assessments <em>within</em> each group — keeping matches scoped to the right prep.

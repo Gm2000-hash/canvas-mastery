@@ -251,7 +251,7 @@ function TrendsView({ courseId, subjects }: { courseId: string | null; subjects:
         {rows === null ? (
           <Skeleton className="h-72 w-full" />
         ) : chartData.length === 0 ? (
-          <EmptyState message="No mastery data yet for this scope. Confirm tagged assignments on Tag Review and recompute mastery." />
+          <EmptyState message="No mastery data yet for this scope. Tag assessments from each class's Assignments page and recompute mastery." />
         ) : (
           <ChartContainer
             config={Object.fromEntries(seriesKeys.map((k) => [k.key, { label: k.key, color: FRAMEWORK_COLOR[k.framework] || "hsl(var(--primary))" }]))}
@@ -752,16 +752,14 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
         {(data === null || roster === null || placeholderStandards === null) ? <Skeleton className="h-60 w-full" /> :
          students.length === 0 ? <EmptyState message="No students enrolled in this course yet. Sync your roster from Courses." /> :
          leafColumns.length === 0 ? (
-          <EmptyState message="No standards available for this course's discipline. Seed standards from Standards, then tag assessments on Tag Review." />
+          <EmptyState message="No standards available for this course's discipline. Seed standards from Library → Standards, then tag assessments from the class's Assignments page." />
          ) :
          visibleStudents.length === 0 ? <EmptyState message="No students match this filter." /> : (
           <div className="space-y-3">
             {(data ?? []).length === 0 && (
               <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
                 <strong>Showing placeholder columns from your discipline standards.</strong>{" "}
-                Mastery cells stay empty until you tag assessments on{" "}
-                <Link to="/app/review" className="underline font-medium">Tag Review</Link>{" "}
-                and recompute mastery.
+                Mastery cells stay empty until you tag assessments from the class's Assignments page and recompute mastery.
               </div>
             )}
             <div className="overflow-auto border rounded-lg max-h-[70vh]">
@@ -1160,7 +1158,7 @@ const EmptyState = forwardRef<HTMLDivElement, { message: string }>(({ message },
     <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-60" />
     <p className="text-sm">{message}</p>
     <p className="text-xs mt-2">
-      Need to set things up? Visit <Link to="/app/classes" className="underline">Classes</Link>, <Link to="/app/review" className="underline">Tag Review</Link>.
+      Need to set things up? Visit <Link to="/app/classes" className="underline">Classes</Link>.
     </p>
   </div>
 ));

@@ -18,7 +18,7 @@ import { FRAMEWORKS, getFramework, defaultFrameworkForSubject, SUBJECTS, GRADES,
 import InvitationsCard from "@/components/InvitationsCard";
 import MergeStudentsCard from "@/components/MergeStudentsCard";
 import { Switch } from "@/components/ui/switch";
-import { Archive } from "lucide-react";
+import { Archive, Sparkles } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 
 export default function Settings() {
@@ -43,6 +43,8 @@ export default function Settings() {
   const [autoArchive, setAutoArchive] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingArchive, setSavingArchive] = useState(false);
+  const [autoTag, setAutoTag] = useState(true);
+  const [savingAutoTag, setSavingAutoTag] = useState(false);
 
   // (legacy single seed kept for migration; new seeding lives per-discipline below)
 
@@ -90,6 +92,7 @@ export default function Settings() {
       setThreshold(Math.round((settings.mastery_threshold ?? 0.8) * 100));
       setWindowN(settings.attempt_window ?? 3);
       setAutoArchive(settings.auto_archive_enabled ?? true);
+      setAutoTag((settings as any).auto_tag_on_import ?? true);
     }
     setDisciplines((discs ?? []) as Discipline[]);
   }
@@ -217,6 +220,20 @@ export default function Settings() {
       toast.success(next ? "Auto-archive enabled" : "Auto-archive disabled");
     }
   }
+  async function updateAutoTag(next: boolean) {
+    setAutoTag(next);
+    setSavingAutoTag(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) { setSavingAutoTag(false); return; }
+    const { error } = await supabase.from("teacher_settings").upsert({
+      teacher_id: u.user.id,
+      auto_tag_on_import: next,
+    });
+    setSavingAutoTag(false);
+    if (error) { setAutoTag(!next); toast.error(error.message); }
+    else toast.success(next ? "Imported questions will be AI-tagged automatically" : "Auto-tagging on import disabled");
+  }
+
   async function addDisciplines() {
     const fw = getFramework(newFramework);
     if (!fw.national && !newState) { toast.error("Pick a state"); return; }
@@ -678,6 +695,27 @@ export default function Settings() {
             />
             <Label htmlFor="auto-archive" className="cursor-pointer">
               {autoArchive ? "Auto-archive is on" : "Auto-archive is off"}
+            </Label>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AUTO-TAG ON IMPORT */}
+      <Card id="auto-tag">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Auto-tag imported questions
+          </CardTitle>
+          <CardDescription>
+            After each Canvas sync, newly imported quiz questions without a standard are queued for background AI tagging. Tags are applied automatically and can be adjusted any time in the Question bank. Each tagged question uses a small amount of AI credit.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3">
+            <Switch id="auto-tag" checked={autoTag} onCheckedChange={updateAutoTag} disabled={savingAutoTag} />
+            <Label htmlFor="auto-tag" className="cursor-pointer">
+              {autoTag ? "Auto-tagging is on" : "Auto-tagging is off"}
             </Label>
           </div>
         </CardContent>

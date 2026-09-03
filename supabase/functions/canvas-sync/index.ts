@@ -442,7 +442,28 @@ Deno.serve(async (req) => {
       console.warn("run_auto_archive call failed:", (e as Error).message);
     }
 
-    return new Response(JSON.stringify({ success: true, stats, question_scores: questionScores, archived }), {
+    // 7) Auto-tag: queue any newly imported, still-untagged quiz questions for background AI tagging.
+    let autoTag: { job_id?: string; added?: number } | null = null;
+    try {
+      const { data: ts } = await admin.from("teacher_settings").select("auto_tag_on_import").eq("teacher_id", teacherId).maybeSingle();
+      const enabled = ts ? ts.auto_tag_on_import !== false : true;
+      if (enabled && syncedCourseIds.length) {
+        const { data: quizAssignRows } = await admin.from("assignments").select("id")
+          .in("course_id", syncedCourseIds).eq("kind", "quiz");
+        const ids = (quizAssignRows ?? []).map((r) => r.id as string);
+        if (ids.length) {
+          const { data: enq, error: enqErr } = await admin.rpc("enqueue_untagged_questions_for", {
+            _teacher_id: teacherId, _scope: "import", _assignment_ids: ids,
+          });
+          if (enqErr) console.warn("enqueue_untagged_questions_for failed:", enqErr.message);
+          else autoTag = enq as any;
+        }
+      }
+    } catch (e) {
+      console.warn("auto-tag enqueue failed:", (e as Error).message);
+    }
+
+    return new Response(JSON.stringify({ success: true, stats, question_scores: questionScores, archived, auto_tag: autoTag }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

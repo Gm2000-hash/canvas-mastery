@@ -1150,6 +1150,105 @@ export type Database = {
           },
         ]
       }
+      tag_job_items: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          error: string | null
+          id: string
+          job_id: string
+          processed_at: string | null
+          question_id: string
+          status: string
+          teacher_id: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id: string
+          processed_at?: string | null
+          question_id: string
+          status?: string
+          teacher_id: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id?: string
+          processed_at?: string | null
+          question_id?: string
+          status?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tag_job_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "tag_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tag_job_items_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tag_jobs: {
+        Row: {
+          consecutive_429: number
+          created_at: string
+          done: number
+          failed: number
+          id: string
+          last_run_at: string | null
+          lease_until: string | null
+          pause_reason: string | null
+          scope: string
+          status: string
+          teacher_id: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          consecutive_429?: number
+          created_at?: string
+          done?: number
+          failed?: number
+          id?: string
+          last_run_at?: string | null
+          lease_until?: string | null
+          pause_reason?: string | null
+          scope?: string
+          status?: string
+          teacher_id: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          consecutive_429?: number
+          created_at?: string
+          done?: number
+          failed?: number
+          id?: string
+          last_run_at?: string | null
+          lease_until?: string | null
+          pause_reason?: string | null
+          scope?: string
+          status?: string
+          teacher_id?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       teacher_disciplines: {
         Row: {
           created_at: string
@@ -1220,6 +1319,7 @@ export type Database = {
         Row: {
           attempt_window: number
           auto_archive_enabled: boolean
+          auto_tag_on_import: boolean
           mastery_threshold: number
           pseudonym_style: string
           reveal_default: boolean
@@ -1229,6 +1329,7 @@ export type Database = {
         Insert: {
           attempt_window?: number
           auto_archive_enabled?: boolean
+          auto_tag_on_import?: boolean
           mastery_threshold?: number
           pseudonym_style?: string
           reveal_default?: boolean
@@ -1238,6 +1339,7 @@ export type Database = {
         Update: {
           attempt_window?: number
           auto_archive_enabled?: boolean
+          auto_tag_on_import?: boolean
           mastery_threshold?: number
           pseudonym_style?: string
           reveal_default?: boolean
@@ -1264,6 +1366,21 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      worker_ticks: {
+        Row: {
+          created_at: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          token?: string
         }
         Relationships: []
       }
@@ -1673,6 +1790,18 @@ export type Database = {
           teacher_count: number
         }[]
       }
+      enqueue_untagged_questions: {
+        Args: { _assignment_ids?: string[]; _scope?: string }
+        Returns: Json
+      }
+      enqueue_untagged_questions_for: {
+        Args: {
+          _assignment_ids?: string[]
+          _scope: string
+          _teacher_id: string
+        }
+        Returns: Json
+      }
       force_archive_state: {
         Args: { _archive: boolean; _course_id: string }
         Returns: boolean
@@ -1913,6 +2042,36 @@ export type Database = {
           suggested_name: string
         }[]
       }
+      tag_job_active: {
+        Args: never
+        Returns: {
+          consecutive_429: number
+          created_at: string
+          done: number
+          failed: number
+          id: string
+          last_run_at: string | null
+          lease_until: string | null
+          pause_reason: string | null
+          scope: string
+          status: string
+          teacher_id: string
+          total: number
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "tag_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      tag_job_control: {
+        Args: { _action: string; _job_id: string }
+        Returns: undefined
+      }
+      tag_worker_arm: { Args: never; Returns: undefined }
+      tag_worker_disarm: { Args: never; Returns: undefined }
       unlink_assignment_from_group: {
         Args: { _assignment_id: string }
         Returns: boolean

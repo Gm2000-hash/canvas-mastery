@@ -117,8 +117,7 @@ export default function StandardQuestionsAccordion({ standardId }: { standardId:
   if (questions.length === 0) {
     return (
       <div className="px-4 py-6 text-center text-sm text-muted-foreground bg-muted/20">
-        No questions tagged to this standard yet. Tag questions from{" "}
-        <span className="font-medium text-foreground">Tag Review</span>.
+        No questions tagged to this standard yet. Use <span className="font-medium text-foreground">Tag all untagged</span> in the Question bank.
       </div>
     );
   }

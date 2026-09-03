@@ -1,5 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+
+// /app/standards moved into Library as a view; keep tab/std params.
+function LegacyStandardsRedirect() {
+  const { search } = useLocation();
+  const p = new URLSearchParams(search);
+  p.set("view", "standards");
+  return <Navigate to={`/app/library?${p.toString()}`} replace />;
+}
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,14 +19,11 @@ import Dashboard from "./pages/app/Dashboard";
 import Settings from "./pages/app/Settings";
 import ClassesHub from "./pages/app/ClassesHub";
 import Assignments from "./pages/app/Assignments";
-import Standards from "./pages/app/Standards";
 import MasteryDebug from "./pages/app/MasteryDebug";
-import Review from "./pages/app/Review";
 import Analytics from "./pages/app/Analytics";
 
 import StudentHistory from "./pages/app/StudentHistory";
 import Admin from "./pages/app/Admin";
-import AssignmentGroups from "./pages/app/AssignmentGroups";
 import Library from "./pages/app/Library";
 import Department from "./pages/app/Department";
 import DepartmentDashboard from "./pages/app/DepartmentDashboard";
@@ -42,10 +47,10 @@ const App = () => (
             <Route path="courses" element={<Navigate to="/app/classes" replace />} />
             <Route path="analytics" element={<Navigate to="/app/classes" replace />} />
             <Route path="assignments" element={<Navigate to="/app/classes" replace />} />
-            <Route path="assignment-groups" element={<AssignmentGroups />} />
-            <Route path="review" element={<Review />} />
-            <Route path="standards" element={<Standards />} />
-            <Route path="question-bank" element={<Navigate to="/app/standards?tab=questions" replace />} />
+            <Route path="assignment-groups" element={<Navigate to="/app/classes?view=groups" replace />} />
+            <Route path="review" element={<Navigate to="/app/library?view=standards&tab=questions" replace />} />
+            <Route path="standards" element={<LegacyStandardsRedirect />} />
+            <Route path="question-bank" element={<Navigate to="/app/library?view=standards&tab=questions" replace />} />
             
             <Route path="mastery/debug" element={<MasteryDebug />} />
             <Route path="student-history" element={<StudentHistory />} />
