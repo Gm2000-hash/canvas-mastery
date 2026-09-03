@@ -21,6 +21,9 @@ import { cn } from "@/lib/utils";
 import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, Cell } from "recharts";
 import { RevealNamesToggle } from "@/components/RevealNamesToggle";
+import { Checkbox } from "@/components/ui/checkbox";
+import { BulkTagActions } from "./BulkTagActions";
+import { UntaggedQuestionsDialog, countUntaggedQuestions } from "./UntaggedQuestionsDialog";
 
 type BankRow = {
   standard_id: string;
@@ -84,6 +87,11 @@ export default function QuestionsTab() {
     { name: string; status: "ok" | "skipped" | "error"; responses: number; reason?: string }[] | null
   >(null);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [untaggedOpen, setUntaggedOpen] = useState(false);
+  const [untaggedCount, setUntaggedCount] = useState<number | null>(null);
+  const [selectedQs, setSelectedQs] = useState<Set<string>>(new Set());
+  const refreshUntagged = () => countUntaggedQuestions().then(setUntaggedCount).catch(() => {});
+  useEffect(() => { refreshUntagged(); }, []);
 
   // Sync external URL param changes (e.g., navigating from Library tab) into selection.
   useEffect(() => {
@@ -250,6 +258,7 @@ export default function QuestionsTab() {
   async function loadQuestionsForStandard(standardId: string) {
     setLoadingQs(true);
     setQuestions(null);
+    setSelectedQs(new Set());
     const node = findNodeByStandardId(tree, standardId);
     const stdIds = collectStandardIds(node);
     if (stdIds.length === 0) { setQuestions([]); setLoadingQs(false); return; }
@@ -355,6 +364,13 @@ export default function QuestionsTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end gap-2 flex-wrap">
+        <Button variant="outline" onClick={() => setUntaggedOpen(true)}>
+          <AlertCircle className="h-4 w-4 mr-2" />
+          Untagged questions
+          {untaggedCount != null && untaggedCount > 0 && (
+            <Badge variant="secondary" className="ml-2 tabular-nums">{untaggedCount}</Badge>
+          )}
+        </Button>
         <Button variant="outline" onClick={() => setCsvOpen(true)}>
           <FileUp className="h-4 w-4 mr-2" />
           Import CSV
@@ -364,6 +380,13 @@ export default function QuestionsTab() {
           Import quiz scores
         </Button>
       </div>
+
+      <UntaggedQuestionsDialog
+        open={untaggedOpen}
+        onOpenChange={setUntaggedOpen}
+        courses={courses}
+        onChanged={() => { loadBank(); refreshUntagged(); if (selectedStandardId) loadQuestionsForStandard(selectedStandardId); }}
+      />
 
       <ImportQuizCsvDialog
         open={csvOpen}
@@ -518,6 +541,15 @@ export default function QuestionsTab() {
               {questions ? `${questions.length} question${questions.length === 1 ? "" : "s"} found` : "Loading…"}
             </DialogDescription>
           </DialogHeader>
+          {questions && questions.length > 0 && (
+            <BulkTagActions
+              selected={questions.filter((q) => selectedQs.has(q.id)).map((q) => ({ id: q.id, assignment_id: q.assignment_id }))}
+              allIds={questions.map((q) => q.id)}
+              onSelectAll={() => setSelectedQs(new Set(questions.map((q) => q.id)))}
+              onClear={() => setSelectedQs(new Set())}
+              onDone={() => { loadBank(); refreshUntagged(); if (selectedStandardId) loadQuestionsForStandard(selectedStandardId); }}
+            />
+          )}
           <div className="flex-1 overflow-y-auto pr-1 space-y-3">
             {loadingQs ? (
               <div className="space-y-2">{[0,1,2,3].map((i) => <Skeleton key={i} className="h-20" />)}</div>
@@ -527,11 +559,17 @@ export default function QuestionsTab() {
               </div>
             ) : (
               questions.map((q) => (
+                <div key={q.id} className="flex items-start gap-2">
+                  <Checkbox
+                    checked={selectedQs.has(q.id)}
+                    onCheckedChange={() => setSelectedQs((p) => { const n = new Set(p); n.has(q.id) ? n.delete(q.id) : n.add(q.id); return n; })}
+                    className="mt-5"
+                    aria-label={`Select question ${q.position ?? ""}`}
+                  />
                 <button
-                  key={q.id}
                   type="button"
                   onClick={() => setOpenQuestion(q)}
-                  className="w-full text-left rounded-lg border bg-card hover:bg-muted/40 transition p-4 flex items-start gap-3"
+                  className="flex-1 text-left rounded-lg border bg-card hover:bg-muted/40 transition p-4 flex items-start gap-3"
                 >
                   <div className="shrink-0 text-xs text-muted-foreground tabular-nums w-10 pt-0.5">
                     Q{q.position ?? "?"}
@@ -572,6 +610,7 @@ export default function QuestionsTab() {
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
                 </button>
+                </div>
               ))
             )}
           </div>
