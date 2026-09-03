@@ -24,6 +24,7 @@ import { RevealNamesToggle } from "@/components/RevealNamesToggle";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BulkTagActions } from "./BulkTagActions";
 import { UntaggedQuestionsDialog, countUntaggedQuestions } from "./UntaggedQuestionsDialog";
+import { TagJobProgress, enqueueAllUntagged } from "./TagJobProgress";
 
 type BankRow = {
   standard_id: string;
@@ -90,7 +91,19 @@ export default function QuestionsTab() {
   const [untaggedOpen, setUntaggedOpen] = useState(false);
   const [untaggedCount, setUntaggedCount] = useState<number | null>(null);
   const [selectedQs, setSelectedQs] = useState<Set<string>>(new Set());
+  const [tagAllBusy, setTagAllBusy] = useState(false);
+  const [jobRefreshKey, setJobRefreshKey] = useState(0);
   const refreshUntagged = () => countUntaggedQuestions().then(setUntaggedCount).catch(() => {});
+
+  async function tagAllUntagged() {
+    setTagAllBusy(true);
+    const res = await enqueueAllUntagged();
+    setTagAllBusy(false);
+    if (!res) return;
+    if (res.added === 0) toast.info("Nothing new to queue — every question is already tagged or queued.");
+    else toast.success(`Queued ${res.added.toLocaleString()} question${res.added === 1 ? "" : "s"} for AI tagging. It runs in the background.`);
+    setJobRefreshKey((k) => k + 1);
+  }
   useEffect(() => { refreshUntagged(); }, []);
 
   // Sync external URL param changes (e.g., navigating from Library tab) into selection.
@@ -371,6 +384,10 @@ export default function QuestionsTab() {
             <Badge variant="secondary" className="ml-2 tabular-nums">{untaggedCount}</Badge>
           )}
         </Button>
+        <Button variant="outline" onClick={tagAllUntagged} disabled={tagAllBusy || untaggedCount === 0}>
+          {tagAllBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+          Tag all untagged
+        </Button>
         <Button variant="outline" onClick={() => setCsvOpen(true)}>
           <FileUp className="h-4 w-4 mr-2" />
           Import CSV
@@ -380,6 +397,11 @@ export default function QuestionsTab() {
           Import quiz scores
         </Button>
       </div>
+
+      <TagJobProgress
+        refreshKey={jobRefreshKey}
+        onProgress={() => { refreshUntagged(); loadBank(); }}
+      />
 
       <UntaggedQuestionsDialog
         open={untaggedOpen}
@@ -901,11 +923,6 @@ export function QuestionDrawer({ question, onClose }: { question: QuestionRow | 
               {retagging ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
               Re-tag with AI
             </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/app/review">
-                <ExternalLink className="h-3 w-3 mr-1" /> Open in Tag Review
-              </Link>
-            </Button>
           </div>
         </div>
       </SheetContent>
@@ -920,7 +937,7 @@ function EmptyState() {
         <AlertCircle className="h-10 w-10 mx-auto text-muted-foreground" />
         <div className="text-sm text-muted-foreground max-w-md mx-auto">
           No tagged questions yet. Sync your Canvas quizzes from the <Link to="/app" className="underline">Dashboard</Link>,
-          then go to <Link to="/app/review" className="underline">Tag Review</Link> and run <strong>AI tag by question</strong> on a quiz.
+          then use <strong>Tag all untagged</strong> above to let AI tag them.
         </div>
       </CardContent>
     </Card>

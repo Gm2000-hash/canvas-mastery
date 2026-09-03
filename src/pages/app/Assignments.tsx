@@ -294,7 +294,7 @@ export default function Assignments() {
           <div className="text-sm flex-1">
             <span className="font-medium">{suggestionCount}</span> assignment{suggestionCount === 1 ? "" : "s"} look like duplicates across multiple classes (e.g., the same quiz given to two sections).
           </div>
-          <Link to="/app/assignment-groups">
+          <Link to="/app/classes?view=groups">
             <Button size="sm" variant="default">Review groups</Button>
           </Link>
         </div>

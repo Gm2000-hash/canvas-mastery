@@ -3,6 +3,8 @@
 // uploaded, written in-app, AI-generated, or imported from Canvas pages/files.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import Standards from "./Standards";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -14,7 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, Download, HelpCircle, Loader2, Pencil, Plus, Search, Sparkles, Upload, X } from "lucide-react";
+import { BookMarked, ChevronDown, Download, HelpCircle, LibraryBig, Loader2, Pencil, Plus, Search, Sparkles, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/contexts/ProfileContext";
 import QuestionsTab, { QuestionDrawer, type QuestionRow } from "./standards/QuestionsTab";
@@ -45,6 +47,12 @@ export default function Library() {
   const { profile } = useProfile();
   const [params, setParams] = useSearchParams();
   const section = (params.get("section") as LibrarySection | null) ?? null;
+  const view = params.get("view") === "standards" ? "standards" : "library";
+  const setView = (v: string) => setParams((p) => {
+    if (v === "standards") { p.set("view", "standards"); p.delete("section"); }
+    else { p.delete("view"); p.delete("tab"); p.delete("std"); }
+    return p;
+  }, { replace: true });
   const setSection = (s: LibrarySection | null) => setParams((p) => { if (s) p.set("section", s); else p.delete("section"); return p; });
 
   // ---- Search state ----
@@ -135,9 +143,22 @@ export default function Library() {
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Library</h1>
-        <p className="text-muted-foreground">Everything imported into or created by the app — searchable by content and standard.</p>
+        <p className="text-muted-foreground">
+          {view === "standards"
+            ? "Browse standards by framework and explore the quiz questions tagged to each one."
+            : "Everything imported into or created by the app — searchable by content and standard."}
+        </p>
+        <Tabs value={view} onValueChange={setView} className="mt-4">
+          <TabsList>
+            <TabsTrigger value="library"><LibraryBig className="h-4 w-4 mr-1.5" />Library</TabsTrigger>
+            <TabsTrigger value="standards"><BookMarked className="h-4 w-4 mr-1.5" />Standards</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
+      {view === "standards" ? (
+        <Standards embedded />
+      ) : (<>
       {/* Search */}
       <Card className="border-primary/20 bg-card/60">
         <CardContent className="p-4 sm:p-5 space-y-3">
@@ -299,6 +320,7 @@ export default function Library() {
       )}
       <CanvasImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={refresh} />
       <QuestionDrawer question={openQuestion} onClose={() => setOpenQuestion(null)} />
+      </>)}
     </div>
   );
 }

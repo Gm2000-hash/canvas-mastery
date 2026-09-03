@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AssignmentGroups from "./AssignmentGroups";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, BarChartHorizontal, Eye, EyeOff, GraduationCap, Loader2, Shuffle, Tag } from "lucide-react";
+import { ArrowRight, BarChartHorizontal, Eye, EyeOff, GraduationCap, Layers, Loader2, Shuffle, Tag } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -58,6 +60,9 @@ function pct(n: number | null | undefined) {
 }
 
 export default function ClassesHub() {
+  const [urlParams, setUrlParams] = useSearchParams();
+  const view = urlParams.get("view") === "groups" ? "groups" : "classes";
+  const setView = (v: string) => setUrlParams((p) => { if (v === "groups") p.set("view", "groups"); else p.delete("view"); return p; }, { replace: true });
   const [rows, setRows] = useState<CourseRow[] | null>(null);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [stats, setStats] = useState<Record<string, ClassStats>>({});
@@ -152,8 +157,19 @@ export default function ClassesHub() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-3xl sm:text-4xl font-semibold mb-2">Classes</h1>
-          <p className="text-muted-foreground">Manage your classes and open per-class analytics. Tag each class with a discipline so standards line up.</p>
+          <p className="text-muted-foreground">
+            {view === "groups"
+              ? "Bundle sections into class groups and let AI match equivalent assessments within each group."
+              : "Manage your classes and open per-class analytics. Tag each class with a discipline so standards line up."}
+          </p>
+          <Tabs value={view} onValueChange={setView} className="mt-4">
+            <TabsList>
+              <TabsTrigger value="classes"><GraduationCap className="h-4 w-4 mr-1.5" />Classes</TabsTrigger>
+              <TabsTrigger value="groups"><Layers className="h-4 w-4 mr-1.5" />Class groups</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
+        {view === "classes" && (
         <div className="flex items-center gap-3 flex-wrap">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">School year</Label>
@@ -199,9 +215,12 @@ export default function ClassesHub() {
             </Dialog>
           </div>
         </div>
+        )}
       </div>
 
-      {rows === null ? (
+      {view === "groups" ? (
+        <AssignmentGroups embedded />
+      ) : rows === null ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40" />)}
         </div>

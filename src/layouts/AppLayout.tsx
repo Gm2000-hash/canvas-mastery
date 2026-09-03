@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, BookMarked, Building2, CheckCheck, GraduationCap, GripVertical, History, Layers, LayoutDashboard, LibraryBig, Menu, Settings as SettingsIcon, Shield } from "lucide-react";
+import { BarChart3, Building2, GraduationCap, GripVertical, History, LayoutDashboard, LibraryBig, Menu, Settings as SettingsIcon, Shield } from "lucide-react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
@@ -14,10 +14,6 @@ import { SecurityPinSetup } from "@/components/SecurityPinSetup";
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/app/classes", label: "Classes", icon: GraduationCap },
-  
-  { to: "/app/assignment-groups", label: "Class Groups", icon: Layers },
-  { to: "/app/review", label: "Tag Review", icon: CheckCheck },
-  { to: "/app/standards", label: "Standards", icon: BookMarked },
   
   { to: "/app/student-history", label: "Student History", icon: History },
   { to: "/app/department", label: "Department", icon: Building2 },
@@ -129,7 +125,7 @@ export default function AppLayout() {
     try {
       const raw = localStorage.getItem(ORDER_KEY);
       // Mastery Connect was replaced by Library; keep the user's slot for it.
-      if (raw) return (JSON.parse(raw) as string[]).map((to) => (to === "/app/mastery-connect" ? "/app/library" : to));
+      if (raw) return (JSON.parse(raw) as string[]).map((to) => (to === "/app/mastery-connect" ? "/app/library" : to === "/app/assignment-groups" ? "/app/classes" : to === "/app/standards" ? "/app/library" : to)).filter((to) => to !== "/app/review");
     } catch {}
     return [];
   });

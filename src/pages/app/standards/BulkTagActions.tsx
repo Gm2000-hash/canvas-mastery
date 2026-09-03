@@ -42,7 +42,7 @@ export function BulkTagActions({ selected, allIds, onSelectAll, onClear, onDone,
     }
     toast.dismiss(toastId);
     setTagging(false);
-    if (ok) toast.success(`AI suggested standards for ${ok} question${ok === 1 ? "" : "s"}${failed ? ` (${failed} failed)` : ""}. Review them in Tag Review.`);
+    if (ok) toast.success(`AI suggested standards for ${ok} question${ok === 1 ? "" : "s"}${failed ? ` (${failed} failed)` : ""}.`);
     onDone();
   }
 

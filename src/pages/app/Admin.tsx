@@ -132,7 +132,7 @@ export default function Admin() {
               <Button size="sm" variant="outline" onClick={() => navigate("/app/mastery/debug")}>
                 <Wrench className="h-4 w-4" /> Mastery debug
               </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate("/app/standards")}>
+              <Button size="sm" variant="outline" onClick={() => navigate("/app/library?view=standards")}>
                 <Database className="h-4 w-4" /> Standards
               </Button>
             </div>
