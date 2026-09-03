@@ -251,7 +251,7 @@ export function RichTextEditor({
 
   // Sync external content changes
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     const currentHTML = editor.getHTML();
     if (content !== currentHTML) {
       isUpdatingRef.current = true;
@@ -261,7 +261,7 @@ export function RichTextEditor({
   }, [content, editor]);
 
   useEffect(() => {
-    if (editor) editor.setEditable(!readOnly);
+    if (editor && !editor.isDestroyed) editor.setEditable(!readOnly);
   }, [readOnly, editor]);
 
   if (!editor) return null;
