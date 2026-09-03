@@ -37,8 +37,11 @@ export async function generatePdfThumbnail(
     );
     if (!blob) return null;
 
-    // Upload to the public avatars bucket under book-covers/
-    const filePath = `book-covers/${bookId}.jpg`;
+    // Store under the owner's folder (storage policies are owner-scoped).
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id;
+    if (!uid) return null;
+    const filePath = `${uid}/book-covers/${bookId}.jpg`;
     const { error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(filePath, blob, {
