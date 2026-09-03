@@ -59,8 +59,39 @@ export function getAiProviderConfig(): AiProviderConfig {
   };
 }
 
-/** Post a chat-completions request through the configured provider. */
-export async function fetchChatCompletion(body: Record<string, unknown>): Promise<Response> {
+export interface RetryOptions {
+  /** Max additional attempts after the first (default 3). Set 0 to disable. */
+  maxRetries?: number;
+  /** Upper bound for a single wait, in ms (default 15s). */
+  maxDelayMs?: number;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Bounded backoff delay: honors Retry-After when present, else exponential with jitter. */
+export function backoffDelayMs(res: Response, attempt: number, maxDelayMs: number): number {
+  const ra = res.headers.get("retry-after");
+  if (ra) {
+    const secs = Number(ra);
+    if (Number.isFinite(secs) && secs > 0) return Math.min(secs * 1000, maxDelayMs);
+    const at = Date.parse(ra);
+    if (!Number.isNaN(at)) return Math.min(Math.max(at - Date.now(), 500), maxDelayMs);
+  }
+  const base = Math.min(1000 * 2 ** attempt, maxDelayMs);
+  return Math.round(base * (0.5 + Math.random()));
+}
+
+/**
+ * Post a chat-completions request through the configured provider with bounded
+ * backoff. Retries only transient failures: 429 (rate limit), 5xx, network
+ * errors, and OpenRouter's "in-flight" 402 (credit reservation contention, not
+ * a real balance problem). Real 400/401/402/403 responses return immediately —
+ * re-sending them cannot succeed and only burns credits.
+ */
+export async function fetchChatCompletion(
+  body: Record<string, unknown>,
+  opts: RetryOptions = {},
+): Promise<Response> {
   const config = getAiProviderConfig();
   const requestBody = config.overrideModel
     ? { ...body, model: config.overrideModel }
@@ -72,11 +103,39 @@ export async function fetchChatCompletion(body: Record<string, unknown>): Promis
     requestBody.max_tokens = 4096;
   }
 
-  return fetch(config.baseUrl, {
-    method: "POST",
-    headers: config.headers,
-    body: JSON.stringify(requestBody),
-  });
+  const maxRetries = opts.maxRetries ?? 3;
+  const maxDelayMs = opts.maxDelayMs ?? 15_000;
+  const payload = JSON.stringify(requestBody);
+
+  let lastErr: unknown = null;
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(config.baseUrl, { method: "POST", headers: config.headers, body: payload });
+    } catch (e) {
+      lastErr = e;
+      if (attempt >= maxRetries) throw e;
+      await sleep(backoffDelayMs(new Response(null), attempt, maxDelayMs));
+      continue;
+    }
+
+    if (res.ok || attempt >= maxRetries) return res;
+
+    let retryable = res.status === 429 || res.status >= 500;
+    if (!retryable && res.status === 402 && config.provider === "openrouter") {
+      // Peek at the body without consuming the response we might hand back.
+      const txt = await res.clone().text().catch(() => "");
+      retryable = /in_flight/i.test(txt);
+    }
+    if (!retryable) return res;
+
+    const delay = backoffDelayMs(res, attempt, maxDelayMs);
+    console.warn(`AI provider ${res.status}; retry ${attempt + 1}/${maxRetries} in ${delay}ms`);
+    await res.body?.cancel().catch(() => {});
+    await sleep(delay);
+  }
+  // unreachable, but keeps TypeScript satisfied
+  throw lastErr instanceof Error ? lastErr : new Error("AI request failed");
 }
 
 /** Human-readable messages for the provider-specific error codes. */
