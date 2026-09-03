@@ -1394,6 +1394,36 @@ export type Database = {
           },
         ]
       }
+      principal_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          school: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          school?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          school?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           ai_preferences: Json
@@ -1405,6 +1435,7 @@ export type Database = {
           grade_levels: string[]
           id: string
           onboarding_dismissed_at: string | null
+          school: string | null
           state: string | null
           subjects: string[]
           updated_at: string
@@ -1419,6 +1450,7 @@ export type Database = {
           grade_levels?: string[]
           id: string
           onboarding_dismissed_at?: string | null
+          school?: string | null
           state?: string | null
           subjects?: string[]
           updated_at?: string
@@ -1433,6 +1465,7 @@ export type Database = {
           grade_levels?: string[]
           id?: string
           onboarding_dismissed_at?: string | null
+          school?: string | null
           state?: string | null
           subjects?: string[]
           updated_at?: string
@@ -1658,6 +1691,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      schools: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          name_key: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          name_key?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          name_key?: string | null
+        }
+        Relationships: []
       }
       standard_key_terms: {
         Row: {
@@ -2162,12 +2216,22 @@ export type Database = {
           created_at: string
           display_name: string
           email: string
+          principal_status: string
           roles: Database["public"]["Enums"]["app_role"][]
+          school: string
           user_id: string
         }[]
       }
       admin_reset_security_pin: {
         Args: { _user_id: string }
+        Returns: undefined
+      }
+      admin_set_user_role: {
+        Args: { _role: string; _user_id: string }
+        Returns: undefined
+      }
+      admin_set_user_school: {
+        Args: { _school: string; _user_id: string }
         Returns: undefined
       }
       analytics_active_dimensions: {
@@ -2419,6 +2483,123 @@ export type Database = {
           _name: string
         }
         Returns: string
+      }
+      approve_principal: {
+        Args: { _approve: boolean; _user_id: string }
+        Returns: undefined
+      }
+      building_breakdown: {
+        Args: {
+          _courses?: string[]
+          _dims: string[]
+          _grades?: string[]
+          _school_year?: string
+          _student_search?: string
+          _subjects?: string[]
+          _teachers?: string[]
+        }
+        Returns: {
+          advanced: number
+          avg_mastery: number
+          basic: number
+          class_count: number
+          key1: string
+          key2: string
+          label1: string
+          label2: string
+          pct_mastered: number
+          proficient: number
+          standards_assessed: number
+          student_count: number
+          teacher_count: number
+        }[]
+      }
+      building_facts: {
+        Args: {
+          _courses?: string[]
+          _grades?: string[]
+          _school_year?: string
+          _student_search?: string
+          _subjects?: string[]
+          _teachers?: string[]
+        }
+        Returns: {
+          computed_at: string
+          course_id: string
+          course_name: string
+          grade: string
+          mastered: boolean
+          mastery_score: number
+          standard_code: string
+          standard_description: string
+          standard_id: string
+          student_id: string
+          student_label: string
+          subject: string
+          teacher_id: string
+          teacher_name: string
+        }[]
+      }
+      building_filter_options: {
+        Args: { _school_year?: string }
+        Returns: Json
+      }
+      building_overview: {
+        Args: {
+          _courses?: string[]
+          _grades?: string[]
+          _school_year?: string
+          _student_search?: string
+          _subjects?: string[]
+          _teachers?: string[]
+        }
+        Returns: {
+          advanced: number
+          avg_mastery: number
+          basic: number
+          class_count: number
+          pct_mastered: number
+          proficient: number
+          standards_assessed: number
+          student_count: number
+          teacher_count: number
+          trend: Json
+        }[]
+      }
+      building_scope_courses: {
+        Args: {
+          _courses?: string[]
+          _grades?: string[]
+          _school_year?: string
+          _subjects?: string[]
+          _teachers?: string[]
+        }
+        Returns: {
+          course_id: string
+          course_name: string
+          grade: string
+          subject: string
+          teacher_id: string
+          teacher_name: string
+        }[]
+      }
+      building_student_history: {
+        Args: { _student_id: string }
+        Returns: {
+          attempts: number
+          course_id: string
+          course_name: string
+          grade: string
+          last_assessed: string
+          mastered: boolean
+          mastery_score: number
+          school_year: string
+          standard_code: string
+          standard_description: string
+          standard_id: string
+          subject: string
+          teacher_name: string
+        }[]
       }
       create_class_group: {
         Args: { _course_ids: string[]; _name: string }
@@ -2726,6 +2907,7 @@ export type Database = {
         }[]
       }
       normalize_assignment_name: { Args: { _name: string }; Returns: string }
+      principal_school: { Args: never; Returns: string }
       redeem_invitation: {
         Args: { _code: string; _user_id: string }
         Returns: {
@@ -2738,6 +2920,15 @@ export type Database = {
         Returns: {
           new_pseudonym: string
           old_pseudonym: string
+          student_id: string
+        }[]
+      }
+      reveal_building_identities: {
+        Args: { _pin: string; _reason?: string; _student_ids: string[] }
+        Returns: {
+          email: string
+          real_name: string
+          real_sortable_name: string
           student_id: string
         }[]
       }
@@ -2908,7 +3099,7 @@ export type Database = {
       verify_security_pin: { Args: { _pin: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "teacher"
+      app_role: "admin" | "teacher" | "principal"
       assignment_kind: "assignment" | "quiz"
     }
     CompositeTypes: {
@@ -3037,7 +3228,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "teacher"],
+      app_role: ["admin", "teacher", "principal"],
       assignment_kind: ["assignment", "quiz"],
     },
   },

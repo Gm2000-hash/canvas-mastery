@@ -3,24 +3,42 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Building2, GraduationCap, GripVertical, History, LayoutDashboard, LibraryBig, Sparkles, Menu, Settings as SettingsIcon, Shield } from "lucide-react";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { BarChart3, Building2, GraduationCap, GripVertical, History, LayoutDashboard, LibraryBig, Sparkles, Menu, Settings as SettingsIcon, Shield, School } from "lucide-react";
+import { useRole } from "@/hooks/useRole";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { SecurityPinSetup } from "@/components/SecurityPinSetup";
 
-const nav = [
+type NavItem = { to: string; label: string; icon: any; end?: boolean };
+
+const teacherNav: NavItem[] = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/app/classes", label: "Classes", icon: GraduationCap },
-  
   { to: "/app/student-history", label: "Student History", icon: History },
   { to: "/app/department", label: "Department", icon: Building2 },
   { to: "/app/library", label: "Library", icon: LibraryBig },
   { to: "/app/curriculum", label: "Curriculum", icon: Sparkles },
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },
 ];
+
+const principalNav: NavItem[] = [
+  { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/app/building", label: "Building Analytics", icon: School },
+  { to: "/app/settings", label: "Settings", icon: SettingsIcon },
+];
+
+const pendingNav: NavItem[] = [
+  { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/app/settings", label: "Settings", icon: SettingsIcon },
+];
+
+const nav = teacherNav;
+
+/** Routes a principal (analytics-only) account may open. */
+const PRINCIPAL_ALLOWED = [/^\/app\/?$/, /^\/app\/building/, /^\/app\/settings/, /^\/app\/pending/];
+const PENDING_ALLOWED = [/^\/app\/?$/, /^\/app\/settings/, /^\/app\/pending/];
 
 function NavList({ items, onNavigate, userEmail, onSignOut, onReorder, draggable }: {
   items: typeof nav;
@@ -116,7 +134,7 @@ function NavList({ items, onNavigate, userEmail, onSignOut, onReorder, draggable
 
 export default function AppLayout() {
   const { user, loading } = useAuth();
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, isPrincipal, pending, loading: roleLoading } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -140,10 +158,24 @@ export default function AppLayout() {
     if (!loading && !user) navigate("/auth", { replace: true });
   }, [loading, user, navigate]);
 
+  // Principals (analytics-only) and pending principals are kept to their own routes.
+  useEffect(() => {
+    if (roleLoading || isAdmin) return;
+    const path = location.pathname;
+    if (pending) {
+      if (!PENDING_ALLOWED.some((re) => re.test(path))) navigate("/app/pending", { replace: true });
+      return;
+    }
+    if (isPrincipal && !PRINCIPAL_ALLOWED.some((re) => re.test(path))) {
+      navigate("/app/building", { replace: true });
+    }
+  }, [roleLoading, isAdmin, isPrincipal, pending, location.pathname, navigate]);
+
   const items = useMemo(() => {
-    const baseItems = [...nav, ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Shield, end: false as const }] : [])];
+    const base: NavItem[] = pending && !isAdmin ? pendingNav : isPrincipal && !isAdmin ? principalNav : teacherNav;
+    const baseItems: NavItem[] = [...base, ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Shield, end: false }] : [])];
     const map = new Map(baseItems.map((i) => [i.to, i]));
-    const ordered: typeof baseItems = [];
+    const ordered: NavItem[] = [];
     for (const to of order) {
       const item = map.get(to);
       if (item) {
@@ -152,7 +184,7 @@ export default function AppLayout() {
       }
     }
     return [...ordered, ...map.values()];
-  }, [isAdmin, order]);
+  }, [isAdmin, isPrincipal, pending, order]);
 
   if (loading || !user) {
     return (

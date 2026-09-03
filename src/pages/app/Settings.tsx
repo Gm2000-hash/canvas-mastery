@@ -20,12 +20,16 @@ import MergeStudentsCard from "@/components/MergeStudentsCard";
 import { Switch } from "@/components/ui/switch";
 import { Archive, Sparkles } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useRole } from "@/hooks/useRole";
+import { SchoolInput } from "@/components/SchoolInput";
 
 export default function Settings() {
   const { patch: patchProfile, refresh: refreshProfile } = useProfile();
+  const role = useRole();
   const location = useLocation();
   // Profile
   const [displayName, setDisplayName] = useState("");
+  const [school, setSchool] = useState("");
   const [state, setState] = useState<string>("");
   const [subject, setSubject] = useState<string>("");
   const [grade, setGrade] = useState<string>("");
@@ -79,6 +83,7 @@ export default function Settings() {
     ]);
     if (profile) {
       setDisplayName(profile.display_name ?? "");
+      setSchool((profile as any).school ?? "");
       setState(profile.state ?? "");
       setSubject(profile.default_subject ?? "");
       setGrade(profile.default_grade ?? "");
@@ -117,10 +122,11 @@ export default function Settings() {
     const { error } = await supabase.from("profiles").upsert({
       id: u.user.id,
       display_name: displayName.trim() || null,
+      school: school.trim() || null,
       state: state || null,
       default_subject: subject || null,
       default_grade: grade || null,
-    });
+    } as any);
     if (error) {
       setSavingProfile(false);
       toast.error(error.message);
@@ -162,6 +168,7 @@ export default function Settings() {
     // page (Dashboard, future pages, etc.) re-renders immediately.
     patchProfile({
       display_name: displayName.trim() || null,
+      school: school.trim() || null,
       state: state || null,
       default_subject: subject || null,
       default_grade: grade || null,
@@ -362,6 +369,14 @@ export default function Settings() {
                 />
                 <p className="text-xs text-muted-foreground">
                   Shown on your dashboard greeting. If left blank, we'll use your email.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="school">School</Label>
+                <SchoolInput id="school" value={school} onChange={setSchool} />
+                <p className="text-xs text-muted-foreground">
+                  Role: <span className="font-medium capitalize">{role.isAdmin ? "admin" : role.isPrincipal ? "principal" : role.pending ? "principal (pending approval)" : "teacher"}</span>.
+                  Principals see data for every teacher at the same school.
                 </p>
               </div>
               <div className="space-y-2">

@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { GraduationCap, ListChecks, BookMarked, Sparkles, RefreshCw, CalendarClock, CalendarCheck, ArrowRight } from "lucide-react";
 import { useSync } from "@/contexts/SyncContext";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useRole } from "@/hooks/useRole";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
+import { currentSchoolYearLabel } from "@/lib/schoolYear";
 import { cn } from "@/lib/utils";
 
 type AssignmentItem = {
@@ -19,6 +21,51 @@ type AssignmentItem = {
 };
 
 export default function Dashboard() {
+  const { isPrincipal, isAdmin, pending, loading: roleLoading } = useRole();
+  if (roleLoading) return <div className="text-muted-foreground">Loading…</div>;
+  if (pending && !isAdmin) return <Navigate to="/app/pending" replace />;
+  if (isPrincipal && !isAdmin) return <PrincipalDashboard />;
+  return <TeacherDashboard />;
+}
+
+function PrincipalDashboard() {
+  const { preferredName, profile } = useProfile();
+  const [ov, setOv] = useState<any | null>(null);
+  useEffect(() => {
+    (supabase as any).rpc("building_overview", { _school_year: currentSchoolYearLabel() }).then(({ data }: any) => setOv(Array.isArray(data) ? data[0] ?? null : data));
+  }, []);
+  const pct = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(Number(v) * 100)}%`);
+  return (
+    <div className="space-y-12">
+      <header>
+        <div className="text-[11px] font-bold tracking-[0.22em] uppercase text-accent mb-3">{profile?.school ?? "Your building"}, at a glance</div>
+        <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl text-primary leading-[0.98] tracking-tight">
+          {preferredName ? <>Welcome back,<br />{preferredName}.</> : <>Welcome back.</>}
+        </h1>
+        <p className="text-muted-foreground mt-4 max-w-md">Here's how students across your building are progressing this school year.</p>
+      </header>
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatTile icon={GraduationCap} label="Teachers" value={ov?.teacher_count ?? 0} />
+        <StatTile icon={ListChecks} label="Classes" value={ov?.class_count ?? 0} />
+        <StatTile icon={BookMarked} label="Students" value={ov?.student_count ?? 0} />
+        <StatTile icon={Sparkles} label="Avg mastery" value={pct(ov?.avg_mastery) as any} />
+      </section>
+      <div className="bg-card rounded-2xl p-6 sm:p-8 shadow-soft flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="text-[10px] font-bold tracking-[0.22em] uppercase text-accent mb-2">Dig in</div>
+          <h2 className="font-display text-xl text-primary">Building analytics</h2>
+          <p className="text-sm text-muted-foreground mt-1">Break results down by teacher, subject, grade, course, student or standard — and combine any of them.</p>
+        </div>
+        <Link to="/app/building"><Button className="rounded-full">Open analytics <ArrowRight className="h-4 w-4 ml-1" /></Button></Link>
+      </div>
+      {!profile?.school && (
+        <p className="text-sm text-muted-foreground">Set your school in <Link to="/app/settings#profile" className="underline">Settings</Link> to see building data.</p>
+      )}
+    </div>
+  );
+}
+
+function TeacherDashboard() {
   const [stats, setStats] = useState({ courses: 0, students: 0, assignments: 0, taggedAssignments: 0, standards: 0 });
   const [canvasConnected, setCanvasConnected] = useState<boolean | null>(null);
   const [upcoming, setUpcoming] = useState<AssignmentItem[] | null>(null);
@@ -186,7 +233,7 @@ export default function Dashboard() {
   );
 }
 
-function StatTile({ icon: Icon, label, value }: { icon: any; label: string; value: number }) {
+function StatTile({ icon: Icon, label, value }: { icon: any; label: string; value: number | string }) {
   return (
     <div className="group relative bg-card rounded-2xl p-6 shadow-soft overflow-hidden transition-all hover:shadow-card">
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-accent scale-x-0 group-hover:scale-x-100 origin-left transition-transform" />

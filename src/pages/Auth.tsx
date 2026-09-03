@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { SchoolInput } from "@/components/SchoolInput";
+import { cn } from "@/lib/utils";
 
 const signinSchema = z.object({
   email: z.string().trim().email("Enter a valid email").max(255),
@@ -17,6 +19,8 @@ const signinSchema = z.object({
 
 const signupSchema = signinSchema.extend({
   inviteCode: z.string().trim().min(6, "Enter your invitation code").max(40),
+  school: z.string().trim().min(2, "Enter your school").max(120),
+  role: z.enum(["teacher", "principal"]),
 });
 
 export default function Auth() {
@@ -24,6 +28,8 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [school, setSchool] = useState("");
+  const [role, setRole] = useState<"teacher" | "principal">("teacher");
   const [loading, setLoading] = useState(false);
 
   async function handleSignIn(e: React.FormEvent) {
@@ -39,7 +45,7 @@ export default function Auth() {
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = signupSchema.safeParse({ email, password, inviteCode });
+    const parsed = signupSchema.safeParse({ email, password, inviteCode, school, role });
     if (!parsed.success) { toast.error(parsed.error.errors[0].message); return; }
     setLoading(true);
     const { data, error } = await supabase.functions.invoke("signup-with-invite", {
@@ -47,6 +53,8 @@ export default function Auth() {
         code: inviteCode.trim().toUpperCase(),
         email: email.trim().toLowerCase(),
         password,
+        school: school.trim(),
+        requestedRole: role,
       },
     });
     if (error || (data as any)?.error) {
@@ -58,7 +66,7 @@ export default function Auth() {
     const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (signInErr) { toast.error(signInErr.message); return; }
-    toast.success("Welcome! Account created.");
+    toast.success(role === "principal" ? "Account created. Principal access is pending admin approval." : "Welcome! Account created.");
     navigate("/app", { replace: true });
   }
 
@@ -168,6 +176,31 @@ export default function Auth() {
                     <Label htmlFor="su-pw">Password</Label>
                     <Input id="su-pw" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
                     <p className="text-xs text-muted-foreground">At least 8 characters.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="su-school">School</Label>
+                    <SchoolInput id="su-school" value={school} onChange={setSchool} required disableSuggestions />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>I am a…</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["teacher", "principal"] as const).map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setRole(r)}
+                          className={cn(
+                            "rounded-xl border px-3 py-2.5 text-sm font-medium text-left transition-colors",
+                            role === r ? "border-primary bg-primary text-primary-foreground" : "hover:bg-secondary"
+                          )}
+                        >
+                          <div className="capitalize">{r}</div>
+                          <div className={cn("text-[11px] font-normal mt-0.5", role === r ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                            {r === "teacher" ? "Classes, Canvas sync, library" : "Building-level analytics (admin approval)"}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Creating…" : "Create account"}
