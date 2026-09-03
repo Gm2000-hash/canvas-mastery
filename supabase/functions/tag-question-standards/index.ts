@@ -166,10 +166,18 @@ Deno.serve(async (req) => {
     }
 
     // Load questions (now including answers jsonb)
-    const { data: questions, error: qErr } = await admin
+    let qQuery = admin
       .from("quiz_questions").select("id, position, question_text, points_possible, answers")
       .eq("assignment_id", assignment_id).order("position");
+    if (onlyIds) qQuery = qQuery.in("id", onlyIds);
+    const { data: questions, error: qErr } = await qQuery;
     if (qErr) throw qErr;
+    if (onlyIds && questions?.length) {
+      // Fresh re-tag: drop prior unconfirmed AI suggestions for just these questions.
+      await admin.from("question_standards").delete()
+        .eq("teacher_id", teacherId).eq("confirmed", false).eq("ai_suggested", true)
+        .in("question_id", questions.map((q) => q.id));
+    }
     if (!questions || questions.length === 0) {
       return new Response(JSON.stringify({
         error: "This assignment has no synced questions. Run a Canvas sync first (Classic Quizzes only).",
