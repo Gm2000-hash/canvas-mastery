@@ -249,6 +249,8 @@ export async function aiImage(prompt: string): Promise<string> {
       model,
       messages: [{ role: "user", content: prompt }],
       modalities: ["image", "text"],
+      // One image is ~1.3k output tokens; keep the credit reservation small.
+      max_tokens: 4096,
     }),
   });
   if (!res.ok) {
