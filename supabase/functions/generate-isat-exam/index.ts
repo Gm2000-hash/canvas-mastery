@@ -20,7 +20,7 @@ serve(async (req) => {
   const questions: Record<string, unknown>[] = [];
   const perStd = Math.ceil(b.question_count / b.selected_standards.length);
   while (questions.length < b.question_count) {
-    const n = Math.min(10, b.question_count - questions.length);
+    const n = Math.min(6, b.question_count - questions.length);
     const out = await aiJson<{ questions: unknown[] }>({
       system: "You write Idaho ISAT-style science assessment items: phenomenon-based, with realistic data tables and scenarios, aligned to three-dimensional standards. Respond with one valid JSON object only.",
       user: `Standards (spread coverage roughly ${perStd} per standard; already written: ${questions.length} of ${b.question_count}):\n${stds}\n\nWrite ${n} NEW items numbered ${questions.length + 1}-${questions.length + n}, mixing types from: ${TYPES.join(", ")}. Mostly DOK 2-3. For choice types provide 4 answers as [{"text","weight"}] with exactly one weight 100 (multiple_answers: 2 correct of 5). For constructed_response provide answers = [{"text":"<model answer / scoring notes>","weight":100}]. Data-analysis items must embed the data table in question_text as plain text. Each item gets a 1-sentence hint that nudges without giving the answer.

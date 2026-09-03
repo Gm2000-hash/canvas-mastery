@@ -101,9 +101,17 @@ export function isAiProviderHardError(status: number): boolean {
   return status === 401 || status === 402 || status === 429;
 }
 
-export function aiProviderErrorMessage(status: number, provider: AiProvider): string {
+/** Map a 402 body to a precise message (OpenRouter distinguishes a low balance from an in-flight budget cap). */
+export function aiCreditsMessageFromBody(provider: AiProvider, bodyText: string): string {
+  if (provider === "openrouter" && /in_flight/i.test(bodyText)) {
+    return "OpenRouter balance is too low to run this request alongside other in-flight AI calls. Wait a minute and retry, or add credits at openrouter.com.";
+  }
+  return aiCreditsMessage(provider);
+}
+
+export function aiProviderErrorMessage(status: number, provider: AiProvider, bodyText = ""): string {
   if (status === 401) return aiAuthMessage(provider);
-  if (status === 402) return aiCreditsMessage(provider);
+  if (status === 402) return aiCreditsMessageFromBody(provider, bodyText);
   if (status === 429) return aiRateLimitMessage(provider);
   return `AI provider error (${status}).`;
 }
