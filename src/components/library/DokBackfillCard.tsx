@@ -22,7 +22,7 @@ export function DokBackfillCard({ onChanged, showJob = true }: { onChanged?: () 
   const refresh = useCallback(async () => {
     const [q, i] = await Promise.all([
       supabase.from("quiz_questions").select("id", { count: "exact", head: true }).is("dok_level", null),
-      supabase.from("library_items").select("id", { count: "exact", head: true }).eq("dok_levels", "{}"),
+      supabase.from("library_items").select("id", { count: "exact", head: true }).eq("dok_levels", "{}" as any),
     ]);
     setQMissing(q.count ?? 0);
     setIMissing(i.count ?? 0);
