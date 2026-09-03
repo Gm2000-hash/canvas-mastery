@@ -161,18 +161,13 @@ export async function aiText(opts: AiCallOptions): Promise<string> {
   };
   if (opts.json) body.response_format = { type: "json_object" };
 
+  // fetchChatCompletion handles 429/5xx/in-flight-402 backoff centrally.
   let res = await fetchChatCompletion(body);
   // OpenRouter reserves credits for the full max_tokens up front; on a low
   // balance a large request 402s even though a smaller one would succeed.
   if (res.status === 402 && (body.max_tokens as number) > 4096) {
     console.warn("402 with max_tokens", body.max_tokens, "- retrying at 4096");
     body.max_tokens = 4096;
-    res = await fetchChatCompletion(body);
-  }
-  // One bounded retry for transient upstream failures.
-  if (res.status >= 500 || res.status === 429) {
-    const retryAfter = Number(res.headers.get("retry-after")) || 2;
-    await new Promise((r) => setTimeout(r, Math.min(retryAfter, 8) * 1000));
     res = await fetchChatCompletion(body);
   }
   if (!res.ok) {
