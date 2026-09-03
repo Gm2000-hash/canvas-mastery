@@ -43,7 +43,7 @@ export default function Admin() {
   }
   useEffect(() => { if (isAdmin) loadUsers(); }, [isAdmin]);
 
-  async function run(key: string, fn: () => Promise<{ error: any }>, ok: string) {
+  async function run(key: string, fn: () => PromiseLike<{ error: any }>, ok: string) {
     setBusy(key);
     const { error } = await fn();
     if (error) toast.error(error.message); else { toast.success(ok); await loadUsers(); }

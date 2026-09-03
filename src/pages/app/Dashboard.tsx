@@ -233,7 +233,7 @@ function TeacherDashboard() {
   );
 }
 
-function StatTile({ icon: Icon, label, value }: { icon: any; label: string; value: number }) {
+function StatTile({ icon: Icon, label, value }: { icon: any; label: string; value: number | string }) {
   return (
     <div className="group relative bg-card rounded-2xl p-6 shadow-soft overflow-hidden transition-all hover:shadow-card">
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-accent scale-x-0 group-hover:scale-x-100 origin-left transition-transform" />
