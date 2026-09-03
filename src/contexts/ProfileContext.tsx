@@ -20,6 +20,7 @@ export type Profile = {
   state: string | null;
   default_subject: string | null;
   default_grade: string | null;
+  school: string | null;
   email: string | null;
 };
 
@@ -52,7 +53,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
     const { data } = await supabase
       .from("profiles")
-      .select("id, display_name, state, default_subject, default_grade")
+      .select("id, display_name, state, default_subject, default_grade, school")
       .eq("id", user.id)
       .maybeSingle();
     setProfile({
@@ -61,6 +62,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       state: data?.state ?? null,
       default_subject: data?.default_subject ?? null,
       default_grade: data?.default_grade ?? null,
+      school: (data as any)?.school ?? null,
       email: user.email ?? null,
     });
     setLoading(false);

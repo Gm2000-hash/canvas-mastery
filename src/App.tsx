@@ -27,6 +27,9 @@ import Admin from "./pages/app/Admin";
 import Library from "./pages/app/Library";
 import Department from "./pages/app/Department";
 import DepartmentDashboard from "./pages/app/DepartmentDashboard";
+import BuildingAnalytics from "./pages/app/BuildingAnalytics";
+import BuildingStudent from "./pages/app/BuildingStudent";
+import PendingApproval from "./pages/app/PendingApproval";
 import { curriculumAppRoutes, curriculumPublicRoutes } from "./modules/curriculum/routes";
 
 const queryClient = new QueryClient();
@@ -60,6 +63,9 @@ const App = () => (
             <Route path="mastery-connect" element={<Navigate to="/app/library" replace />} />
             <Route path="department" element={<Department />} />
             <Route path="department/:subject" element={<DepartmentDashboard />} />
+            <Route path="building" element={<BuildingAnalytics />} />
+            <Route path="building/students/:studentId" element={<BuildingStudent />} />
+            <Route path="pending" element={<PendingApproval />} />
             <Route path="admin" element={<Admin />} />
             {curriculumAppRoutes()}
           </Route>

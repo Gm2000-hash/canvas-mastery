@@ -1,5 +1,8 @@
 // Public edge function: validates an invitation code, creates the auth user,
 // and atomically marks the invitation as used. Deployed with verify_jwt = false.
+// The requested role (teacher | principal) and school are passed as user
+// metadata; the handle_new_user trigger turns them into a teacher role or a
+// pending principal request.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
@@ -26,12 +29,15 @@ Deno.serve(async (req) => {
   const email = String(body?.email ?? "").trim().toLowerCase();
   const password = String(body?.password ?? "");
   const displayName = body?.displayName ? String(body.displayName).trim().slice(0, 80) : null;
+  const requestedRole = String(body?.requestedRole ?? "teacher").toLowerCase() === "principal" ? "principal" : "teacher";
+  const school = body?.school ? String(body.school).trim().slice(0, 120) : "";
 
   if (!code) return json({ error: "Invitation code is required" }, 400);
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Invalid email" }, 400);
   if (!password || password.length < 8 || password.length > 72) {
     return json({ error: "Password must be 8–72 characters" }, 400);
   }
+  if (!school) return json({ error: "School is required" }, 400);
 
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -58,7 +64,11 @@ Deno.serve(async (req) => {
     email,
     password,
     email_confirm: true,
-    user_metadata: displayName ? { display_name: displayName } : {},
+    user_metadata: {
+      ...(displayName ? { display_name: displayName } : {}),
+      requested_role: requestedRole,
+      school,
+    },
   });
   if (createErr || !created.user) {
     return json({ error: createErr?.message ?? "Failed to create account" }, 400);
@@ -76,5 +86,5 @@ Deno.serve(async (req) => {
     return json({ error: result?.error ?? redeemErr?.message ?? "Failed to redeem invitation" }, 400);
   }
 
-  return json({ ok: true, user_id: userId });
+  return json({ ok: true, user_id: userId, requested_role: requestedRole });
 });
