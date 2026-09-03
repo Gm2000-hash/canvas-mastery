@@ -461,6 +461,105 @@ export type Database = {
         }
         Relationships: []
       }
+      library_item_standards: {
+        Row: {
+          created_at: string
+          id: string
+          library_item_id: string
+          standard_id: string
+          teacher_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          library_item_id: string
+          standard_id: string
+          teacher_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          library_item_id?: string
+          standard_id?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_item_standards_library_item_id_fkey"
+            columns: ["library_item_id"]
+            isOneToOne: false
+            referencedRelation: "library_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "library_item_standards_standard_id_fkey"
+            columns: ["standard_id"]
+            isOneToOne: false
+            referencedRelation: "standards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      library_items: {
+        Row: {
+          body: string | null
+          canvas_course_id: number | null
+          canvas_item_id: number | null
+          canvas_item_type: string | null
+          created_at: string
+          file_mime: string | null
+          file_name: string | null
+          file_path: string | null
+          grade: string | null
+          id: string
+          kind: string
+          search_tsv: unknown
+          source: string
+          subject: string | null
+          teacher_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          canvas_course_id?: number | null
+          canvas_item_id?: number | null
+          canvas_item_type?: string | null
+          created_at?: string
+          file_mime?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          grade?: string | null
+          id?: string
+          kind: string
+          search_tsv?: unknown
+          source?: string
+          subject?: string | null
+          teacher_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          canvas_course_id?: number | null
+          canvas_item_id?: number | null
+          canvas_item_type?: string | null
+          created_at?: string
+          file_mime?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          grade?: string | null
+          id?: string
+          kind?: string
+          search_tsv?: unknown
+          source?: string
+          subject?: string | null
+          teacher_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mastery_snapshots: {
         Row: {
           attempts: number
@@ -1734,6 +1833,19 @@ export type Database = {
       }
       school_year_end_for: { Args: { _anchor: string }; Returns: string }
       school_year_label: { Args: { _anchor: string }; Returns: string }
+      search_library: {
+        Args: { _kind?: string; _q?: string; _standard_id?: string }
+        Returns: {
+          item_id: string
+          item_type: string
+          rank: number
+          snippet: string
+          source: string
+          standards: Json
+          title: string
+          updated_at: string
+        }[]
+      }
       search_students_history:
         | {
             Args: { _query: string }
