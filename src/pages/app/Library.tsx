@@ -212,9 +212,9 @@ export default function Library() {
                     <img src={s.image} alt={s.label} width={768} height={512} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
                   </div>
                   <div className="p-4">
-                    <div className="flex items-baseline justify-between gap-2">
+                    <div className="flex items-baseline justify-between gap-2 flex-wrap">
                       <h2 className="font-display text-xl">{s.label}</h2>
-                      <span className="font-sans text-sm text-muted-foreground tabular-nums">{counts[s.key] == null ? "…" : `${counts[s.key]} item${counts[s.key] === 1 ? "" : "s"}`}</span>
+                      <span className="font-sans text-xs text-muted-foreground tabular-nums whitespace-nowrap">{counts[s.key] == null ? "…" : `${counts[s.key]} item${counts[s.key] === 1 ? "" : "s"}`}</span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1 font-sans">{s.blurb}</p>
                   </div>
