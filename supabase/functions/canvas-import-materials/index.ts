@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
       const pages = await fetchAll<any>(creds, `/api/v1/courses/${c.canvas_course_id}/pages?published=true`);
       for (const p of pages) {
         try {
-          const res = await fetch(`${creds.base_url}/api/v1/courses/${c.canvas_course_id}/pages/${encodeURIComponent(p.url)}`, {
+          const res = await canvasFetch(`${creds.base_url}/api/v1/courses/${c.canvas_course_id}/pages/${encodeURIComponent(p.url)}`, {
             headers: { Authorization: `Bearer ${creds.api_token}` },
           });
           if (!res.ok) { stats.skipped++; continue; }
