@@ -116,7 +116,7 @@ export function UntaggedQuestionsDialog({ open, onOpenChange, courses, onChanged
                 <Checkbox checked={selected.has(r.id)} onCheckedChange={() => toggle(r.id)} className="mt-0.5" />
                 <div className="shrink-0 text-xs text-muted-foreground tabular-nums w-8 pt-0.5">Q{r.position ?? "?"}</div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm line-clamp-2">{r.question_text?.replace(/<[^>]+>/g, "") || <span className="italic text-muted-foreground">(no text)</span>}</div>
+                  <div className="text-sm line-clamp-2">{r.question_text?.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim() || <span className="italic text-muted-foreground">(no text)</span>}</div>
                   <Badge variant="outline" className="text-[11px] mt-1">{r.assignment_name}</Badge>
                 </div>
               </label>
