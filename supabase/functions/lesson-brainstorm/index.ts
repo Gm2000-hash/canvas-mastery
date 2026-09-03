@@ -39,8 +39,9 @@ Standards: ${lc.standards || "(none yet)"}`;
     if (!upstream.ok || !upstream.body) {
       const config = getAiProviderConfig();
       const status = upstream.status;
-      console.error("brainstorm upstream", status, (await upstream.text().catch(() => "")).slice(0, 500));
-      const msg = isAiProviderHardError(status) ? aiProviderErrorMessage(status, config.provider) : `AI provider error (${status}).`;
+      const txt = await upstream.text().catch(() => "");
+      console.error("brainstorm upstream", status, txt.slice(0, 500));
+      const msg = isAiProviderHardError(status) ? aiProviderErrorMessage(status, config.provider, txt) : `AI provider error (${status}).`;
       return json({ error: msg }, isAiProviderHardError(status) ? status : 502);
     }
     // Pass the OpenAI-compatible SSE stream straight through.

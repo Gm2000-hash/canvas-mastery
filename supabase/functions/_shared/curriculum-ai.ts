@@ -179,7 +179,7 @@ export async function aiText(opts: AiCallOptions): Promise<string> {
     const txt = await res.text().catch(() => "");
     console.error("AI provider error", res.status, txt.slice(0, 500));
     if (isAiProviderHardError(res.status)) {
-      throw new HttpError(res.status, aiProviderErrorMessage(res.status, config.provider));
+      throw new HttpError(res.status, aiProviderErrorMessage(res.status, config.provider, txt));
     }
     throw new HttpError(502, `AI provider error (${res.status}).`);
   }
@@ -255,7 +255,7 @@ export async function aiImage(prompt: string): Promise<string> {
     const txt = await res.text().catch(() => "");
     console.error("Image provider error", res.status, txt.slice(0, 400));
     if (isAiProviderHardError(res.status)) {
-      throw new HttpError(res.status, aiProviderErrorMessage(res.status, config.provider));
+      throw new HttpError(res.status, aiProviderErrorMessage(res.status, config.provider, txt));
     }
     throw new HttpError(502, `Image generation failed (${res.status}).`);
   }
