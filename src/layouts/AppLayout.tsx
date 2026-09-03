@@ -128,7 +128,8 @@ export default function AppLayout() {
   const [order, setOrder] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(ORDER_KEY);
-      if (raw) return JSON.parse(raw);
+      // Mastery Connect was replaced by Library; keep the user's slot for it.
+      if (raw) return (JSON.parse(raw) as string[]).map((to) => (to === "/app/mastery-connect" ? "/app/library" : to));
     } catch {}
     return [];
   });
