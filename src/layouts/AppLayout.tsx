@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRightLeft, BarChart3, BookMarked, Building2, CheckCheck, GraduationCap, GripVertical, History, Layers, LayoutDashboard, Menu, Settings as SettingsIcon, Shield } from "lucide-react";
+import { BarChart3, BookMarked, Building2, CheckCheck, GraduationCap, GripVertical, History, Layers, LayoutDashboard, LibraryBig, Menu, Settings as SettingsIcon, Shield } from "lucide-react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
 import { SyncProvider, SyncStatusPill } from "@/contexts/SyncContext";
@@ -21,7 +21,7 @@ const nav = [
   
   { to: "/app/student-history", label: "Student History", icon: History },
   { to: "/app/department", label: "Department", icon: Building2 },
-  { to: "/app/mastery-connect", label: "Mastery Connect", icon: ArrowRightLeft },
+  { to: "/app/library", label: "Library", icon: LibraryBig },
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -128,7 +128,8 @@ export default function AppLayout() {
   const [order, setOrder] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(ORDER_KEY);
-      if (raw) return JSON.parse(raw);
+      // Mastery Connect was replaced by Library; keep the user's slot for it.
+      if (raw) return (JSON.parse(raw) as string[]).map((to) => (to === "/app/mastery-connect" ? "/app/library" : to));
     } catch {}
     return [];
   });
