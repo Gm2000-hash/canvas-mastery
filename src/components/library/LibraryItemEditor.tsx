@@ -13,8 +13,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Loader2, Upload, X } from "lucide-react";
 import { StandardsPicker } from "./StandardsPicker";
-import { SECTIONS, type LibraryItem, type LibraryKind, type LibrarySource } from "./libraryTypes";
+import { DOK_LEVELS, SECTIONS, type LibraryItem, type LibraryKind, type LibrarySource } from "./libraryTypes";
 import { GRADES } from "@/lib/frameworks";
+import { cn } from "@/lib/utils";
 
 export type EditorDraft = {
   id?: string;
@@ -25,6 +26,7 @@ export type EditorDraft = {
   grade: string | null;
   subject: string | null;
   standardIds: string[];
+  dokLevels: number[];
   file_path?: string | null;
   file_name?: string | null;
   file_mime?: string | null;
@@ -34,6 +36,7 @@ export function draftFromItem(it: LibraryItem): EditorDraft {
   return {
     id: it.id, kind: it.kind, title: it.title, body: it.body ?? "", source: it.source,
     grade: it.grade, subject: it.subject, standardIds: it.standards.map((s) => s.id),
+    dokLevels: it.dok_levels ?? [],
     file_path: it.file_path, file_name: it.file_name, file_mime: it.file_mime,
   };
 }
@@ -80,6 +83,7 @@ export function LibraryItemEditor({ draft, open, onClose, onSaved, subjectHint, 
       const row = {
         teacher_id: uid, kind: d.kind, title: d.title.trim(), body: d.body.trim() || null,
         source: d.source, grade: d.grade, subject: d.subject, file_path, file_name, file_mime,
+        dok_levels: Array.from(new Set(d.dokLevels)).sort(),
       };
       let id = d.id;
       if (id) {
@@ -151,6 +155,24 @@ export function LibraryItemEditor({ draft, open, onClose, onSaved, subjectHint, 
           <div className="space-y-1.5">
             <Label>Standards</Label>
             <StandardsPicker value={d.standardIds} onChange={(ids) => set({ standardIds: ids })} subjectHint={subjectHint} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Depth of Knowledge</Label>
+            <div className="flex flex-wrap gap-2">
+              {DOK_LEVELS.map((lvl) => {
+                const on = d.dokLevels.includes(lvl.level);
+                return (
+                  <button key={lvl.level} type="button" title={lvl.blurb} aria-pressed={on}
+                    onClick={() => set({ dokLevels: on ? d.dokLevels.filter((x) => x !== lvl.level) : [...d.dokLevels, lvl.level] })}
+                    className={cn("rounded-full border px-3 py-1 text-xs font-sans transition-colors",
+                      on ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-accent/50 text-muted-foreground")}>
+                    DOK {lvl.level} · {lvl.name}
+                  </button>
+                );
+              })}
+              {!d.dokLevels.length && <span className="text-xs text-muted-foreground self-center">None yet — the AI tagger will fill this in, or pick levels by hand.</span>}
+            </div>
           </div>
 
           {(mode === "upload" || d.file_path || file) && (

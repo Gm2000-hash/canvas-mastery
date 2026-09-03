@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Sparkles } from "lucide-react";
 import { StandardsPicker } from "./StandardsPicker";
-import { SECTIONS, type LibraryKind } from "./libraryTypes";
+import { DOK_LEVELS, SECTIONS, type LibraryKind } from "./libraryTypes";
 import type { EditorDraft } from "./LibraryItemEditor";
 import { GRADES } from "@/lib/frameworks";
 
@@ -26,6 +26,7 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
   const [grade, setGrade] = useState<string>(gradeHint ?? "none");
   const [length, setLength] = useState<"short" | "medium" | "long">("medium");
   const [level, setLevel] = useState(READING_LEVELS[1]);
+  const [dok, setDok] = useState<"1" | "2" | "3" | "4" | "mix">("mix");
   const [format, setFormat] = useState("");
   const [topic, setTopic] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +40,7 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
         body: {
           kind, standard_ids: standardIds,
           grade: grade === "none" ? null : grade, subject: subjectHint ?? null,
-          options: { length, reading_level: level, format: format || undefined, topic: topic || undefined },
+          options: { length, reading_level: level, dok, format: format || undefined, topic: topic || undefined },
         },
       });
       if (error) throw new Error((error as any).message ?? "Generation failed");
@@ -48,6 +49,7 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
         kind, title: data.title, body: data.body, source: "ai",
         grade: data.grade ?? (grade === "none" ? null : grade), subject: data.subject ?? subjectHint ?? null,
         standardIds: data.suggested_standard_ids ?? standardIds,
+        dokLevels: data.dok_levels ?? (dok === "mix" ? [1, 2, 3] : [Number(dok)]),
       });
       onClose();
     } catch (e: any) {
@@ -96,6 +98,16 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
               <Select value={level} onValueChange={setLevel}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{READING_LEVELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Depth of Knowledge</Label>
+              <Select value={dok} onValueChange={(v) => setDok(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mix">Mix of levels (DOK 1–3) — best coverage</SelectItem>
+                  {DOK_LEVELS.map((d) => <SelectItem key={d.level} value={String(d.level)}>DOK {d.level} · {d.name}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">

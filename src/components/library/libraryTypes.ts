@@ -21,6 +21,7 @@ export type LibraryItem = {
   canvas_course_id: number | null;
   created_at: string;
   updated_at: string;
+  dok_levels: number[];
   standards: { id: string; code: string; description: string }[];
 };
 
@@ -32,6 +33,27 @@ export const SECTIONS: { key: LibrarySection; label: string; singular: string; b
 ];
 
 export const SOURCE_LABEL: Record<LibrarySource, string> = { upload: "Uploaded", created: "Created", ai: "AI", canvas: "Canvas" };
+
+/** Webb's Depth of Knowledge levels. */
+export const DOK_LEVELS: { level: number; name: string; blurb: string }[] = [
+  { level: 1, name: "Recall", blurb: "Define, identify, list, recall facts" },
+  { level: 2, name: "Skill / Concept", blurb: "Classify, compare, summarize, apply" },
+  { level: 3, name: "Strategic Thinking", blurb: "Justify with evidence, analyze, explain" },
+  { level: 4, name: "Extended Thinking", blurb: "Design, synthesize, investigate" },
+];
+
+export function dokName(level: number) {
+  return DOK_LEVELS.find((d) => d.level === level)?.name ?? `DOK ${level}`;
+}
+
+/** Compact "DOK 1–3" / "DOK 2" label for a set of levels. */
+export function dokLabel(levels: number[] | null | undefined) {
+  const l = Array.from(new Set(levels ?? [])).sort();
+  if (!l.length) return null;
+  if (l.length === 1) return `DOK ${l[0]}`;
+  const contiguous = l.every((v, i) => i === 0 || v === l[i - 1] + 1);
+  return contiguous ? `DOK ${l[0]}–${l[l.length - 1]}` : `DOK ${l.join(", ")}`;
+}
 
 export function sectionMeta(key: LibrarySection) {
   return SECTIONS.find((s) => s.key === key)!;

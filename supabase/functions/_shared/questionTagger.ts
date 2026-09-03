@@ -8,7 +8,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0
 import { fetchChatCompletion } from "./openrouter.ts";
 
 export type Tag = { code: string; description: string; matched_terms?: string[] };
-type BatchResult = { question_id: number; standards: Tag[] };
+type BatchResult = { question_id: number; dok?: number; standards: Tag[] };
 
 /** Configuration problems the caller must surface (no discipline, no standards, no questions). */
 export class TaggerConfigError extends Error {
@@ -203,11 +203,18 @@ RULES:
 - If content partially overlaps with a standard, tag it. Only return an empty array if the question is truly unrelated to ANY standard in the list.
 - Prefer the most specific standard that matches the content (1–3 standards per question).
 - For each match, return the standard code, brief description, and 2–5 matched_terms — terms from the question that led you to choose this standard.
+- ALSO assign every question a Webb's Depth of Knowledge level (dok, 1-4), even when no standard matches:
+  1 = Recall & reproduction (define, identify, list, recall a fact or simple procedure)
+  2 = Skills & concepts (classify, compare, summarize, interpret data, apply a concept in one step)
+  3 = Strategic thinking (justify with evidence, analyze, draw conclusions, multi-step reasoning, explain phenomena)
+  4 = Extended thinking (design, synthesize across sources, extended investigation — rare for single quiz items)
+  Most multiple-choice recall items are DOK 1; "which best explains / predict / analyze the data" items are DOK 2-3.
 
 Use the tool provided to return your analysis.`;
 
   const BATCH_SIZE = 10;
   const allResults: { question_id: string; tags: Tag[] }[] = [];
+  const dokById = new Map<string, number>();
   const processed: string[] = [];
   let batchesRun = 0;
 
@@ -235,6 +242,7 @@ Use the tool provided to return your analysis.`;
                   type: "object",
                   properties: {
                     question_id: { type: "number", description: "The question's index in this batch (0..N-1)." },
+                    dok: { type: "integer", minimum: 1, maximum: 4, description: "Webb's Depth of Knowledge level for this question (1-4)." },
                     standards: {
                       type: "array",
                       items: {
@@ -254,7 +262,7 @@ Use the tool provided to return your analysis.`;
                       maxItems: 3,
                     },
                   },
-                  required: ["question_id", "standards"],
+                  required: ["question_id", "dok", "standards"],
                   additionalProperties: false,
                 },
               },
@@ -272,7 +280,7 @@ Use the tool provided to return your analysis.`;
       const t = await aiRes.text().catch(() => "");
       if (status === 401 || status === 402 || status === 403 || status === 429) {
         // Persist whatever we have so far before bubbling up.
-        await persistResults(admin, teacherId, assignmentId, allResults, codeToId, questions.length);
+        await persistResults(admin, teacherId, assignmentId, allResults, codeToId, questions.length, dokById);
         throw new TaggerProviderError(status, t.slice(0, 300));
       }
       console.error(`AI provider ${status} on batch ${batchesRun}: ${t.slice(0, 200)}`);
@@ -289,15 +297,22 @@ Use the tool provided to return your analysis.`;
       catch (e) { console.error("parse args", e); }
     }
     const tagsByIdx = new Map<number, Tag[]>();
-    for (const t of batchTags) tagsByIdx.set(t.question_id, t.standards ?? []);
+    const dokByIdx = new Map<number, number>();
+    for (const t of batchTags) {
+      tagsByIdx.set(t.question_id, t.standards ?? []);
+      const d = Math.round(Number(t.dok));
+      if (d >= 1 && d <= 4) dokByIdx.set(t.question_id, d);
+    }
     for (let k = 0; k < slice.length; k++) {
       processed.push(slice[k].id);
       const tags = tagsByIdx.get(k) ?? [];
       if (tags.length > 0) allResults.push({ question_id: slice[k].id, tags });
+      const d = dokByIdx.get(k);
+      if (d) dokById.set(slice[k].id, d);
     }
   }
 
-  const { qRows, aRows } = await persistResults(admin, teacherId, assignmentId, allResults, codeToId, questions.length);
+  const { qRows, aRows } = await persistResults(admin, teacherId, assignmentId, allResults, codeToId, questions.length, dokById);
 
   return {
     questions_total: questions.length,
@@ -310,6 +325,18 @@ Use the tool provided to return your analysis.`;
   };
 }
 
+/** Write DOK levels back to quiz_questions, grouped by level (≤4 statements). */
+async function persistDok(admin: SupabaseClient, teacherId: string, dokById: Map<string, number>) {
+  if (!dokById.size) return;
+  const byLevel = new Map<number, string[]>();
+  for (const [id, lvl] of dokById) byLevel.set(lvl, [...(byLevel.get(lvl) ?? []), id]);
+  for (const [lvl, ids] of byLevel) {
+    const { error } = await admin.from("quiz_questions").update({ dok_level: lvl })
+      .eq("teacher_id", teacherId).in("id", ids);
+    if (error) console.error("quiz_questions dok update", error);
+  }
+}
+
 async function persistResults(
   admin: SupabaseClient,
   teacherId: string,
@@ -317,7 +344,9 @@ async function persistResults(
   allResults: { question_id: string; tags: Tag[] }[],
   codeToId: Map<string, string>,
   totalQuestions: number,
+  dokById: Map<string, number> = new Map(),
 ): Promise<{ qRows: number; aRows: number }> {
+  await persistDok(admin, teacherId, dokById);
   const qRows: Record<string, unknown>[] = [];
   for (const r of allResults) {
     for (const t of r.tags) {

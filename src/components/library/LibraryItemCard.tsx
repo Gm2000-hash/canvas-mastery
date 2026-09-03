@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Download, FileText, FolderInput, MoreHorizontal, Pencil, Sparkles, Trash2, Upload, Link2 } from "lucide-react";
-import { SECTIONS, SOURCE_LABEL, type LibraryItem, type LibraryKind } from "./libraryTypes";
+import { SECTIONS, SOURCE_LABEL, dokLabel, dokName, type LibraryItem, type LibraryKind } from "./libraryTypes";
 
 export async function downloadItemFile(it: LibraryItem) {
   if (!it.file_path) return;
@@ -79,6 +79,7 @@ export function LibraryItemCard({ item, onEdit, onChanged }: {
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <Badge variant="outline" className="gap-1 text-[11px] font-normal"><SourceIcon source={item.source} /> {SOURCE_LABEL[item.source]}</Badge>
             {item.grade && <Badge variant="outline" className="text-[11px] font-normal">Gr {item.grade}</Badge>}
+            {dokLabel(item.dok_levels) && <Badge variant="outline" className="text-[11px] font-normal bg-primary/5 border-primary/30 text-primary">{dokLabel(item.dok_levels)}</Badge>}
             {item.standards.slice(0, 3).map((s) => <Badge key={s.id} variant="secondary" className="text-[11px] font-normal">{s.code}</Badge>)}
             {item.standards.length > 3 && <span className="text-[11px] text-muted-foreground">+{item.standards.length - 3}</span>}
           </div>
@@ -91,6 +92,7 @@ export function LibraryItemCard({ item, onEdit, onChanged }: {
             <DialogTitle className="font-display text-2xl">{item.title}</DialogTitle>
             <DialogDescription className="flex flex-wrap gap-1.5 pt-1">
               <Badge variant="outline" className="gap-1 text-[11px] font-normal"><SourceIcon source={item.source} /> {SOURCE_LABEL[item.source]}</Badge>
+              {(item.dok_levels ?? []).map((l) => <Badge key={l} variant="outline" className="text-[11px] font-normal bg-primary/5 border-primary/30 text-primary">DOK {l} · {dokName(l)}</Badge>)}
               {item.standards.map((s) => <Badge key={s.id} variant="secondary" className="text-[11px] font-normal" title={s.description}>{s.code}</Badge>)}
             </DialogDescription>
           </DialogHeader>

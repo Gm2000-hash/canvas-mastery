@@ -25,6 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { BulkTagActions } from "./BulkTagActions";
 import { UntaggedQuestionsDialog, countUntaggedQuestions } from "./UntaggedQuestionsDialog";
 import { TagJobProgress, enqueueAllUntagged } from "./TagJobProgress";
+import { dokName } from "@/components/library/libraryTypes";
 
 type BankRow = {
   standard_id: string;
@@ -52,6 +53,7 @@ export type QuestionRow = {
   assignments: { id: string; name: string; course_id: string } | null;
   answers: QuestionAnswer[] | null;
   item_type: string | null;
+  dok_level?: number | null;
   // computed
   response_count?: number;
   avg_pct?: number | null;
@@ -279,7 +281,7 @@ export default function QuestionsTab() {
     // Pull tags honoring the status filter (default: all — confirmed AND ai-suggested)
     let qsQuery = supabase
       .from("question_standards")
-      .select("question_id, standard_id, ai_suggested, confirmed, standards(code, description), quiz_questions!inner(id, position, question_text, points_possible, assignment_id, answers, item_type, assignments!inner(id, name, course_id))")
+      .select("question_id, standard_id, ai_suggested, confirmed, standards(code, description), quiz_questions!inner(id, position, question_text, points_possible, assignment_id, answers, item_type, dok_level, assignments!inner(id, name, course_id))")
       .in("standard_id", stdIds);
     if (statusFilter === "CONFIRMED") qsQuery = qsQuery.eq("confirmed", true);
     if (statusFilter === "SUGGESTED") qsQuery = qsQuery.eq("confirmed", false).eq("ai_suggested", true);
@@ -301,6 +303,7 @@ export default function QuestionsTab() {
           assignments: q.assignments,
           answers: q.answers ?? null,
           item_type: q.item_type ?? null,
+          dok_level: q.dok_level ?? null,
           standards: [],
           _anyConfirmed: false,
         });
@@ -610,6 +613,9 @@ export default function QuestionsTab() {
                       {q.points_possible != null && (
                         <span className="text-[11px] text-muted-foreground">{q.points_possible} pts</span>
                       )}
+                      {q.dok_level != null && (
+                        <Badge variant="outline" className="text-[11px] bg-primary/5 border-primary/30 text-primary" title={dokName(q.dok_level)}>DOK {q.dok_level}</Badge>
+                      )}
                       {(q.standards ?? []).slice(0, 4).map((s, i) => (
                         <Badge key={i} variant="outline" className="text-[11px] font-code bg-accent/5 border-accent/30">{s.code}</Badge>
                       ))}
@@ -834,6 +840,9 @@ export function QuestionDrawer({ question, onClose }: { question: QuestionRow | 
             Question {question.position ?? "?"}
             {question.points_possible != null && (
               <Badge variant="outline" className="text-[11px]">{question.points_possible} pts</Badge>
+            )}
+            {question.dok_level != null && (
+              <Badge variant="outline" className="text-[11px] bg-primary/5 border-primary/30 text-primary">DOK {question.dok_level} · {dokName(question.dok_level)}</Badge>
             )}
           </SheetTitle>
           {question.assignments && (

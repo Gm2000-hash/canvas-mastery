@@ -25,6 +25,7 @@ import { StandardsPicker, useStandardOptions } from "@/components/library/Standa
 import { LibraryItemCard } from "@/components/library/LibraryItemCard";
 import { LibraryItemEditor, draftFromItem, type EditorDraft } from "@/components/library/LibraryItemEditor";
 import { GenerateContentDialog } from "@/components/library/GenerateContentDialog";
+import { DokBackfillCard } from "@/components/library/DokBackfillCard";
 
 type SearchRow = {
   item_type: LibrarySection;
@@ -97,11 +98,12 @@ export default function Library() {
   const loadItems = useCallback(async (kind: LibraryKind) => {
     setItems(null);
     const { data, error } = await supabase.from("library_items")
-      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, created_at, updated_at, library_item_standards(standard_id, standards(id, code, description))")
+      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, created_at, updated_at, library_item_standards(standard_id, standards(id, code, description))")
       .eq("kind", kind).order("updated_at", { ascending: false });
     if (error) { toast.error(error.message); setItems([]); return; }
     setItems((data as any[]).map((r) => ({
       ...r,
+      dok_levels: r.dok_levels ?? [],
       standards: (r.library_item_standards ?? []).map((l: any) => l.standards).filter(Boolean),
     })));
   }, []);
@@ -117,12 +119,12 @@ export default function Library() {
   const [openQuestion, setOpenQuestion] = useState<QuestionRow | null>(null);
 
   const blankDraft = (kind: LibraryKind, source: EditorDraft["source"]): EditorDraft => ({
-    kind, title: "", body: "", source, grade: profile?.default_grade ?? null, subject: profile?.default_subject ?? null, standardIds: [],
+    kind, title: "", body: "", source, grade: profile?.default_grade ?? null, subject: profile?.default_subject ?? null, standardIds: [], dokLevels: [],
   });
 
   async function openQuestionResult(id: string) {
     const { data, error } = await supabase.from("quiz_questions")
-      .select("id, position, question_text, points_possible, assignment_id, answers, item_type, assignments(id, name, course_id)")
+      .select("id, position, question_text, points_possible, assignment_id, answers, item_type, dok_level, assignments(id, name, course_id)")
       .eq("id", id).maybeSingle();
     if (error || !data) { toast.error("Could not open question"); return; }
     setOpenQuestion(data as any as QuestionRow);
@@ -130,10 +132,10 @@ export default function Library() {
 
   async function openItemResult(id: string) {
     const { data } = await supabase.from("library_items")
-      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, created_at, updated_at, library_item_standards(standards(id, code, description))")
+      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, created_at, updated_at, library_item_standards(standards(id, code, description))")
       .eq("id", id).maybeSingle();
     if (!data) return;
-    const it: LibraryItem = { ...(data as any), standards: ((data as any).library_item_standards ?? []).map((l: any) => l.standards).filter(Boolean) };
+    const it: LibraryItem = { ...(data as any), dok_levels: (data as any).dok_levels ?? [], standards: ((data as any).library_item_standards ?? []).map((l: any) => l.standards).filter(Boolean) };
     setEditor({ draft: draftFromItem(it), mode: "edit" });
   }
 
@@ -221,6 +223,7 @@ export default function Library() {
         </section>
       ) : (
         <>
+          <DokBackfillCard onChanged={refresh} showJob={section !== "question"} />
           {/* Tiles */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {SECTIONS.map((s) => {
