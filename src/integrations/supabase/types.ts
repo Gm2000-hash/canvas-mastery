@@ -1024,6 +1024,7 @@ export type Database = {
           canvas_item_id: number | null
           canvas_item_type: string | null
           created_at: string
+          dok_levels: number[]
           file_mime: string | null
           file_name: string | null
           file_path: string | null
@@ -1043,6 +1044,7 @@ export type Database = {
           canvas_item_id?: number | null
           canvas_item_type?: string | null
           created_at?: string
+          dok_levels?: number[]
           file_mime?: string | null
           file_name?: string | null
           file_path?: string | null
@@ -1062,6 +1064,7 @@ export type Database = {
           canvas_item_id?: number | null
           canvas_item_type?: string | null
           created_at?: string
+          dok_levels?: number[]
           file_mime?: string | null
           file_name?: string | null
           file_path?: string | null
@@ -1651,6 +1654,7 @@ export type Database = {
           assignment_id: string
           canvas_question_id: number
           created_at: string
+          dok_level: number | null
           id: string
           item_type: string | null
           points_possible: number | null
@@ -1663,6 +1667,7 @@ export type Database = {
           assignment_id: string
           canvas_question_id: number
           created_at?: string
+          dok_level?: number | null
           id?: string
           item_type?: string | null
           points_possible?: number | null
@@ -1675,6 +1680,7 @@ export type Database = {
           assignment_id?: string
           canvas_question_id?: number
           created_at?: string
+          dok_level?: number | null
           id?: string
           item_type?: string | null
           points_possible?: number | null
