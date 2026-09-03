@@ -2361,6 +2361,42 @@ export type Database = {
           student_name: string
         }[]
       }
+      analytics_dok_breakdown: {
+        Args: { _course_id?: string; _framework?: string; _subject?: string }
+        Returns: {
+          avg_pct_correct: number
+          dok_level: number
+          question_count: number
+          responses: number
+          standards_covered: number
+          students: number
+        }[]
+      }
+      analytics_dok_standard_matrix: {
+        Args: { _course_id?: string; _framework?: string; _subject?: string }
+        Returns: {
+          avg_pct_correct: number
+          code: string
+          description: string
+          dok_level: number
+          framework: string
+          question_count: number
+          responses: number
+          standard_id: string
+          subject: string
+        }[]
+      }
+      analytics_dok_trends: {
+        Args: { _course_id?: string; _granularity?: string; _subject?: string }
+        Returns: {
+          avg_pct_correct: number
+          bucket_label: string
+          bucket_ts: string
+          dok_level: number
+          question_count: number
+          responses: number
+        }[]
+      }
       analytics_mastery_distribution: {
         Args: { _course_id?: string; _subject?: string }
         Returns: {
