@@ -19,7 +19,7 @@ import Analytics from "./pages/app/Analytics";
 import StudentHistory from "./pages/app/StudentHistory";
 import Admin from "./pages/app/Admin";
 import AssignmentGroups from "./pages/app/AssignmentGroups";
-import MasteryConnect from "./pages/app/MasteryConnect";
+import Library from "./pages/app/Library";
 import Department from "./pages/app/Department";
 import DepartmentDashboard from "./pages/app/DepartmentDashboard";
 
@@ -50,7 +50,8 @@ const App = () => (
             <Route path="mastery/debug" element={<MasteryDebug />} />
             <Route path="student-history" element={<StudentHistory />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="mastery-connect" element={<MasteryConnect />} />
+            <Route path="library" element={<Library />} />
+            <Route path="mastery-connect" element={<Navigate to="/app/library" replace />} />
             <Route path="department" element={<Department />} />
             <Route path="department/:subject" element={<DepartmentDashboard />} />
             <Route path="admin" element={<Admin />} />
