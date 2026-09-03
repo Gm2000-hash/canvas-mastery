@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ImportCoursesDialog } from "@/components/ImportCoursesDialog";
 import { toast } from "sonner";
-import { getFramework, FRAMEWORKS } from "@/lib/frameworks";
+import { getFramework, FRAMEWORKS, defaultFrameworkForSubject } from "@/lib/frameworks";
 import { recentSchoolYears, currentSchoolYearLabel } from "@/lib/schoolYear";
 import { CompareView } from "./Analytics";
 
@@ -230,7 +230,10 @@ export default function ClassesHub() {
             const disc = disciplines.find((d) => d.id === c.discipline_id) ?? null;
             const effective = disc ?? defaultDisc;
             const s = stats[c.id];
-            const fw = s?.framework ? getFramework(s.framework) : null;
+            // Framework comes from the RPC; if it's missing, derive it from the
+            // subject (Science -> NGSS, otherwise State).
+            const fwId = s?.framework ?? (s?.subject ? defaultFrameworkForSubject(s.subject) : null);
+            const fw = fwId ? getFramework(fwId) : null;
             return (
               <Card key={c.id} className={(c.hidden || c.archived_at) ? "opacity-60" : ""}>
                 <CardHeader className="pb-3">

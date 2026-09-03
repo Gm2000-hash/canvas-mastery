@@ -548,7 +548,12 @@ export default function Settings() {
               <ChipMultiSelect
                 options={SUBJECTS}
                 selected={newSubjects}
-                onChange={setNewSubjects}
+                onChange={(subs) => {
+                  setNewSubjects(subs);
+                  // Pre-select the sensible default framework for the first
+                  // chosen subject (Science -> NGSS, otherwise State). Still editable.
+                  if (subs.length > 0) setNewFramework(defaultFrameworkForSubject(subs[0]));
+                }}
               />
             </div>
 
