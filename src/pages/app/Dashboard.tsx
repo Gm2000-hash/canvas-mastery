@@ -158,7 +158,7 @@ export default function Dashboard() {
         />
         <AssignmentsList
           eyebrow="Just past"
-          title="Recent assessments"
+          title="Recent assignments"
           icon={CalendarCheck}
           items={recent}
           emptyMessage="No past assessments yet."
