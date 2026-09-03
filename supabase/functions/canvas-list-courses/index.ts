@@ -1,6 +1,7 @@
 // Lists every course the teacher's Canvas API token can see (active + completed teacher enrollments)
 // without writing anything. Used by the "Import courses" dialog so the teacher can pick which to sync.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { canvasFetch, paceByRemaining } from "../_shared/canvasFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,7 +35,7 @@ async function canvasFetchAll<T>(creds: CanvasCreds, path: string): Promise<T[]>
   let url = `${creds.base_url}${path}${path.includes("?") ? "&" : "?"}per_page=100`;
   let safety = 0;
   while (url && safety < 30) {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${creds.api_token}` } });
+    const res = await canvasFetch(url, { headers: { Authorization: `Bearer ${creds.api_token}` } });
     if (!res.ok) {
       const t = await res.text().catch(() => "");
       throw new CanvasApiError(res.status, t.slice(0, 500));
@@ -44,6 +45,7 @@ async function canvasFetchAll<T>(creds: CanvasCreds, path: string): Promise<T[]>
     const links = parseLinkHeader(res.headers.get("Link"));
     url = links.next ?? "";
     safety++;
+    if (url) await paceByRemaining(res);
   }
   return items;
 }

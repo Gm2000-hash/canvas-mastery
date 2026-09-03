@@ -10,6 +10,7 @@
 // At least one filter must be provided. Returns per-quiz results so the UI can
 // show which quizzes succeeded, were skipped, or failed.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { canvasFetch, paceByRemaining } from "../_shared/canvasFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,7 +35,7 @@ async function canvasFetchAll<T>(creds: CanvasCreds, path: string): Promise<T[]>
   let url = `${creds.base_url}${path}${path.includes("?") ? "&" : "?"}per_page=100`;
   let safety = 0;
   while (url && safety < 30) {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${creds.api_token}` } });
+    const res = await canvasFetch(url, { headers: { Authorization: `Bearer ${creds.api_token}` } });
     if (!res.ok) {
       const t = await res.text().catch(() => "");
       throw new Error(`Canvas ${res.status}: ${t.slice(0, 200)}`);
@@ -50,6 +51,7 @@ async function canvasFetchAll<T>(creds: CanvasCreds, path: string): Promise<T[]>
     const links = parseLinkHeader(res.headers.get("Link"));
     url = links.next ?? "";
     safety++;
+    if (url) await paceByRemaining(res);
   }
   return items;
 }
@@ -152,7 +154,7 @@ export async function syncQuestionScoresForTeacher(opts: {
         try {
           // Returns a single object with scored_items (or items) array
           const url = `${creds.base_url}/api/quiz/v1/courses/${courseCanvasId}/quizzes/${quizId}/submissions/${subId}/results`;
-          const res = await fetch(url, { headers: { Authorization: `Bearer ${creds.api_token}` } });
+          const res = await canvasFetch(url, { headers: { Authorization: `Bearer ${creds.api_token}` } });
           if (!res.ok) {
             await res.text().catch(() => "");
             continue;

@@ -15,7 +15,7 @@ import { TaggerConfigError, TaggerProviderError, tagQuestionsForAssignment } fro
 const MAX_TEACHERS = 3;
 const MAX_ITEMS = 30;
 const LEASE_MINUTES = 4;
-const MAX_429_PER_RUN = 3;
+const MAX_429_PER_RUN = 2;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -122,9 +122,12 @@ Deno.serve(async (req) => {
               processedCount += doneIds.length;
             }
             if (e.status === 429) {
+              // The shared provider helper already retried with backoff before
+              // surfacing this, so the limit is sustained: park until the next
+              // tick instead of hammering the provider from this run.
               consecutive429 += 1;
-              if (consecutive429 >= MAX_429_PER_RUN) break; // park until next tick
-              await new Promise((r) => setTimeout(r, 4000 * consecutive429));
+              if (consecutive429 >= MAX_429_PER_RUN) break;
+              await new Promise((r) => setTimeout(r, 8000 * consecutive429));
               continue;
             }
             // 401 / 402 / 403 — circuit breaker: pause the whole job.

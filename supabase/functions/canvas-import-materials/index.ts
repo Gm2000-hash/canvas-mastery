@@ -1,6 +1,7 @@
 // Imports Canvas course Pages (as Readings) and Files (into the library) for
 // the signed-in teacher. Input: { course_ids: uuid[] } (app course ids).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { canvasFetch, paceByRemaining } from "../_shared/canvasFetch.ts";
 import { z } from "https://esm.sh/zod@3.23.8";
 
 const corsHeaders = {
@@ -29,7 +30,7 @@ async function fetchAll<T>(creds: Creds, path: string): Promise<T[]> {
   let url = `${creds.base_url}${path}${path.includes("?") ? "&" : "?"}per_page=100`;
   let n = 0;
   while (url && n < 20) {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${creds.api_token}` } });
+    const res = await canvasFetch(url, { headers: { Authorization: `Bearer ${creds.api_token}` } });
     if (!res.ok) {
       if (res.status === 401) throw new Error("Canvas rejected your access token. Update it in Settings.");
       return items; // 403/404 = feature disabled for this course
@@ -38,6 +39,7 @@ async function fetchAll<T>(creds: Creds, path: string): Promise<T[]> {
     items.push(...(Array.isArray(page) ? page : []));
     url = parseLink(res.headers.get("Link")).next ?? "";
     n++;
+    if (url) await paceByRemaining(res);
   }
   return items;
 }
@@ -91,7 +93,7 @@ Deno.serve(async (req) => {
       const pages = await fetchAll<any>(creds, `/api/v1/courses/${c.canvas_course_id}/pages?published=true`);
       for (const p of pages) {
         try {
-          const res = await fetch(`${creds.base_url}/api/v1/courses/${c.canvas_course_id}/pages/${encodeURIComponent(p.url)}`, {
+          const res = await canvasFetch(`${creds.base_url}/api/v1/courses/${c.canvas_course_id}/pages/${encodeURIComponent(p.url)}`, {
             headers: { Authorization: `Bearer ${creds.api_token}` },
           });
           if (!res.ok) { stats.skipped++; continue; }
