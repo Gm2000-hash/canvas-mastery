@@ -1451,6 +1451,10 @@ export type Database = {
           note: string
         }[]
       }
+      default_framework_for_subject: {
+        Args: { _subject: string }
+        Returns: string
+      }
       department_assessments: {
         Args: { _grades?: string[]; _school_year?: string; _subject: string }
         Returns: {

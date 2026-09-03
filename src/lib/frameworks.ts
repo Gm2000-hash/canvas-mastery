@@ -103,6 +103,15 @@ export function getFramework(id?: string | null): Framework {
   return FRAMEWORKS.find((f) => f.id === id) ?? FRAMEWORKS[0];
 }
 
+/**
+ * Default framework when a teacher hasn't explicitly chosen one:
+ * Science follows NGSS; every other subject follows the state's standards.
+ * Mirrors public.default_framework_for_subject() in the database.
+ */
+export function defaultFrameworkForSubject(subject?: string | null): FrameworkId {
+  return subject === "Science" ? "NGSS" : "STATE";
+}
+
 export const SUBJECTS = [
   "Math",
   "ELA",

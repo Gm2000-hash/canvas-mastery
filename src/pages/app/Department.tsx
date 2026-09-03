@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { currentSchoolYearLabel, recentSchoolYears } from "@/lib/schoolYear";
-import { GRADES } from "@/lib/frameworks";
+import { GRADES, getFramework, defaultFrameworkForSubject } from "@/lib/frameworks";
 import { toast } from "sonner";
 
 type SubjectRow = {
@@ -142,12 +142,13 @@ export default function Department() {
         .eq("state", state)
         .maybeSingle();
       if (!existing) {
+        const autoFw = defaultFrameworkForSubject(s);
         const { error } = await supabase.from("teacher_disciplines").insert({
           teacher_id: u.user.id,
           subject: s,
           grade,
-          state,
-          framework: "CUSTOM",
+          state: getFramework(autoFw).national ? state : (state || "ID"),
+          framework: autoFw,
           is_default: false,
         });
         if (error) { toast.error(error.message); return; }

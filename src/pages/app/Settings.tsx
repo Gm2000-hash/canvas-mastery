@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { FRAMEWORKS, getFramework, SUBJECTS, GRADES, STATES, type FrameworkId } from "@/lib/frameworks";
+import { FRAMEWORKS, getFramework, defaultFrameworkForSubject, SUBJECTS, GRADES, STATES, type FrameworkId } from "@/lib/frameworks";
 import InvitationsCard from "@/components/InvitationsCard";
 import MergeStudentsCard from "@/components/MergeStudentsCard";
 import { Switch } from "@/components/ui/switch";
@@ -138,12 +138,13 @@ export default function Settings() {
         .maybeSingle();
       if (!existing) {
         const isFirst = disciplines.length === 0;
+        const autoFw = defaultFrameworkForSubject(subject);
         const { error: discErr } = await supabase.from("teacher_disciplines").insert({
           teacher_id: u.user.id,
-          state: state || "",
+          state: getFramework(autoFw).national ? (state || "") : (state || "ID"),
           subject,
           grade,
-          framework: "CUSTOM",
+          framework: autoFw,
           is_default: isFirst,
         });
         if (!discErr) {
@@ -547,7 +548,12 @@ export default function Settings() {
               <ChipMultiSelect
                 options={SUBJECTS}
                 selected={newSubjects}
-                onChange={setNewSubjects}
+                onChange={(subs) => {
+                  setNewSubjects(subs);
+                  // Pre-select the sensible default framework for the first
+                  // chosen subject (Science -> NGSS, otherwise State). Still editable.
+                  if (subs.length > 0) setNewFramework(defaultFrameworkForSubject(subs[0]));
+                }}
               />
             </div>
 
