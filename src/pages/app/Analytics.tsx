@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, ResponsiveContainer, Legend } from "recharts";
-import { ArrowLeft, ArrowRight, BarChart3, BarChartHorizontal, TrendingUp, GraduationCap, BookMarked, ListChecks, Layers, HelpCircle, Download, ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowLeft, ArrowRight, BarChart3, BarChartHorizontal, TrendingUp, GraduationCap, BookMarked, ListChecks, Layers, HelpCircle, Download, ChevronRight, ChevronDown, Gauge } from "lucide-react";
+import { DokView } from "@/components/analytics/DokView";
 import { Button } from "@/components/ui/button";
 import { getFramework, FRAMEWORKS } from "@/lib/frameworks";
 import { Link, useParams } from "react-router-dom";
@@ -162,6 +163,7 @@ export default function Analytics() {
           <TabsTrigger value="standards"><BookMarked className="h-4 w-4 mr-1.5" /> Standards</TabsTrigger>
           <TabsTrigger value="assignments"><ListChecks className="h-4 w-4 mr-1.5" /> Assessments</TabsTrigger>
           <TabsTrigger value="levels"><Layers className="h-4 w-4 mr-1.5" /> Mastery levels</TabsTrigger>
+          <TabsTrigger value="dok"><Gauge className="h-4 w-4 mr-1.5" /> Depth of Knowledge</TabsTrigger>
           <TabsTrigger value="questions"><HelpCircle className="h-4 w-4 mr-1.5" /> Questions</TabsTrigger>
         </TabsList>
 
@@ -170,6 +172,7 @@ export default function Analytics() {
         <TabsContent value="standards"><StandardsView courseId={courseFilter} subjects={subjects} courses={courses} /></TabsContent>
         <TabsContent value="assignments"><AssignmentsView courseId={courseFilter} courses={courses} /></TabsContent>
         <TabsContent value="levels"><LevelsView courseId={courseFilter} subjects={subjects} /></TabsContent>
+        <TabsContent value="dok"><DokView courseId={courseFilter} subjects={subjects} /></TabsContent>
         <TabsContent value="questions"><QuestionsView courseId={courseFilter} /></TabsContent>
       </Tabs>
     </div>
