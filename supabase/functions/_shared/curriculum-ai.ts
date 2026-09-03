@@ -162,6 +162,13 @@ export async function aiText(opts: AiCallOptions): Promise<string> {
   if (opts.json) body.response_format = { type: "json_object" };
 
   let res = await fetchChatCompletion(body);
+  // OpenRouter reserves credits for the full max_tokens up front; on a low
+  // balance a large request 402s even though a smaller one would succeed.
+  if (res.status === 402 && (body.max_tokens as number) > 4096) {
+    console.warn("402 with max_tokens", body.max_tokens, "- retrying at 4096");
+    body.max_tokens = 4096;
+    res = await fetchChatCompletion(body);
+  }
   // One bounded retry for transient upstream failures.
   if (res.status >= 500 || res.status === 429) {
     const retryAfter = Number(res.headers.get("retry-after")) || 2;
@@ -177,6 +184,8 @@ export async function aiText(opts: AiCallOptions): Promise<string> {
     throw new HttpError(502, `AI provider error (${res.status}).`);
   }
   const data = await res.json();
+  const finish = data?.choices?.[0]?.finish_reason;
+  if (finish === "length") console.warn("AI output truncated at max_tokens", body.max_tokens, JSON.stringify(data?.usage ?? {}));
   const content = data?.choices?.[0]?.message?.content;
   const text = typeof content === "string"
     ? content
@@ -192,8 +201,16 @@ export async function aiJson<T = Record<string, unknown>>(opts: AiCallOptions): 
   const text = await aiText({ ...opts, json: opts.json ?? true });
   try {
     return extractJson(text) as T;
+  } catch {
+    /* fall through to lenient repair */
+  }
+  try {
+    const { jsonrepair } = await import("https://esm.sh/jsonrepair@3.8.0");
+    const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const start = text.search(/[{[]/);
+    return JSON.parse(jsonrepair((fence ? fence[1] : text.slice(Math.max(start, 0))).trim())) as T;
   } catch (e) {
-    console.error("JSON parse failed:", (e as Error).message, text.slice(0, 400));
+    console.error("JSON parse failed:", (e as Error).message, "len", text.length, "head", text.slice(0, 200), "tail", text.slice(-300));
     throw new HttpError(502, "AI returned malformed output. Please try again.");
   }
 }

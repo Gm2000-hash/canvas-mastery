@@ -51,7 +51,7 @@ const SPEC: Record<string, { shape: string; guide: string }> = {
 };
 
 const uid = () => crypto.randomUUID();
-const withIds = (xs: unknown) => arr<Record<string, unknown>>(xs).map((x) => ({ id: uid(), ...x }));
+const withIds = (xs: unknown): Array<Record<string, unknown> & { id: string }> => arr<Record<string, unknown>>(xs).map((x) => ({ ...x, id: uid() }));
 
 /** Add ids / fix cross references so the content matches the client types exactly. */
 function normalize(type: string, c: Record<string, unknown>): Record<string, unknown> {

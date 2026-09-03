@@ -33,7 +33,7 @@ export async function extractLessonsFromText(text: string, sourceName: string): 
 
 /** Extract plain text from Office Open XML archives (docx/pptx/xlsx). */
 export async function extractOfficeText(bytes: Uint8Array, ext: string): Promise<string> {
-  const JSZip = (await import("npm:jszip@3.10.1")).default;
+  const JSZip = (await import("https://esm.sh/jszip@3.10.1")).default;
   const zip = await JSZip.loadAsync(bytes);
   const pick = (re: RegExp) => Object.keys(zip.files).filter((n) => re.test(n)).sort();
   let names: string[] = [];
