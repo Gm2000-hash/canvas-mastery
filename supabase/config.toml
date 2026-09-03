@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.canvas-sync-question-scores]
 verify_jwt = true
+
+[functions.tag-queue-worker]
+verify_jwt = false
