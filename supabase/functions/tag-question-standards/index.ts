@@ -96,12 +96,17 @@ Deno.serve(async (req) => {
     }
     const teacherId = userData.user.id;
 
-    const { assignment_id } = await req.json();
+    // Optional question_ids restricts tagging to a selection within the assignment
+    // and clears that selection's previous unconfirmed AI suggestions first.
+    const { assignment_id, question_ids } = await req.json();
     if (!assignment_id) {
       return new Response(JSON.stringify({ error: "assignment_id is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const onlyIds: string[] | null = Array.isArray(question_ids) && question_ids.length
+      ? question_ids.filter((x: unknown) => typeof x === "string").slice(0, 500)
+      : null;
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
