@@ -102,7 +102,15 @@ export async function fetchChatCompletion(
   if (config.provider === "openrouter" && !requestBody.max_tokens) {
     requestBody.max_tokens = 4096;
   }
+  return postProviderWithBackoff(config, requestBody, opts);
+}
 
+/** Low-level: POST an already-final body to the provider with bounded backoff. Use when the model must not be overridden (e.g. image models). */
+export async function postProviderWithBackoff(
+  config: AiProviderConfig,
+  requestBody: Record<string, unknown>,
+  opts: RetryOptions = {},
+): Promise<Response> {
   const maxRetries = opts.maxRetries ?? 3;
   const maxDelayMs = opts.maxDelayMs ?? 15_000;
   const payload = JSON.stringify(requestBody);
