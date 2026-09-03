@@ -71,8 +71,8 @@ export function CoverArtPicker({ open, onOpenChange, bookId, bookTitle, currentC
       upsert: true,
     });
     if (error) throw error;
-    const { data: publicUrl } = supabase.storage.from("book-covers").getPublicUrl(filePath);
-    return publicUrl.publicUrl + `?t=${Date.now()}`;
+    const { data: signed } = await supabase.storage.from("book-covers").createSignedUrl(filePath, 60 * 60 * 24 * 365 * 10);
+    return (signed?.signedUrl ?? "") + `&t=${Date.now()}`;
   };
 
   const saveCoverUrl = async (url: string) => {

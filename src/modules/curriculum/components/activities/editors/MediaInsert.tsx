@@ -59,9 +59,10 @@ export function MediaInsert({ media, onChange }: MediaInsertProps) {
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data: signed } = await supabase.storage
         .from("activity-media")
-        .getPublicUrl(path);
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      const publicUrl = signed?.signedUrl ?? "";
 
       // Auto-detect type from file
       let type: MediaEmbed["type"] = currentType as MediaEmbed["type"];

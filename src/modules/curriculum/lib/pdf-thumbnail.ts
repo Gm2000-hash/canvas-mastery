@@ -51,11 +51,12 @@ export async function generatePdfThumbnail(
       return null;
     }
 
-    const { data: urlData } = supabase.storage
+    // Buckets are private in this project: hand back a long-lived signed URL.
+    const { data: urlData } = await supabase.storage
       .from('avatars')
-      .getPublicUrl(filePath);
+      .createSignedUrl(filePath, 60 * 60 * 24 * 365 * 10);
 
-    return urlData.publicUrl;
+    return urlData?.signedUrl ?? null;
   } catch (err) {
     console.error('Failed to generate PDF thumbnail:', err);
     return null;
