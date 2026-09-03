@@ -27,6 +27,7 @@ import Admin from "./pages/app/Admin";
 import Library from "./pages/app/Library";
 import Department from "./pages/app/Department";
 import DepartmentDashboard from "./pages/app/DepartmentDashboard";
+import { curriculumAppRoutes, curriculumPublicRoutes } from "./modules/curriculum/routes";
 
 const queryClient = new QueryClient();
 
@@ -60,7 +61,9 @@ const App = () => (
             <Route path="department" element={<Department />} />
             <Route path="department/:subject" element={<DepartmentDashboard />} />
             <Route path="admin" element={<Admin />} />
+            {curriculumAppRoutes()}
           </Route>
+          {curriculumPublicRoutes()}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
