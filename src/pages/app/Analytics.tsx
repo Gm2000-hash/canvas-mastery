@@ -521,6 +521,11 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
         studentMap.set(r.student_id, { id: r.student_id, name: r.student_name, sortable: r.student_sortable });
       }
       // Tagged standards override placeholders (same id, fresher metadata + parent_code from RPC).
+      // Also drop any placeholder that shares the same code under a different id
+      // (same standard, different grade row) so columns never duplicate.
+      stdMap.forEach((s, id) => {
+        if (id !== r.standard_id && s.code === r.code && s.framework === r.framework) stdMap.delete(id);
+      });
       stdMap.set(r.standard_id, {
         id: r.standard_id, code: r.code, parent_code: r.parent_code,
         description: r.description, subject: r.subject, framework: r.framework,
