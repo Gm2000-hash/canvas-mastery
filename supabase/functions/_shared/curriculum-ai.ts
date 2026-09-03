@@ -237,17 +237,13 @@ export async function aiImage(prompt: string): Promise<string> {
   const model = config.provider === "openrouter"
     ? "google/gemini-2.5-flash-image"
     : "google/gemini-2.5-flash-image-preview";
-  const res = await fetch(config.baseUrl, {
-    method: "POST",
-    headers: config.headers,
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: prompt }],
-      modalities: ["image", "text"],
-      // One image is ~1.3k output tokens; keep the credit reservation small.
-      max_tokens: 4096,
-    }),
-  });
+  const res = await postProviderWithBackoff(config, {
+    model,
+    messages: [{ role: "user", content: prompt }],
+    modalities: ["image", "text"],
+    // One image is ~1.3k output tokens; keep the credit reservation small.
+    max_tokens: 4096,
+  }, { maxRetries: 2 });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     console.error("Image provider error", res.status, txt.slice(0, 400));
