@@ -149,7 +149,7 @@ export function DokView({ courseId, subjects }: { courseId: string | null; subje
                 return (
                   <div key={dokKey(lvl)} className="rounded-xl border p-3 space-y-1.5" style={{ borderColor: DOK_COLOR[dokKey(lvl)] + "66" }}>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-sm" style={{ color: DOK_COLOR[dokKey(lvl)] }}>{dokTitle(lvl)}</span>
+                      <span className="font-medium text-sm whitespace-nowrap" style={{ color: DOK_COLOR[dokKey(lvl)] }}>{dokTitle(lvl)}</span>
                       <span className="text-xs text-muted-foreground">{lvl == null ? "no level yet" : dokName(lvl)}</span>
                     </div>
                     <div className="text-2xl font-semibold tabular-nums">{r?.question_count ?? 0}<span className="text-xs font-normal text-muted-foreground ml-1">q · {(share * 100).toFixed(0)}%</span></div>
@@ -233,7 +233,7 @@ export function DokView({ courseId, subjects }: { courseId: string | null; subje
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead className="min-w-[260px]">Standard</TableHead>
-                    {DOK_LEVELS.map((d) => <TableHead key={d.level} className="text-center" style={{ color: DOK_COLOR[String(d.level)] }}>DOK {d.level}</TableHead>)}
+                    {DOK_LEVELS.map((d) => <TableHead key={d.level} className="text-center whitespace-nowrap" style={{ color: DOK_COLOR[String(d.level)] }}>DOK {d.level}</TableHead>)}
                     <TableHead className="text-center text-muted-foreground">Untagged</TableHead>
                   </TableRow>
                 </TableHeader>
