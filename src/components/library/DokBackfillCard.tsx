@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Layers, Loader2, Sparkles } from "lucide-react";
 import { TagJobProgress } from "@/pages/app/standards/TagJobProgress";
 
-export function DokBackfillCard({ onChanged }: { onChanged?: () => void }) {
+export function DokBackfillCard({ onChanged, showJob = true }: { onChanged?: () => void; showJob?: boolean }) {
   const [qMissing, setQMissing] = useState<number | null>(null);
   const [iMissing, setIMissing] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,7 +55,7 @@ export function DokBackfillCard({ onChanged }: { onChanged?: () => void }) {
         if ((data as any)?.error) { toast.error(String((data as any).error)); break; }
         tagged += (data as any).tagged ?? 0;
         const next = (data as any).remaining ?? 0;
-        if ((data as any).processed === 0 || next >= remaining && (data as any).tagged === 0) break; // nothing tagged this round — avoid spinning
+        if ((data as any).processed === 0 || (next >= remaining && (data as any).tagged === 0)) break; // nothing tagged this round — avoid spinning
         remaining = next;
         onChanged?.();
       }
@@ -73,7 +73,7 @@ export function DokBackfillCard({ onChanged }: { onChanged?: () => void }) {
 
   return (
     <div className="space-y-3">
-      <TagJobProgress refreshKey={jobKey} onProgress={() => { refresh(); onChanged?.(); }} />
+      {showJob && <TagJobProgress refreshKey={jobKey} onProgress={() => { refresh(); onChanged?.(); }} />}
       {total > 0 && (
         <Card className="border-primary/20 bg-card/60">
           <CardContent className="py-4 flex items-start justify-between gap-3 flex-wrap">

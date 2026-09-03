@@ -223,7 +223,7 @@ export default function Library() {
         </section>
       ) : (
         <>
-          <DokBackfillCard onChanged={refresh} />
+          <DokBackfillCard onChanged={refresh} showJob={section !== "question"} />
           {/* Tiles */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {SECTIONS.map((s) => {

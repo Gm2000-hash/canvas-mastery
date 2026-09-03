@@ -83,7 +83,7 @@ export function TagJobProgress({ onProgress, refreshKey }: { onProgress?: () => 
             <div className="min-w-0">
               <div className="font-medium flex items-center gap-2 flex-wrap">
                 <Sparkles className="h-3.5 w-3.5" />
-                AI tagging {paused ? "paused" : job.status === "running" ? "in progress" : "queued"}
+                {job.scope === "dok_backfill" ? "DOK tagging" : "AI tagging"} {paused ? "paused" : job.status === "running" ? "in progress" : "queued"}
                 <Badge variant="secondary" className="tabular-nums">{job.done} / {job.total}</Badge>
                 {job.failed > 0 && <Badge variant="outline" className="tabular-nums">{job.failed} skipped</Badge>}
               </div>
