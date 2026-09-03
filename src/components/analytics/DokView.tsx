@@ -36,7 +36,7 @@ function pct(n: number | null | undefined) {
 function scoreColor(n: number | null | undefined) {
   if (n == null) return undefined;
   const v = Number(n);
-  return v >= 0.8 ? "hsl(var(--mastery-high, 160 84% 39%))" : v >= 0.6 ? "hsl(var(--mastery-mid, 38 92% 50%))" : "hsl(var(--mastery-low, 0 84% 60%))";
+  return v >= 0.8 ? "hsl(var(--mastery-high))" : v >= 0.6 ? "hsl(var(--mastery-mid))" : "hsl(var(--mastery-low))";
 }
 
 export function DokView({ courseId, subjects }: { courseId: string | null; subjects: string[] }) {
