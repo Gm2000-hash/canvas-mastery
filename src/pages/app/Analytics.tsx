@@ -468,11 +468,19 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
         const d = (disc as any[])?.[0];
         if (!d) { setPlaceholderStandards([]); return; }
         let q = supabase.from("standards")
-          .select("id, code, description, subject, framework")
+          .select("id, code, description, subject, framework, grade")
           .eq("subject", d.subject);
         if (d.framework) q = q.eq("framework", d.framework);
         const { data: stds } = await q.order("code");
-        setPlaceholderStandards(((stds as any) ?? []).map((s: any) => ({
+        // The library can hold the same code once per grade (e.g. NGSS
+        // MS-* standards exist for grades 6, 7 and 8). Keep one column per
+        // code, preferring the discipline's grade when there's a match.
+        const byCode = new Map<string, any>();
+        ((stds as any[]) ?? []).forEach((s) => {
+          const cur = byCode.get(s.code);
+          if (!cur || (d.grade && s.grade === d.grade && cur.grade !== d.grade)) byCode.set(s.code, s);
+        });
+        setPlaceholderStandards(Array.from(byCode.values()).map((s: any) => ({
           id: s.id, code: s.code, description: s.description ?? "",
           subject: s.subject, framework: s.framework ?? "STATE",
         })));
@@ -513,6 +521,11 @@ function ClassMatrixView({ course, collapsed = false, onToggleCollapsed }: {
         studentMap.set(r.student_id, { id: r.student_id, name: r.student_name, sortable: r.student_sortable });
       }
       // Tagged standards override placeholders (same id, fresher metadata + parent_code from RPC).
+      // Also drop any placeholder that shares the same code under a different id
+      // (same standard, different grade row) so columns never duplicate.
+      stdMap.forEach((s, id) => {
+        if (id !== r.standard_id && s.code === r.code && s.framework === r.framework) stdMap.delete(id);
+      });
       stdMap.set(r.standard_id, {
         id: r.standard_id, code: r.code, parent_code: r.parent_code,
         description: r.description, subject: r.subject, framework: r.framework,
