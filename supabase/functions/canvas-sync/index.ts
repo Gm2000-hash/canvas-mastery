@@ -7,6 +7,7 @@
 //     discipline_assignments?: { canvas_course_id: number; discipline_id: string | null }[];
 //   }
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { canvasFetch, paceByRemaining } from "../_shared/canvasFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,7 +48,7 @@ async function canvasFetchAll<T>(creds: CanvasCreds, path: string, init: Request
   let url = `${creds.base_url}${path}${path.includes("?") ? "&" : "?"}per_page=100`;
   let safety = 0;
   while (url && safety < 30) {
-    const res = await fetch(url, {
+    const res = await canvasFetch(url, {
       ...init,
       headers: { ...(init.headers ?? {}), Authorization: `Bearer ${creds.api_token}` },
     });
@@ -60,6 +61,7 @@ async function canvasFetchAll<T>(creds: CanvasCreds, path: string, init: Request
     const links = parseLinkHeader(res.headers.get("Link"));
     url = links.next ?? "";
     safety++;
+    if (url) await paceByRemaining(res);
   }
   return items;
 }
