@@ -371,6 +371,247 @@ export type Database = {
           },
         ]
       }
+      curriculum_lesson_standards: {
+        Row: {
+          id: string
+          lesson_id: string
+          matched_terms: string[]
+          ngss_code: string
+          ngss_description: string
+        }
+        Insert: {
+          id?: string
+          lesson_id: string
+          matched_terms?: string[]
+          ngss_code: string
+          ngss_description: string
+        }
+        Update: {
+          id?: string
+          lesson_id?: string
+          matched_terms?: string[]
+          ngss_code?: string
+          ngss_description?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "curriculum_lesson_standards_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "curriculum_lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      curriculum_lessons: {
+        Row: {
+          created_at: string
+          explanation: Json
+          id: string
+          image_url: string | null
+          interactive_activities: Json | null
+          intro: Json
+          key_terms: Json
+          objectives: Json
+          reading_paragraphs: Json | null
+          reading_title: string | null
+          sort_order: number
+          title: string
+          unit_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          explanation?: Json
+          id?: string
+          image_url?: string | null
+          interactive_activities?: Json | null
+          intro?: Json
+          key_terms?: Json
+          objectives?: Json
+          reading_paragraphs?: Json | null
+          reading_title?: string | null
+          sort_order?: number
+          title: string
+          unit_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          explanation?: Json
+          id?: string
+          image_url?: string | null
+          interactive_activities?: Json | null
+          intro?: Json
+          key_terms?: Json
+          objectives?: Json
+          reading_paragraphs?: Json | null
+          reading_title?: string | null
+          sort_order?: number
+          title?: string
+          unit_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "curriculum_lessons_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_quizzes: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          question_ids: string[]
+          settings: Json
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          question_ids?: string[]
+          settings?: Json
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          question_ids?: string[]
+          settings?: Json
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      exam_review_materials: {
+        Row: {
+          created_at: string
+          exam_id: string
+          flashcards: Json
+          id: string
+          review_lesson: Json
+          study_guide: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exam_id: string
+          flashcards?: Json
+          id?: string
+          review_lesson?: Json
+          study_guide?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          exam_id?: string
+          flashcards?: Json
+          id?: string
+          review_lesson?: Json
+          study_guide?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_review_materials_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: true
+            referencedRelation: "isat_exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      h5p_activities: {
+        Row: {
+          activity_type: string
+          content: Json
+          created_at: string
+          id: string
+          title: string
+          unit_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          content?: Json
+          created_at?: string
+          id?: string
+          title: string
+          unit_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          content?: Json
+          created_at?: string
+          id?: string
+          title?: string
+          unit_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "h5p_activities_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      h5p_activity_standards: {
+        Row: {
+          activity_id: string
+          id: string
+          matched_terms: string[]
+          ngss_code: string
+          ngss_description: string
+        }
+        Insert: {
+          activity_id: string
+          id?: string
+          matched_terms?: string[]
+          ngss_code: string
+          ngss_description: string
+        }
+        Update: {
+          activity_id?: string
+          id?: string
+          matched_terms?: string[]
+          ngss_code?: string
+          ngss_description?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "h5p_activity_standards_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "h5p_activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       historical_access_log: {
         Row: {
           accessed_at: string
@@ -458,6 +699,282 @@ export type Database = {
           revoked?: boolean
           used_at?: string | null
           used_by?: string | null
+        }
+        Relationships: []
+      }
+      isat_exams: {
+        Row: {
+          answers: Json | null
+          completed_at: string | null
+          created_at: string
+          grade_level: string
+          hints_enabled: boolean
+          hints_used: number
+          id: string
+          question_count: number
+          questions: Json
+          score: number | null
+          title: string
+          total_points: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          grade_level?: string
+          hints_enabled?: boolean
+          hints_used?: number
+          id?: string
+          question_count?: number
+          questions?: Json
+          score?: number | null
+          title: string
+          total_points?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          grade_level?: string
+          hints_enabled?: boolean
+          hints_used?: number
+          id?: string
+          question_count?: number
+          questions?: Json
+          score?: number | null
+          title?: string
+          total_points?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      lesson_assignments: {
+        Row: {
+          ai_metadata: Json
+          assignment_type: string
+          canvas_assignment_id: number | null
+          canvas_course_id: number | null
+          created_at: string
+          due_in_days: number | null
+          google_doc_url: string | null
+          google_sheet_url: string | null
+          google_slides_url: string | null
+          id: string
+          instructions: string
+          lesson_plan_id: string
+          materials: Json
+          points_possible: number
+          quiz_questions: Json
+          rubric: Json
+          sort_order: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_metadata?: Json
+          assignment_type?: string
+          canvas_assignment_id?: number | null
+          canvas_course_id?: number | null
+          created_at?: string
+          due_in_days?: number | null
+          google_doc_url?: string | null
+          google_sheet_url?: string | null
+          google_slides_url?: string | null
+          id?: string
+          instructions?: string
+          lesson_plan_id: string
+          materials?: Json
+          points_possible?: number
+          quiz_questions?: Json
+          rubric?: Json
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_metadata?: Json
+          assignment_type?: string
+          canvas_assignment_id?: number | null
+          canvas_course_id?: number | null
+          created_at?: string
+          due_in_days?: number | null
+          google_doc_url?: string | null
+          google_sheet_url?: string | null
+          google_slides_url?: string | null
+          id?: string
+          instructions?: string
+          lesson_plan_id?: string
+          materials?: Json
+          points_possible?: number
+          quiz_questions?: Json
+          rubric?: Json
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_assignments_lesson_plan_id_fkey"
+            columns: ["lesson_plan_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_plan_standards: {
+        Row: {
+          id: string
+          lesson_plan_id: string
+          ngss_code: string
+          ngss_description: string
+        }
+        Insert: {
+          id?: string
+          lesson_plan_id: string
+          ngss_code: string
+          ngss_description: string
+        }
+        Update: {
+          id?: string
+          lesson_plan_id?: string
+          ngss_code?: string
+          ngss_description?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_plan_standards_lesson_plan_id_fkey"
+            columns: ["lesson_plan_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_plans: {
+        Row: {
+          activities: Json | null
+          assessment: string | null
+          created_at: string
+          differentiation: string | null
+          duration_minutes: number | null
+          embedded_activities: Json | null
+          id: string
+          lesson_date: string | null
+          materials: string | null
+          notes: string | null
+          objectives: string | null
+          resources: Json | null
+          sort_order: number | null
+          title: string
+          udl_supports: Json
+          unit_id: string | null
+          updated_at: string
+          user_id: string
+          vocabulary: Json | null
+        }
+        Insert: {
+          activities?: Json | null
+          assessment?: string | null
+          created_at?: string
+          differentiation?: string | null
+          duration_minutes?: number | null
+          embedded_activities?: Json | null
+          id?: string
+          lesson_date?: string | null
+          materials?: string | null
+          notes?: string | null
+          objectives?: string | null
+          resources?: Json | null
+          sort_order?: number | null
+          title: string
+          udl_supports?: Json
+          unit_id?: string | null
+          updated_at?: string
+          user_id: string
+          vocabulary?: Json | null
+        }
+        Update: {
+          activities?: Json | null
+          assessment?: string | null
+          created_at?: string
+          differentiation?: string | null
+          duration_minutes?: number | null
+          embedded_activities?: Json | null
+          id?: string
+          lesson_date?: string | null
+          materials?: string | null
+          notes?: string | null
+          objectives?: string | null
+          resources?: Json | null
+          sort_order?: number | null
+          title?: string
+          udl_supports?: Json
+          unit_id?: string | null
+          updated_at?: string
+          user_id?: string
+          vocabulary?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_plans_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      library_books: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          file_path: string
+          file_size: number
+          id: string
+          is_published: boolean
+          page_count: number | null
+          share_token: string | null
+          source_discipline: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          file_path: string
+          file_size?: number
+          id?: string
+          is_published?: boolean
+          page_count?: number | null
+          share_token?: string | null
+          source_discipline?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+          is_published?: boolean
+          page_count?: number | null
+          share_token?: string | null
+          source_discipline?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -782,38 +1299,219 @@ export type Database = {
         }
         Relationships: []
       }
+      note_links: {
+        Row: {
+          created_at: string
+          id: string
+          source_note_id: string
+          target_note_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          source_note_id: string
+          target_note_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          source_note_id?: string
+          target_note_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_links_source_note_id_fkey"
+            columns: ["source_note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_links_target_note_id_fkey"
+            columns: ["target_note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notes: {
+        Row: {
+          content: Json
+          content_text: string
+          created_at: string
+          icon: string | null
+          id: string
+          is_public: boolean
+          parent_id: string | null
+          search_vector: unknown
+          share_token: string | null
+          sort_order: number
+          tags: string[]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: Json
+          content_text?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_public?: boolean
+          parent_id?: string | null
+          search_vector?: unknown
+          share_token?: string | null
+          sort_order?: number
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: Json
+          content_text?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_public?: boolean
+          parent_id?: string | null
+          search_vector?: unknown
+          share_token?: string | null
+          sort_order?: number
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          ai_preferences: Json
+          avatar_url: string | null
           created_at: string
           default_grade: string | null
           default_subject: string | null
           display_name: string | null
+          grade_levels: string[]
           id: string
           onboarding_dismissed_at: string | null
           state: string | null
+          subjects: string[]
           updated_at: string
         }
         Insert: {
+          ai_preferences?: Json
+          avatar_url?: string | null
           created_at?: string
           default_grade?: string | null
           default_subject?: string | null
           display_name?: string | null
+          grade_levels?: string[]
           id: string
           onboarding_dismissed_at?: string | null
           state?: string | null
+          subjects?: string[]
           updated_at?: string
         }
         Update: {
+          ai_preferences?: Json
+          avatar_url?: string | null
           created_at?: string
           default_grade?: string | null
           default_subject?: string | null
           display_name?: string | null
+          grade_levels?: string[]
           id?: string
           onboarding_dismissed_at?: string | null
           state?: string | null
+          subjects?: string[]
           updated_at?: string
         }
         Relationships: []
+      }
+      question_bank: {
+        Row: {
+          answers: Json | null
+          blooms_level: string | null
+          canvas_question_id: number | null
+          created_at: string
+          dok_level: number | null
+          id: string
+          points_possible: number | null
+          question_text: string
+          question_type: string
+          source_course: string | null
+          source_quiz: string | null
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          blooms_level?: string | null
+          canvas_question_id?: number | null
+          created_at?: string
+          dok_level?: number | null
+          id?: string
+          points_possible?: number | null
+          question_text: string
+          question_type: string
+          source_course?: string | null
+          source_quiz?: string | null
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          blooms_level?: string | null
+          canvas_question_id?: number | null
+          created_at?: string
+          dok_level?: number | null
+          id?: string
+          points_possible?: number | null
+          question_text?: string
+          question_type?: string
+          source_course?: string | null
+          source_quiz?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      question_bank_standards: {
+        Row: {
+          id: string
+          ngss_code: string
+          ngss_description: string
+          question_bank_id: string
+        }
+        Insert: {
+          id?: string
+          ngss_code: string
+          ngss_description: string
+          question_bank_id: string
+        }
+        Update: {
+          id?: string
+          ngss_code?: string
+          ngss_description?: string
+          question_bank_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_bank_standards_question_bank_id_fkey"
+            columns: ["question_bank_id"]
+            isOneToOne: false
+            referencedRelation: "question_bank"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       question_responses: {
         Row: {
@@ -960,6 +1658,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      standard_key_terms: {
+        Row: {
+          created_at: string
+          id: string
+          key_terms: string[]
+          standard_code: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_terms?: string[]
+          standard_code: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_terms?: string[]
+          standard_code?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       standards: {
         Row: {
@@ -1345,6 +2070,48 @@ export type Database = {
           reveal_default?: boolean
           teacher_id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      units: {
+        Row: {
+          created_at: string
+          date_end: string | null
+          date_start: string | null
+          description: string | null
+          discipline: string | null
+          grade_level: string | null
+          id: string
+          sort_order: number | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_end?: string | null
+          date_start?: string | null
+          description?: string | null
+          discipline?: string | null
+          grade_level?: string | null
+          id?: string
+          sort_order?: number | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_end?: string | null
+          date_start?: string | null
+          description?: string | null
+          discipline?: string | null
+          grade_level?: string | null
+          id?: string
+          sort_order?: number | null
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1826,6 +2593,64 @@ export type Database = {
           state: string
           subject: string
           teacher_id: string
+        }[]
+      }
+      get_public_exam: {
+        Args: { _exam_id: string }
+        Returns: {
+          grade_level: string
+          hints_enabled: boolean
+          id: string
+          question_count: number
+          questions: Json
+          title: string
+        }[]
+      }
+      get_public_review: {
+        Args: { _exam_id: string }
+        Returns: {
+          exam_id: string
+          exam_title: string
+          flashcards: Json
+          id: string
+          review_lesson: Json
+          study_guide: Json
+        }[]
+      }
+      get_published_books: {
+        Args: never
+        Returns: {
+          cover_url: string
+          created_at: string
+          file_path: string
+          file_size: number
+          id: string
+          is_published: boolean
+          page_count: number
+          source_discipline: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      get_shared_book: {
+        Args: { _share_token: string }
+        Returns: {
+          file_path: string
+          id: string
+          source_discipline: string
+          title: string
+        }[]
+      }
+      get_shared_note: {
+        Args: { _token: string }
+        Returns: {
+          author_display_name: string
+          content: Json
+          icon: string
+          id: string
+          tags: string[]
+          title: string
+          updated_at: string
         }[]
       }
       has_role: {
