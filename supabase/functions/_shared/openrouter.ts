@@ -15,8 +15,20 @@ export interface AiProviderConfig {
   overrideModel?: string;
 }
 
+/**
+ * Normalize a pasted OpenRouter key: trim whitespace, drop an accidental
+ * "Bearer " prefix, and lowercase the fixed "sk-or-v1-" prefix (mobile
+ * keyboards often auto-capitalize the first letter, which OpenRouter rejects).
+ */
+export function normalizeOpenRouterKey(raw: string | undefined): string {
+  let k = (raw ?? "").trim().replace(/^bearer\s+/i, "");
+  const m = k.match(/^(sk-or(?:-v\d+)?-)(.*)$/i);
+  if (m) k = m[1].toLowerCase() + m[2];
+  return k;
+}
+
 export function getAiProviderConfig(): AiProviderConfig {
-  const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+  const OPENROUTER_API_KEY = normalizeOpenRouterKey(Deno.env.get("OPENROUTER_API_KEY"));
   if (OPENROUTER_API_KEY) {
     return {
       provider: "openrouter",
