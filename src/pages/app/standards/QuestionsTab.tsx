@@ -25,6 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { BulkTagActions } from "./BulkTagActions";
 import { UntaggedQuestionsDialog, countUntaggedQuestions } from "./UntaggedQuestionsDialog";
 import { TagJobProgress, enqueueAllUntagged } from "./TagJobProgress";
+import { dokName } from "@/components/library/libraryTypes";
 
 type BankRow = {
   standard_id: string;
