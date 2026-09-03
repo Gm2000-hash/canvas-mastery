@@ -8,7 +8,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0
 import { fetchChatCompletion } from "./openrouter.ts";
 
 export type Tag = { code: string; description: string; matched_terms?: string[] };
-type BatchResult = { question_id: number; standards: Tag[] };
+type BatchResult = { question_id: number; dok?: number; standards: Tag[] };
 
 /** Configuration problems the caller must surface (no discipline, no standards, no questions). */
 export class TaggerConfigError extends Error {

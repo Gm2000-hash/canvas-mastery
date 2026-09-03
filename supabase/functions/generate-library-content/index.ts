@@ -26,6 +26,8 @@ const BodySchema = z.object({
     reading_level: z.string().max(40).optional(),
     format: z.string().max(60).optional(),
     topic: z.string().max(300).optional(),
+    /** Target Depth of Knowledge: a single level, or "mix" for a spread across levels. */
+    dok: z.enum(["1", "2", "3", "4", "mix"]).optional(),
   }).optional(),
 });
 
@@ -40,6 +42,29 @@ const LENGTH_GUIDE: Record<string, string> = {
   medium: "Aim for roughly 600-900 words.",
   long: "Be thorough (roughly 1000-1500 words).",
 };
+
+const DOK_DESC: Record<string, string> = {
+  "1": "DOK 1 — Recall & reproduction: define, identify, list, recall facts, follow a simple procedure.",
+  "2": "DOK 2 — Skills & concepts: classify, compare, summarize, interpret data, apply a concept.",
+  "3": "DOK 3 — Strategic thinking: justify with evidence, analyze, draw conclusions, explain phenomena.",
+  "4": "DOK 4 — Extended thinking: design investigations, synthesize across sources, sustained projects.",
+};
+
+function dokGuide(dok: string | undefined, kind: string): { text: string; levels: number[] } {
+  if (!dok) return { text: "", levels: [] };
+  if (dok === "mix") {
+    const levels = kind === "reading" ? [1, 2, 3] : [1, 2, 3];
+    return {
+      levels,
+      text: `Depth of Knowledge: deliberately span DOK ${levels.join(", ")} so the standards are covered at multiple cognitive levels. Build up from recall (DOK 1) through concept application (DOK 2) to evidence-based reasoning (DOK 3). Label each question/task with its DOK level in brackets, e.g. "[DOK 2]".\n${levels.map((l) => DOK_DESC[String(l)]).join("\n")}`,
+    };
+  }
+  const lvl = Number(dok);
+  return {
+    levels: [lvl],
+    text: `Depth of Knowledge: target ${DOK_DESC[dok]} Every task and question should sit at DOK ${lvl}; label them "[DOK ${lvl}]".`,
+  };
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -69,6 +94,7 @@ Deno.serve(async (req) => {
     const effGrade = grade ?? stds[0].grade;
     const effSubject = subject ?? stds[0].subject;
     const length = options?.length ?? "medium";
+    const dok = dokGuide(options?.dok, kind);
 
     const system = `You are an expert ${effSubject} teacher and curriculum designer. Write classroom-ready materials in clean Markdown. Never include preamble or commentary — output only the material itself.`;
     const user = [
@@ -77,6 +103,7 @@ Deno.serve(async (req) => {
       options?.reading_level ? `Reading level: ${options.reading_level}.` : "",
       options?.format ? `Format preference: ${options.format}.` : "",
       options?.topic ? `Topic focus: ${options.topic}.` : "",
+      dok.text,
       LENGTH_GUIDE[length],
       `Align tightly to these standards and reference their codes where relevant:\n${stdLines}`,
       `Start the response with a single H1 title line ("# Title"), then the content.`,
@@ -102,7 +129,7 @@ Deno.serve(async (req) => {
     const title = (titleMatch?.[1] ?? `${effSubject} ${kind.replace("_", " ")}`).trim().slice(0, 200);
     const body = titleMatch ? content.replace(titleMatch[0], "").trim() : content.trim();
 
-    return json({ title, body, suggested_standard_ids: stds.map((s) => s.id), grade: effGrade, subject: effSubject });
+    return json({ title, body, suggested_standard_ids: stds.map((s) => s.id), grade: effGrade, subject: effSubject, dok_levels: dok.levels });
   } catch (e) {
     console.error("generate-library-content error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
