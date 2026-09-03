@@ -296,7 +296,7 @@ export default function ClassesHub() {
                   </div>
                   <div className="pt-2 flex items-center gap-2 flex-wrap">
                     {s?.subject && <Badge variant="outline" className="text-[11px]">{s.subject}</Badge>}
-                    {fw && <Badge variant="outline" className="text-[11px]" style={{ borderColor: FRAMEWORK_COLOR[s!.framework ?? "STATE"], color: FRAMEWORK_COLOR[s!.framework ?? "STATE"] }}>{fw.shortLabel}</Badge>}
+                    {fw && <Badge variant="outline" className="text-[11px]" style={{ borderColor: FRAMEWORK_COLOR[fwId ?? "STATE"], color: FRAMEWORK_COLOR[fwId ?? "STATE"] }}>{fw.shortLabel}</Badge>}
                     <Popover>
                       <PopoverTrigger asChild>
                         <button
