@@ -98,7 +98,8 @@ export interface AiProviderConfig {
  * keyboards often auto-capitalize the first letter, which OpenRouter rejects).
  */
 export function normalizeOpenRouterKey(raw: string | undefined): string {
-  let k = (raw ?? "").trim().replace(/^bearer\s+/i, "");
+  // Tolerate pasted quotes, `Bearer ` prefixes, `OPENROUTER_API_KEY=` prefixes and stray whitespace/line breaks.
+  let k = (raw ?? "").trim().replace(/^["'`]+|["'`]+$/g, "").replace(/^[A-Z_]+\s*=\s*/, "").replace(/^bearer\s+/i, "").replace(/\s+/g, "");
   const m = k.match(/^(sk-or(?:-v\d+)?-)(.*)$/i);
   if (m) k = m[1].toLowerCase() + m[2];
   return k;
