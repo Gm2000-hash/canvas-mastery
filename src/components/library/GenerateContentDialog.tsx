@@ -37,7 +37,7 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
         body: {
           kind, standard_ids: standardIds,
           grade: grade === "none" ? null : grade, subject: subjectHint ?? null,
-          options: { length, reading_level: level, dok, format: format || undefined, topic: topic || undefined },
+          options: { length, dok, format: format || undefined, topic: topic || undefined },
         },
       });
       if (error) throw new Error((error as any).message ?? "Generation failed");
