@@ -154,7 +154,7 @@ export interface AiCallOptions {
 /** Call the chat model and return raw text. Throws HttpError with a user-facing message on provider errors. */
 export async function aiText(opts: AiCallOptions): Promise<string> {
   const tier: AiTier = opts.tier ?? "default";
-  const config = getAiProviderConfig(tier);
+  const config = await getAiProviderConfig(tier);
   const messages = opts.messages
     ? [{ role: "system", content: opts.system }, ...opts.messages]
     : [{ role: "system", content: opts.system }, { role: "user", content: opts.user }];
@@ -238,7 +238,7 @@ export const arr = <T = unknown>(v: unknown): T[] => (Array.isArray(v) ? (v as T
 
 /** Generate a single image. Returns a data URL (PNG/JPEG). */
 export async function aiImage(prompt: string): Promise<string> {
-  const config = getAiProviderConfig();
+  const config = await getAiProviderConfig();
   const model = config.provider === "openrouter"
     ? "google/gemini-2.5-flash-image"
     : "google/gemini-2.5-flash-image-preview";

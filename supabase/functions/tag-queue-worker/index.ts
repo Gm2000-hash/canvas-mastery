@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
   await admin.from("worker_ticks").delete().eq("token", token);
 
   let provider: "openrouter" | "lovable" = "lovable";
-  try { provider = getAiProviderConfig().provider; } catch (e) {
+  try { provider = (await getAiProviderConfig()).provider; } catch (e) {
     // No AI key at all — pause every runnable job so we don't spin.
     await admin.from("tag_jobs").update({ status: "paused", pause_reason: (e as Error).message })
       .in("status", ["queued", "running"]);

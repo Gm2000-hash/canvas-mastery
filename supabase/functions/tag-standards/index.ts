@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const { provider } = getAiProviderConfig();
+    const { provider } = await getAiProviderConfig();
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -299,7 +299,7 @@ Use the tool provided.`;
             },
           }],
           tool_choice: { type: "function", function: { name: "tag_standards" } },
-        });
+        }, { tier: "bulk" });
 
         if (!aiRes.ok) {
           const t = await aiRes.text().catch(() => "");
@@ -472,7 +472,7 @@ ASSIGNMENT DESCRIPTION: ${stripHtmlForTagger(assignment.description ?? "") || "(
         },
       }],
       tool_choice: { type: "function", function: { name: "tag_standards" } },
-    });
+    }, { tier: "bulk" });
 
     if (!aiRes.ok) {
       if (isAiProviderHardError(aiRes.status)) {

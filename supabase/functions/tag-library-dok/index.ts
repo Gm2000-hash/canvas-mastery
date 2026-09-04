@@ -84,12 +84,12 @@ serve(async (req, ctx) => {
       }],
       tool_choice: { type: "function", function: { name: "assign_dok" } },
       temperature: 0.2,
-    });
+    }, { tier: "bulk" });
     if (!res.ok) {
       const t = await res.text().catch(() => "");
       console.error("tag-library-dok provider error", res.status, t.slice(0, 300));
       if (isAiProviderHardError(res.status)) {
-        throw new HttpError(res.status, aiProviderErrorMessage(res.status, getAiProviderConfig().provider, t));
+        throw new HttpError(res.status, aiProviderErrorMessage(res.status, (await getAiProviderConfig()).provider, t));
       }
       continue; // transient — skip this batch, client will retry on the next loop
     }
