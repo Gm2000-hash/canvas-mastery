@@ -41,6 +41,7 @@ export function AiProviderCard() {
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   const call = async (body?: Record<string, unknown>) => {
     const { data: res, error: err } = await supabase.functions.invoke("ai-provider-admin", { body: body ?? { action: "status" } });
