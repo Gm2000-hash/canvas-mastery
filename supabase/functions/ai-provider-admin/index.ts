@@ -43,9 +43,12 @@ Deno.serve(async (req) => {
 
     if (action === "set_openrouter_key") {
       const key = normalizeOpenRouterKey(typeof body?.key === "string" ? body.key : "");
-      if (!/^sk-or-v\d+-[A-Za-z0-9]{20,}$/.test(key)) {
-        return json({ error: "That doesn't look like an OpenRouter key (they start with sk-or-v1-)." }, 400);
+      // Only a light shape check here — the live OpenRouter probe below is the real validation.
+      if (!key) return json({ error: "Paste your OpenRouter API key first." }, 400);
+      if (!/^sk-or-/i.test(key)) {
+        return json({ error: `That doesn't look like an OpenRouter key — they start with "sk-or-" (you pasted one starting with "${key.slice(0, 6)}…"). Create one at openrouter.ai → Keys.` }, 400);
       }
+      if (key.length < 20) return json({ error: "That key looks incomplete — copy the full key from openrouter.ai → Keys." }, 400);
       const probe = await checkOpenRouterKey(key);
       if (!probe.ok) {
         return json({ error: probe.status === 401 ? "OpenRouter rejected this key (invalid or deleted). Check it and try again." : `Could not verify the key with OpenRouter (status ${probe.status || "network"}).` }, 400);
