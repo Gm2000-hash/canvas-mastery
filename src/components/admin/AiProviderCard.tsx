@@ -4,12 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Coins, KeyRound, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertTriangle, ArrowRight, Coins, KeyRound, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Tier = "default" | "bulk" | "heavy";
+type Provider = "openrouter" | "lovable";
+type Fallback = Provider | "none";
 type Status = {
-  provider: "openrouter" | "lovable";
+  provider: Provider;
+  primary: Provider;
+  fallback: Fallback;
   keySource: "admin" | "env" | "none";
   keyHint: string | null;
   setBy: string | null;
@@ -22,6 +27,8 @@ type Status = {
   chains: Record<Tier, string[]>;
   history: { hint: string | null; action: "set" | "removed"; by: string | null; set_at: string }[];
 };
+
+const PROVIDER_LABEL: Record<Provider, string> = { openrouter: "OpenRouter", lovable: "Lovable AI (built-in)" };
 
 const TIER_LABEL: Record<Tier, string> = { default: "Everyday", bulk: "Bulk tagging", heavy: "Heavy jobs" };
 
