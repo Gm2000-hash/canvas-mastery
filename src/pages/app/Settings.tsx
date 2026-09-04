@@ -446,6 +446,9 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* GOOGLE */}
+      <GoogleConnectionCard />
+
       {/* DISCIPLINES (multi) */}
       <Card id="disciplines">
         <CardHeader>
