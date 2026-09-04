@@ -12,8 +12,6 @@ import { DOK_LEVELS, SECTIONS, type LibraryKind } from "./libraryTypes";
 import type { EditorDraft } from "./LibraryItemEditor";
 import { GRADES } from "@/lib/frameworks";
 
-const READING_LEVELS = ["Below grade level", "On grade level", "Above grade level"];
-
 export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHint, gradeHint }: {
   open: boolean;
   kind: LibraryKind;
@@ -25,7 +23,6 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
   const [standardIds, setStandardIds] = useState<string[]>([]);
   const [grade, setGrade] = useState<string>(gradeHint ?? "none");
   const [length, setLength] = useState<"short" | "medium" | "long">("medium");
-  const [level, setLevel] = useState(READING_LEVELS[1]);
   const [dok, setDok] = useState<"1" | "2" | "3" | "4" | "mix">("mix");
   const [format, setFormat] = useState("");
   const [topic, setTopic] = useState("");
