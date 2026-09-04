@@ -4,7 +4,7 @@ import {
 } from "docx";
 import { saveAs } from "file-saver";
 import {
-  answerKeyBlocks, KIND_LABEL, plainInline, questionsToBlocks, resourceMetaLine, safeFilename,
+  answerKeyBlocks, KIND_LABEL, plainInline, plainInlineKeepSpace, questionsToBlocks, resourceMetaLine, safeFilename,
   type ExportBlock, type ExportResource,
 } from "./resource";
 
@@ -14,16 +14,17 @@ function runs(text: string, base: Partial<ConstructorParameters<typeof TextRun>[
   const re = /(\*\*|__)(.+?)\1|(\*|_)(.+?)\3|`([^`]+)`/g;
   let last = 0; let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
-    if (m.index > last) out.push(new TextRun({ text: plainInline(text.slice(last, m.index)), ...base } as any));
+    if (m.index > last) out.push(new TextRun({ text: plainInlineKeepSpace(text.slice(last, m.index)), ...base } as any));
     if (m[2] != null) out.push(new TextRun({ text: m[2], bold: true, ...base } as any));
     else if (m[4] != null) out.push(new TextRun({ text: m[4], italics: true, ...base } as any));
     else out.push(new TextRun({ text: m[5], font: "Courier New", ...base } as any));
     last = m.index + m[0].length;
   }
-  if (last < text.length) out.push(new TextRun({ text: plainInline(text.slice(last)), ...base } as any));
+  if (last < text.length) out.push(new TextRun({ text: plainInlineKeepSpace(text.slice(last)), ...base } as any));
   return out.length ? out : [new TextRun({ text: "", ...base } as any)];
 }
 
+let olInstance = 0;
 function blockParagraphs(blocks: ExportBlock[]): Paragraph[] {
   const out: Paragraph[] = [];
   for (const b of blocks) {
@@ -35,7 +36,7 @@ function blockParagraphs(blocks: ExportBlock[]): Paragraph[] {
       case "quote": out.push(new Paragraph({ indent: { left: 720 }, spacing: { after: 160 }, children: runs(b.text, { italics: true, color: "555555" }) })); break;
       case "hr": out.push(new Paragraph({ border: { bottom: { style: "single" as any, size: 6, color: "BBBBBB", space: 1 } }, spacing: { after: 200 }, children: [] })); break;
       case "ul": b.items.forEach((i) => out.push(new Paragraph({ numbering: { reference: "bullets", level: 0 }, spacing: { after: 60 }, children: runs(i) }))); break;
-      case "ol": b.items.forEach((i) => out.push(new Paragraph({ numbering: { reference: "numbers", level: 0 }, spacing: { after: 60 }, children: runs(i) }))); break;
+      case "ol": { const instance = ++olInstance; b.items.forEach((i) => out.push(new Paragraph({ numbering: { reference: "numbers", level: 0, instance }, spacing: { after: 60 }, children: runs(i) }))); break; }
     }
   }
   return out;
@@ -65,6 +66,7 @@ function resourceParagraphs(r: ExportResource, opts: { answerKey: boolean }): Pa
 }
 
 export async function exportResourcesDocx(resources: ExportResource[], opts: { answerKey?: boolean; filename?: string } = {}) {
+  olInstance = 0;
   const children: Paragraph[] = [];
   resources.forEach((r, i) => {
     if (i > 0) children.push(new Paragraph({ children: [new PageBreak()] }));

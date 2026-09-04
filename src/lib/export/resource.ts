@@ -54,6 +54,17 @@ export const KIND_LABEL: Record<ExportResource["kind"], string> = {
 /* ───────────── Markdown → blocks ───────────── */
 
 /** Remove inline markdown markers, leaving plain text. */
+/** Like plainInline but keeps leading/trailing whitespace (for run splitting). */
+export function plainInlineKeepSpace(s: string): string {
+  return s
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)")
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")
+    .replace(/(\*|_)(.+?)\1/g, "$2")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/~~(.+?)~~/g, "$1");
+}
+
 export function plainInline(s: string): string {
   return s
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
@@ -198,7 +209,8 @@ export function questionsToBlocks(qs: ExportQuestion[], opts: { showAnswers: boo
     if (q.answers.length) {
       blocks.push({ type: "ul", items: q.answers.map((a, j) => `${String.fromCharCode(65 + j)}. ${a.text}${opts.showAnswers && a.correct ? " ✓" : ""}`) });
     } else {
-      blocks.push({ type: "p", text: "_______________________________________________" });
+      blocks.push({ type: "p", text: "Answer:" });
+      blocks.push({ type: "hr" });
     }
   });
   return blocks;
@@ -207,7 +219,7 @@ export function questionsToBlocks(qs: ExportQuestion[], opts: { showAnswers: boo
 export function answerKeyBlocks(qs: ExportQuestion[]): ExportBlock[] {
   const items = qs.map((q, i) => {
     const correct = q.answers.map((a, j) => (a.correct ? String.fromCharCode(65 + j) : null)).filter(Boolean);
-    return `${i + 1}. ${correct.length ? correct.join(", ") : "(open response)"}`;
+    return correct.length ? correct.join(", ") : "(open response)";
   });
   return [{ type: "h2", text: "Answer key" }, { type: "ol", items }];
 }
