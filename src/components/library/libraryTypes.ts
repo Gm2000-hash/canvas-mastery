@@ -48,7 +48,7 @@ export const SECTIONS: { key: LibrarySection; label: string; singular: string; b
   { key: "lesson_plan", label: "Lesson plans", singular: "lesson plan", blurb: "Full lessons ready to teach.", image: lessonPlansImg },
 ];
 
-export const SOURCE_LABEL: Record<LibrarySource, string> = { upload: "Uploaded", created: "Created", ai: "AI", canvas: "Canvas" };
+export const SOURCE_LABEL: Record<LibrarySource, string> = { upload: "Uploaded", created: "Created", ai: "AI", canvas: "Canvas", google: "Google Classroom" };
 
 /** Webb's Depth of Knowledge levels. */
 export const DOK_LEVELS: { level: number; name: string; blurb: string }[] = [
