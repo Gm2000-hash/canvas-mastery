@@ -172,12 +172,14 @@ export type Database = {
       assignments: {
         Row: {
           assignment_group_id: string | null
-          canvas_assignment_id: number
+          canvas_assignment_id: number | null
           canvas_quiz_id: number | null
           course_id: string
           created_at: string
           description: string | null
           due_at: string | null
+          google_coursework_id: string | null
+          google_form_id: string | null
           id: string
           kind: Database["public"]["Enums"]["assignment_kind"]
           name: string
@@ -188,12 +190,14 @@ export type Database = {
         }
         Insert: {
           assignment_group_id?: string | null
-          canvas_assignment_id: number
+          canvas_assignment_id?: number | null
           canvas_quiz_id?: number | null
           course_id: string
           created_at?: string
           description?: string | null
           due_at?: string | null
+          google_coursework_id?: string | null
+          google_form_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["assignment_kind"]
           name: string
@@ -204,12 +208,14 @@ export type Database = {
         }
         Update: {
           assignment_group_id?: string | null
-          canvas_assignment_id?: number
+          canvas_assignment_id?: number | null
           canvas_quiz_id?: number | null
           course_id?: string
           created_at?: string
           description?: string | null
           due_at?: string | null
+          google_coursework_id?: string | null
+          google_form_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["assignment_kind"]
           name?: string
@@ -318,46 +324,52 @@ export type Database = {
       courses: {
         Row: {
           archived_at: string | null
-          canvas_course_id: number
+          canvas_course_id: number | null
           canvas_workflow_state: string | null
           course_code: string | null
           created_at: string
           discipline_id: string | null
           end_at: string | null
+          google_course_id: string | null
           hidden: boolean
           id: string
           last_synced_at: string | null
           name: string
+          platform: string
           teacher_id: string
           term: string | null
         }
         Insert: {
           archived_at?: string | null
-          canvas_course_id: number
+          canvas_course_id?: number | null
           canvas_workflow_state?: string | null
           course_code?: string | null
           created_at?: string
           discipline_id?: string | null
           end_at?: string | null
+          google_course_id?: string | null
           hidden?: boolean
           id?: string
           last_synced_at?: string | null
           name: string
+          platform?: string
           teacher_id: string
           term?: string | null
         }
         Update: {
           archived_at?: string | null
-          canvas_course_id?: number
+          canvas_course_id?: number | null
           canvas_workflow_state?: string | null
           course_code?: string | null
           created_at?: string
           discipline_id?: string | null
           end_at?: string | null
+          google_course_id?: string | null
           hidden?: boolean
           id?: string
           last_synced_at?: string | null
           name?: string
+          platform?: string
           teacher_id?: string
           term?: string | null
         }
@@ -538,6 +550,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      google_credentials: {
+        Row: {
+          connected_at: string
+          email: string | null
+          refresh_token_ciphertext: string
+          scopes: string[]
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          connected_at?: string
+          email?: string | null
+          refresh_token_ciphertext: string
+          scopes?: string[]
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          connected_at?: string
+          email?: string | null
+          refresh_token_ciphertext?: string
+          scopes?: string[]
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       h5p_activities: {
         Row: {
@@ -1652,9 +1691,10 @@ export type Database = {
         Row: {
           answers: Json | null
           assignment_id: string
-          canvas_question_id: number
+          canvas_question_id: number | null
           created_at: string
           dok_level: number | null
+          google_item_id: string | null
           id: string
           item_type: string | null
           points_possible: number | null
@@ -1665,9 +1705,10 @@ export type Database = {
         Insert: {
           answers?: Json | null
           assignment_id: string
-          canvas_question_id: number
+          canvas_question_id?: number | null
           created_at?: string
           dok_level?: number | null
+          google_item_id?: string | null
           id?: string
           item_type?: string | null
           points_possible?: number | null
@@ -1678,9 +1719,10 @@ export type Database = {
         Update: {
           answers?: Json | null
           assignment_id?: string
-          canvas_question_id?: number
+          canvas_question_id?: number | null
           created_at?: string
           dok_level?: number | null
+          google_item_id?: string | null
           id?: string
           item_type?: string | null
           points_possible?: number | null
@@ -1694,6 +1736,72 @@ export type Database = {
             columns: ["assignment_id"]
             isOneToOne: false
             referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_links: {
+        Row: {
+          assignment_id: string | null
+          created_at: string
+          direction: string
+          external_course_id: string | null
+          external_course_name: string | null
+          external_item_id: string
+          external_type: string
+          id: string
+          library_item_id: string | null
+          platform: string
+          question_set_key: string | null
+          synced_at: string
+          teacher_id: string
+          url: string | null
+        }
+        Insert: {
+          assignment_id?: string | null
+          created_at?: string
+          direction: string
+          external_course_id?: string | null
+          external_course_name?: string | null
+          external_item_id: string
+          external_type: string
+          id?: string
+          library_item_id?: string | null
+          platform: string
+          question_set_key?: string | null
+          synced_at?: string
+          teacher_id: string
+          url?: string | null
+        }
+        Update: {
+          assignment_id?: string | null
+          created_at?: string
+          direction?: string
+          external_course_id?: string | null
+          external_course_name?: string | null
+          external_item_id?: string
+          external_type?: string
+          id?: string
+          library_item_id?: string | null
+          platform?: string
+          question_set_key?: string | null
+          synced_at?: string
+          teacher_id?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_links_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_links_library_item_id_fkey"
+            columns: ["library_item_id"]
+            isOneToOne: false
+            referencedRelation: "library_items"
             referencedColumns: ["id"]
           },
         ]
@@ -2105,6 +2213,7 @@ export type Database = {
           attempt_window: number
           auto_archive_enabled: boolean
           auto_tag_on_import: boolean
+          google_quiz_target: string
           mastery_threshold: number
           pseudonym_style: string
           reveal_default: boolean
@@ -2115,6 +2224,7 @@ export type Database = {
           attempt_window?: number
           auto_archive_enabled?: boolean
           auto_tag_on_import?: boolean
+          google_quiz_target?: string
           mastery_threshold?: number
           pseudonym_style?: string
           reveal_default?: boolean
@@ -2125,6 +2235,7 @@ export type Database = {
           attempt_window?: number
           auto_archive_enabled?: boolean
           auto_tag_on_import?: boolean
+          google_quiz_target?: string
           mastery_threshold?: number
           pseudonym_style?: string
           reveal_default?: boolean
@@ -2816,6 +2927,15 @@ export type Database = {
           state: string
           subject: string
           teacher_id: string
+        }[]
+      }
+      get_google_connection_status: {
+        Args: never
+        Returns: {
+          connected: boolean
+          connected_at: string
+          email: string
+          scopes: string[]
         }[]
       }
       get_public_exam: {
