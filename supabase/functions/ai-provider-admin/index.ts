@@ -5,11 +5,14 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import {
   checkOpenRouterKey,
   invalidateOpenRouterKeyCache,
+  invalidateProviderOrderCache,
   LOVABLE_MODEL_CHAINS,
   normalizeOpenRouterKey,
   OPENROUTER_MODEL_CHAINS,
   OPENROUTER_SECRET_NAME,
+  PROVIDER_ORDER_SETTING,
   resolveOpenRouterKey,
+  resolveProviderOrder,
 } from "../_shared/openrouter.ts";
 import { encryptSecret } from "../_shared/crypto.ts";
 
