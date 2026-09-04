@@ -105,9 +105,44 @@ export function normalizeOpenRouterKey(raw: string | undefined): string {
   return k;
 }
 
-export async function getAiProviderConfig(tier: AiTier = "default"): Promise<AiProviderConfig> {
-  const { key: OPENROUTER_API_KEY } = await resolveOpenRouterKey();
-  if (OPENROUTER_API_KEY) {
+// ---- provider order (admin-selected primary + fallback) -------------------
+export type AiFallback = AiProvider | "none";
+export interface AiProviderOrder { primary: AiProvider; fallback: AiFallback }
+export const PROVIDER_ORDER_SETTING = "AI_PROVIDER_ORDER";
+const DEFAULT_ORDER: AiProviderOrder = { primary: "openrouter", fallback: "lovable" };
+let orderCache: { value: AiProviderOrder; at: number } | null = null;
+export function invalidateProviderOrderCache() { orderCache = null; }
+
+const isProvider = (v: unknown): v is AiProvider => v === "openrouter" || v === "lovable";
+
+/** Admin-chosen provider order from `app_settings` (defaults to OpenRouter → Lovable). Cached 60 s per isolate. */
+export async function resolveProviderOrder(): Promise<AiProviderOrder> {
+  if (orderCache && Date.now() - orderCache.at < KEY_CACHE_TTL_MS) return orderCache.value;
+  let value = DEFAULT_ORDER;
+  try {
+    const url = Deno.env.get("SUPABASE_URL");
+    const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (url && svc) {
+      const admin = createClient(url, svc, { auth: { persistSession: false } });
+      const { data } = await admin.from("app_settings").select("value").eq("key", PROVIDER_ORDER_SETTING).maybeSingle();
+      const v = data?.value as Partial<AiProviderOrder> | undefined;
+      if (v && isProvider(v.primary)) {
+        const fallback: AiFallback = isProvider(v.fallback) && v.fallback !== v.primary ? v.fallback : "none";
+        value = { primary: v.primary, fallback };
+      }
+    }
+  } catch (e) {
+    console.warn("resolveProviderOrder: using default", e instanceof Error ? e.message : e);
+  }
+  orderCache = { value, at: Date.now() };
+  return value;
+}
+
+/** Build the config for one provider, or null when its key is missing. */
+async function buildProviderConfig(provider: AiProvider, tier: AiTier): Promise<AiProviderConfig | null> {
+  if (provider === "openrouter") {
+    const { key: OPENROUTER_API_KEY } = await resolveOpenRouterKey();
+    if (!OPENROUTER_API_KEY) return null;
     return {
       provider: "openrouter",
       baseUrl: "https://openrouter.ai/api/v1/chat/completions",
@@ -122,12 +157,8 @@ export async function getAiProviderConfig(tier: AiTier = "default"): Promise<AiP
       modelChain: OPENROUTER_MODEL_CHAINS[tier],
     };
   }
-
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    throw new Error("No AI provider key configured. Add an OpenRouter key in Admin or configure LOVABLE_API_KEY.");
-  }
-
+  if (!LOVABLE_API_KEY) return null;
   return {
     provider: "lovable",
     baseUrl: "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -139,10 +170,36 @@ export async function getAiProviderConfig(tier: AiTier = "default"): Promise<AiP
   };
 }
 
-/** Provider name only (cheap, cached). */
+/**
+ * Ordered list of usable provider configs: the admin-selected primary first,
+ * then the fallback (each skipped when its key is missing). Throws when none is usable.
+ */
+export async function getAiProviderConfigs(tier: AiTier = "default"): Promise<AiProviderConfig[]> {
+  const order = await resolveProviderOrder();
+  const wanted: AiProvider[] = order.fallback === "none" ? [order.primary] : [order.primary, order.fallback];
+  const configs: AiProviderConfig[] = [];
+  for (const p of wanted) {
+    const c = await buildProviderConfig(p, tier);
+    if (c) configs.push(c);
+  }
+  if (configs.length === 0) {
+    throw new Error(
+      order.primary === "openrouter"
+        ? "No AI provider key configured. Add an OpenRouter key in Admin or configure LOVABLE_API_KEY."
+        : "No AI provider available. Configure LOVABLE_API_KEY or add an OpenRouter key in Admin.",
+    );
+  }
+  return configs;
+}
+
+/** The active (primary, or fallback when the primary has no key) provider config. */
+export async function getAiProviderConfig(tier: AiTier = "default"): Promise<AiProviderConfig> {
+  return (await getAiProviderConfigs(tier))[0];
+}
+
+/** Active provider name only (cheap, cached). */
 export async function getAiProvider(): Promise<AiProvider> {
-  const { key } = await resolveOpenRouterKey();
-  return key ? "openrouter" : "lovable";
+  return (await getAiProviderConfig()).provider;
 }
 
 export interface RetryOptions {
@@ -180,18 +237,38 @@ export async function fetchChatCompletion(
   body: Record<string, unknown>,
   opts: RetryOptions = {},
 ): Promise<Response> {
-  const config = await getAiProviderConfig(opts.tier ?? "default");
-  const requestBody: Record<string, unknown> = config.overrideModel
-    ? { ...body, model: config.overrideModel }
-    : { ...body };
-  if (config.modelChain) requestBody.models = config.modelChain;
+  const configs = await getAiProviderConfigs(opts.tier ?? "default");
+  let last: Response | null = null;
+  let lastErr: unknown = null;
+  for (let i = 0; i < configs.length; i++) {
+    const config = configs[i];
+    const requestBody: Record<string, unknown> = config.overrideModel
+      ? { ...body, model: config.overrideModel }
+      : { ...body };
+    delete requestBody.models;
+    if (config.modelChain) requestBody.models = config.modelChain;
 
-  // OpenRouter bills against the requested max tokens, so cap it to avoid
-  // exhausting small credit balances on models with very high default limits.
-  if (config.provider === "openrouter" && !requestBody.max_tokens) {
-    requestBody.max_tokens = 4096;
+    // OpenRouter bills against the requested max tokens, so cap it to avoid
+    // exhausting small credit balances on models with very high default limits.
+    if (config.provider === "openrouter" && !requestBody.max_tokens) {
+      requestBody.max_tokens = 4096;
+    }
+    try {
+      const res = await postProviderWithBackoff(config, requestBody, opts);
+      // Success, or a request-shaped error (400) that the fallback would repeat → hand back.
+      if (res.ok || res.status === 400 || i === configs.length - 1) return res;
+      // Provider-side failure (auth, credits, policy, rate limit, outage): try the fallback provider.
+      console.warn(`AI provider ${config.provider} failed with ${res.status}; failing over to ${configs[i + 1].provider}`);
+      await res.body?.cancel().catch(() => {});
+      last = res;
+    } catch (e) {
+      lastErr = e;
+      if (i === configs.length - 1) throw e;
+      console.warn(`AI provider ${config.provider} unreachable; failing over to ${configs[i + 1].provider}`);
+    }
   }
-  return postProviderWithBackoff(config, requestBody, opts);
+  if (last) return last;
+  throw lastErr instanceof Error ? lastErr : new Error("AI request failed");
 }
 
 /** Low-level: POST an already-final body to the provider with bounded backoff. Use when the model must not be overridden (e.g. image models). */

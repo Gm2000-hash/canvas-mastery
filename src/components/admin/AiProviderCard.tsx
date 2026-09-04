@@ -4,12 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Coins, KeyRound, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertTriangle, ArrowRight, Coins, KeyRound, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Tier = "default" | "bulk" | "heavy";
+type Provider = "openrouter" | "lovable";
+type Fallback = Provider | "none";
 type Status = {
-  provider: "openrouter" | "lovable";
+  provider: Provider;
+  primary: Provider;
+  fallback: Fallback;
   keySource: "admin" | "env" | "none";
   keyHint: string | null;
   setBy: string | null;
@@ -23,6 +28,8 @@ type Status = {
   history: { hint: string | null; action: "set" | "removed"; by: string | null; set_at: string }[];
 };
 
+const PROVIDER_LABEL: Record<Provider, string> = { openrouter: "OpenRouter", lovable: "Lovable AI (built-in)" };
+
 const TIER_LABEL: Record<Tier, string> = { default: "Everyday", bulk: "Bulk tagging", heavy: "Heavy jobs" };
 
 const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "");
@@ -34,6 +41,7 @@ export function AiProviderCard() {
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   const call = async (body?: Record<string, unknown>) => {
     const { data: res, error: err } = await supabase.functions.invoke("ai-provider-admin", { body: body ?? { action: "status" } });
@@ -76,8 +84,22 @@ export function AiProviderCard() {
     setRemoving(false);
   };
 
+  const setOrder = async (primary: Provider, fallback: Fallback) => {
+    if (fallback === primary) fallback = "none";
+    setSavingOrder(true);
+    try {
+      await call({ action: "set_provider_order", primary, fallback });
+      toast.success(`Primary: ${PROVIDER_LABEL[primary]}${fallback !== "none" ? ` · fallback: ${PROVIDER_LABEL[fallback]}` : " · no fallback"}. Active within a minute.`);
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+    setSavingOrder(false);
+  };
+
   const remaining = data?.credits?.remaining;
   const empty = remaining !== undefined && remaining <= 0.01;
+  const missing = (p: Provider) => (p === "openrouter" ? data?.keySource === "none" : !data?.lovableAvailable);
 
   return (
     <Card className={data?.low || data?.keyError ? "border-destructive/60" : undefined}>
@@ -97,6 +119,40 @@ export function AiProviderCard() {
       </CardHeader>
       <CardContent className="space-y-3 text-xs text-muted-foreground">
         {error && <p className="text-destructive">{error}</p>}
+
+        {data && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="w-24 shrink-0">Primary:</span>
+            <Select value={data.primary} onValueChange={(v) => setOrder(v as Provider, data.fallback)} disabled={savingOrder}>
+              <SelectTrigger className="h-8 w-[190px] text-xs" aria-label="Primary AI provider"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openrouter">{PROVIDER_LABEL.openrouter}</SelectItem>
+                <SelectItem value="lovable">{PROVIDER_LABEL.lovable}</SelectItem>
+              </SelectContent>
+            </Select>
+            <ArrowRight className="h-3 w-3" />
+            <span>Fallback:</span>
+            <Select value={data.fallback} onValueChange={(v) => setOrder(data.primary, v as Fallback)} disabled={savingOrder}>
+              <SelectTrigger className="h-8 w-[190px] text-xs" aria-label="Fallback AI provider"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {data.primary !== "openrouter" && <SelectItem value="openrouter">{PROVIDER_LABEL.openrouter}</SelectItem>}
+                {data.primary !== "lovable" && <SelectItem value="lovable">{PROVIDER_LABEL.lovable}</SelectItem>}
+                <SelectItem value="none">None</SelectItem>
+              </SelectContent>
+            </Select>
+            {savingOrder && <Loader2 className="h-3 w-3 animate-spin" />}
+            {data.provider !== data.primary && (
+              <Badge variant="outline" className="text-[10px] font-normal text-destructive border-destructive/50">
+                {PROVIDER_LABEL[data.primary]} has no key — currently running on {PROVIDER_LABEL[data.provider]}
+              </Badge>
+            )}
+            {data.fallback !== "none" && missing(data.fallback) && data.provider === data.primary && (
+              <Badge variant="outline" className="text-[10px] font-normal">fallback {PROVIDER_LABEL[data.fallback]} has no key</Badge>
+            )}
+          </div>
+        )}
+        {data && <p>Requests go to the primary first; if it fails (out of credits, invalid key, rate limit or outage) they automatically retry on the fallback.</p>}
+
         {data?.keyError && (
           <div className="flex items-center gap-2 text-destructive font-medium">
             <AlertTriangle className="h-4 w-4" />
@@ -110,7 +166,8 @@ export function AiProviderCard() {
           </div>
         )}
         {data && !data.low && data.credits && <p>Used ${data.credits.used.toFixed(2)} of ${data.credits.total.toFixed(2)} purchased on OpenRouter.</p>}
-        {data?.provider === "lovable" && <p>Running on built-in Lovable AI; usage is billed from workspace credits. Enter an OpenRouter key below to switch.</p>}
+        {data?.provider === "lovable" && <p>Running on built-in Lovable AI; usage is billed from workspace credits.</p>}
+
 
         {data && (
           <div className="flex flex-wrap items-center gap-2">
