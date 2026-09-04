@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import ImportQuizCsvDialog from "@/components/ImportQuizCsvDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, Cell } from "recharts";
 import { RevealNamesToggle } from "@/components/RevealNamesToggle";
+import { ExportButton } from "@/components/library/ExportMenu";
+import { resourceFromQuestions } from "@/lib/export/resource";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BulkTagActions } from "./BulkTagActions";
 import { UntaggedQuestionsDialog, countUntaggedQuestions } from "./UntaggedQuestionsDialog";
@@ -93,6 +95,7 @@ export default function QuestionsTab() {
   const [untaggedOpen, setUntaggedOpen] = useState(false);
   const [untaggedCount, setUntaggedCount] = useState<number | null>(null);
   const [selectedQs, setSelectedQs] = useState<Set<string>>(new Set());
+  const selectedStandardCode = selectedStandardId ? bank?.find((r) => r.standard_id === selectedStandardId)?.code ?? null : null;
   const [tagAllBusy, setTagAllBusy] = useState(false);
   const [jobRefreshKey, setJobRefreshKey] = useState(0);
   const refreshUntagged = () => countUntaggedQuestions().then(setUntaggedCount).catch(() => {});
@@ -573,6 +576,8 @@ export default function QuestionsTab() {
               onSelectAll={() => setSelectedQs(new Set(questions.map((q) => q.id)))}
               onClear={() => setSelectedQs(new Set())}
               onDone={() => { loadBank(); refreshUntagged(); if (selectedStandardId) loadQuestionsForStandard(selectedStandardId); }}
+              exportRows={questions}
+              exportTitle={selectedStandardCode ? `Questions — ${selectedStandardCode}` : "Question set"}
             />
           )}
           <div className="flex-1 overflow-y-auto pr-1 space-y-3">
@@ -850,7 +855,8 @@ export function QuestionDrawer({ question, onClose }: { question: QuestionRow | 
               From <span className="font-medium">{question.assignments.name}</span>
             </SheetDescription>
           )}
-          <div className="pt-2">
+          <div className="pt-2 flex items-center gap-2 flex-wrap">
+            <ExportButton source={() => [resourceFromQuestions([question], `Question ${question.position ?? ""}`.trim())]} />
             <RevealNamesToggle
               revealed={revealed}
               loading={revealLoading}

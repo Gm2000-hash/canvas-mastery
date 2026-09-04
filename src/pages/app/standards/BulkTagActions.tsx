@@ -9,11 +9,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Sparkles, Tag, X } from "lucide-react";
 import { StandardsPicker } from "@/components/library/StandardsPicker";
+import { ExportButton } from "@/components/library/ExportMenu";
+import { resourceFromQuestions } from "@/lib/export/resource";
+import type { QuestionRow } from "./QuestionsTab";
 
 export type SelectableQuestion = { id: string; assignment_id: string };
 
-export function BulkTagActions({ selected, allIds, onSelectAll, onClear, onDone, subjectHint }: {
+export function BulkTagActions({ selected, allIds, onSelectAll, onClear, onDone, subjectHint, exportRows, exportTitle }: {
   selected: SelectableQuestion[];
+  /** Full rows for the current list; the export uses the selected ones (or all when nothing is selected). */
+  exportRows?: QuestionRow[];
+  exportTitle?: string;
   allIds: string[];
   onSelectAll: () => void;
   onClear: () => void;
@@ -67,9 +73,19 @@ export function BulkTagActions({ selected, allIds, onSelectAll, onClear, onDone,
     <div className="flex items-center gap-2 flex-wrap rounded-lg border bg-muted/40 px-3 py-2 text-sm">
       <label className="flex items-center gap-2 cursor-pointer">
         <Checkbox checked={allSelected ? true : n > 0 ? "indeterminate" : false} onCheckedChange={(v) => (v ? onSelectAll() : onClear())} aria-label="Select all" />
-        <span className="text-muted-foreground">{n ? `${n} selected` : "Select questions to tag them"}</span>
+        <span className="text-muted-foreground">{n ? `${n} selected` : "Select questions to tag or export them"}</span>
       </label>
       <div className="ml-auto flex items-center gap-2">
+        {exportRows && exportRows.length > 0 && (
+          <ExportButton
+            label={n ? `Export ${n}` : "Export all"}
+            source={() => {
+              const sel = new Set(selected.map((q) => q.id));
+              const rows = n ? exportRows.filter((q) => sel.has(q.id)) : exportRows;
+              return [resourceFromQuestions(rows, exportTitle ?? "Question set")];
+            }}
+          />
+        )}
         <Button size="sm" variant="outline" disabled={!n || tagging} onClick={aiTag}>
           {tagging ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />} AI tag selected
         </Button>
