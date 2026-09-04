@@ -22,7 +22,6 @@ import {
 } from "@/modules/curriculum/lib/content-generator";
 import { useProfileDefaults } from "@/modules/curriculum/hooks/useProfileDefaults";
 import { useAiPreferences } from "@/modules/curriculum/hooks/useAiPreferences";
-import { AiEngineSelect } from "@/modules/curriculum/components/AiEngineSelect";
 import { toast } from "sonner";
 
 interface Props {
@@ -76,7 +75,7 @@ export default function GenerateContentDialog({ open, onOpenChange, onComplete, 
   const [selectedNgssSubs, setSelectedNgssSubs] = useState<Set<string>>(new Set());
   const [expandedCoreIdeas, setExpandedCoreIdeas] = useState<Set<string>>(new Set());
   const [targetDok, setTargetDok] = useState<string>("any");
-  const [modelOverride, setModelOverride] = useState<string>("");
+  const modelOverride = "";
   const abortRef = useRef(false);
   const latestProgressRef = useRef<GenerationProgress | null>(null);
 
