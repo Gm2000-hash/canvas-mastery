@@ -10,8 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Download, FileText, FolderInput, MoreHorizontal, Pencil, Share2, Sparkles, Trash2, Upload, Link2 } from "lucide-react";
-import { SECTIONS, SOURCE_LABEL, dokLabel, dokName, type LibraryItem, type LibraryKind } from "./libraryTypes";
+import { Download, ExternalLink, FileText, FolderInput, GraduationCap, MoreHorizontal, Pencil, Share2, Sparkles, Trash2, Upload, Link2 } from "lucide-react";
+import { SECTIONS, SOURCE_LABEL, PLATFORM_LABEL, dokLabel, dokName, type LibraryItem, type LibraryKind, type ResourceLink } from "./libraryTypes";
 import { ExportMenuItems, useExportActions } from "./ExportMenu";
 import { resourceFromLibraryItem } from "@/lib/export/resource";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,29 @@ function SourceIcon({ source }: { source: LibraryItem["source"] }) {
   if (source === "ai") return <Sparkles className={cls} />;
   if (source === "upload") return <Upload className={cls} />;
   if (source === "canvas") return <Link2 className={cls} />;
+  if (source === "google") return <GraduationCap className={cls} />;
   return <Pencil className={cls} />;
+}
+
+/** "Where this lives": one badge per platform, newest link wins, click opens it. */
+export function PlatformBadges({ links, compact }: { links: ResourceLink[] | undefined; compact?: boolean }) {
+  if (!links?.length) return null;
+  const byPlatform = new Map<ResourceLink["platform"], ResourceLink>();
+  for (const l of [...links].sort((a, b) => b.synced_at.localeCompare(a.synced_at))) if (!byPlatform.has(l.platform)) byPlatform.set(l.platform, l);
+  return (
+    <>
+      {Array.from(byPlatform.values()).map((l) => {
+        const label = compact ? PLATFORM_LABEL[l.platform].replace("Google Classroom", "Classroom").replace("Google Drive", "Drive") : PLATFORM_LABEL[l.platform];
+        const title = `${PLATFORM_LABEL[l.platform]}${l.external_course_name ? ` · ${l.external_course_name}` : ""} · ${l.direction === "imported" ? "imported" : "sent"} ${new Date(l.synced_at).toLocaleDateString()}`;
+        const cls = cn("text-[11px] font-normal gap-1", l.platform === "canvas" ? "border-destructive/40 text-destructive bg-destructive/5" : "border-accent/50 text-accent-foreground bg-accent/10");
+        return l.url ? (
+          <a key={l.id} href={l.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title={title}>
+            <Badge variant="outline" className={cls}>{label}{!compact && l.external_course_name ? ` · ${l.external_course_name}` : ""} <ExternalLink className="h-2.5 w-2.5" /></Badge>
+          </a>
+        ) : <Badge key={l.id} variant="outline" className={cls} title={title}>{label}</Badge>;
+      })}
+    </>
+  );
 }
 
 export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSelect }: {
@@ -54,6 +76,9 @@ export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSel
   }
 
   const snippet = (item.body ?? "").replace(/[#*_>`]/g, "").slice(0, 180);
+  const onCanvas = item.source === "canvas" || (item.links ?? []).some((l) => l.platform === "canvas");
+  const onGoogle = item.source === "google" || (item.links ?? []).some((l) => l.platform === "google_classroom");
+  const suggest = onCanvas && !onGoogle ? "google" : onGoogle && !onCanvas ? "canvas" : null;
 
   return (
     <>
@@ -81,7 +106,7 @@ export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSel
                 {item.file_path && <DropdownMenuItem onClick={() => downloadItemFile(item)}><Download className="h-4 w-4 mr-2" /> Download file</DropdownMenuItem>}
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger><Share2 className="h-4 w-4 mr-2" /> Export</DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent><ExportMenuItems run={exp.run} busy={exp.busy} /></DropdownMenuSubContent>
+                  <DropdownMenuSubContent><ExportMenuItems run={exp.run} busy={exp.busy} suggest={suggest} /></DropdownMenuSubContent>
                 </DropdownMenuSub>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger><FolderInput className="h-4 w-4 mr-2" /> Move to…</DropdownMenuSubTrigger>
@@ -100,6 +125,7 @@ export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSel
             : item.file_name ? <p className="text-sm text-muted-foreground flex items-center gap-1.5 font-sans"><FileText className="h-3.5 w-3.5" /> {item.file_name}</p> : null}
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <Badge variant="outline" className="gap-1 text-[11px] font-normal"><SourceIcon source={item.source} /> {SOURCE_LABEL[item.source]}</Badge>
+            <PlatformBadges links={item.links} compact />
             {item.grade && <Badge variant="outline" className="text-[11px] font-normal">Gr {item.grade}</Badge>}
             {dokLabel(item.dok_levels) && <Badge variant="outline" className="text-[11px] font-normal bg-primary/5 border-primary/30 text-primary">{dokLabel(item.dok_levels)}</Badge>}
             {item.standards.slice(0, 3).map((s) => <Badge key={s.id} variant="secondary" className="text-[11px] font-normal">{s.code}</Badge>)}
@@ -115,6 +141,7 @@ export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSel
             <DialogTitle className="font-display text-2xl">{item.title}</DialogTitle>
             <DialogDescription className="flex flex-wrap gap-1.5 pt-1">
               <Badge variant="outline" className="gap-1 text-[11px] font-normal"><SourceIcon source={item.source} /> {SOURCE_LABEL[item.source]}</Badge>
+              <PlatformBadges links={item.links} />
               {(item.dok_levels ?? []).map((l) => <Badge key={l} variant="outline" className="text-[11px] font-normal bg-primary/5 border-primary/30 text-primary">DOK {l} · {dokName(l)}</Badge>)}
               {item.standards.map((s) => <Badge key={s.id} variant="secondary" className="text-[11px] font-normal" title={s.description}>{s.code}</Badge>)}
             </DialogDescription>
@@ -132,7 +159,7 @@ export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSel
           <div className="flex justify-end gap-2 pt-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild><Button variant="outline"><Share2 className="h-4 w-4 mr-1.5" /> Export</Button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end"><ExportMenuItems run={exp.run} busy={exp.busy} /></DropdownMenuContent>
+              <DropdownMenuContent align="end"><ExportMenuItems run={exp.run} busy={exp.busy} suggest={suggest} /></DropdownMenuContent>
             </DropdownMenu>
             <Button variant="outline" onClick={() => { setViewing(false); onEdit(item); }}><Pencil className="h-4 w-4 mr-1.5" /> Edit</Button>
           </div>

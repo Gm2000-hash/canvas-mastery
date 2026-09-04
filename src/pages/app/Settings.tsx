@@ -22,6 +22,7 @@ import { Archive, Sparkles } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useRole } from "@/hooks/useRole";
 import { SchoolInput } from "@/components/SchoolInput";
+import { GoogleConnectionCard } from "@/components/GoogleConnectionCard";
 
 export default function Settings() {
   const { patch: patchProfile, refresh: refreshProfile } = useProfile();
@@ -445,6 +446,9 @@ export default function Settings() {
           </form>
         </CardContent>
       </Card>
+
+      {/* GOOGLE */}
+      <GoogleConnectionCard />
 
       {/* DISCIPLINES (multi) */}
       <Card id="disciplines">

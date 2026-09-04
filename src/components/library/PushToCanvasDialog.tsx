@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Loader2, Send } from "lucide-react";
 import { KIND_LABEL, resourceToHtml, type ExportResource } from "@/lib/export/resource";
+import { linkOwner } from "./PushToGoogleClassroomDialog";
 
 type CanvasCourse = { canvas_course_id: number; name: string; course_code: string | null; term: string | null; workflow_state: string | null };
 type Target = "page" | "assignment" | "quiz";
@@ -66,6 +67,7 @@ export function PushToCanvasDialog({ open, resources, onClose }: { open: boolean
           html: target === "quiz" ? "" : resourceToHtml(r),
           published: publish,
           questions: target === "quiz" ? (r.questions ?? []).map((q) => ({ text: q.text, points: q.points, itemType: q.itemType, answers: q.answers })) : [],
+          ...linkOwner(r),
         },
       });
       const msg = (error as any)?.message ?? (data as any)?.error;
