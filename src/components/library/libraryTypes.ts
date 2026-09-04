@@ -5,7 +5,22 @@ import lessonPlansImg from "@/assets/library-lesson-plans.jpg";
 
 export type LibraryKind = "reading" | "activity" | "lesson_plan";
 export type LibrarySection = "question" | LibraryKind;
-export type LibrarySource = "upload" | "created" | "ai" | "canvas";
+export type LibrarySource = "upload" | "created" | "ai" | "canvas" | "google";
+
+/** Where a resource lives on an external platform (Canvas / Google Classroom / Drive). */
+export type ResourceLink = {
+  id: string;
+  platform: "canvas" | "google_classroom" | "google_drive";
+  external_course_id: string | null;
+  external_course_name: string | null;
+  external_item_id: string;
+  external_type: string;
+  url: string | null;
+  direction: "imported" | "exported";
+  synced_at: string;
+};
+
+export const PLATFORM_LABEL: Record<ResourceLink["platform"], string> = { canvas: "Canvas", google_classroom: "Google Classroom", google_drive: "Google Drive" };
 
 export type LibraryItem = {
   id: string;
@@ -23,6 +38,7 @@ export type LibraryItem = {
   updated_at: string;
   dok_levels: number[];
   standards: { id: string; code: string; description: string }[];
+  links?: ResourceLink[];
 };
 
 export const SECTIONS: { key: LibrarySection; label: string; singular: string; blurb: string; image: string }[] = [

@@ -148,6 +148,21 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Mirror Canvas origins into resource_links (the cross-platform "where this lives" registry).
+    try {
+      const { data: imported } = await admin.from("library_items").select("id, canvas_course_id, canvas_item_id, canvas_item_type, updated_at")
+        .eq("teacher_id", teacherId).eq("source", "canvas").not("canvas_item_id", "is", null);
+      const courseNames = new Map((courses ?? []).map((c) => [String(c.canvas_course_id), c.name]));
+      const rows = (imported ?? []).map((r) => ({
+        teacher_id: teacherId, library_item_id: r.id, platform: "canvas", external_course_id: String(r.canvas_course_id ?? ""),
+        external_course_name: courseNames.get(String(r.canvas_course_id)) ?? null,
+        external_item_id: String(r.canvas_item_id), external_type: String(r.canvas_item_type ?? "page"),
+        url: `${creds.base_url}/courses/${r.canvas_course_id}/${r.canvas_item_type === "file" ? "files" : "pages"}/${r.canvas_item_id}`,
+        direction: "imported", synced_at: r.updated_at,
+      }));
+      if (rows.length) await admin.from("resource_links").upsert(rows, { onConflict: "teacher_id,platform,external_type,external_item_id" });
+    } catch (e) { console.warn("resource_links mirror failed", (e as Error).message); }
+
     return json({ success: true, stats });
   } catch (e) {
     console.error("canvas-import-materials error", e);

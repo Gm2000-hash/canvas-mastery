@@ -27,6 +27,8 @@ const Body = z.object({
   published: z.boolean().default(false),
   points: z.number().min(0).max(1000).optional(),
   questions: z.array(Question).max(200).default([]),
+  library_item_id: z.string().uuid().nullable().optional(),
+  question_set_key: z.string().max(200).nullable().optional(),
 });
 
 function canvasQuestionType(q: z.infer<typeof Question>): string {
