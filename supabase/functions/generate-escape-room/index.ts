@@ -26,6 +26,7 @@ serve(async (req) => {
 Create ${b.numPuzzles} sequential rooms with a continuous storyline. Vary puzzle_type across: decode, matching, diagram, vocabulary, data, riddle. Every room's answer must require content knowledge and resolve to a short lock_code (a number or single word) with a clear explanation. Provide 2-3 progressive hints and 3 plausible distractor codes per room. form_section_instructions tells the teacher exactly how to set up that section's validated short-answer question.
 Return JSON: {"theme_title":string,"narrative_intro":string,"google_form_setup":string,"puzzles":[{"room_number":number,"room_name":string,"narrative_text":string,"scenario_text":string,"challenge_steps":[string],"story_transition":string,"puzzle_type":string,"question_text":string,"hints":[string],"lock_code":string,"lock_code_explanation":string,"form_section_instructions":string,"distractors":[string]}],"answer_key_summary":string,"estimated_time_minutes":number}`,
     maxTokens: 7000,
+    tier: "heavy",
   });
 
   const puzzles = arr<Record<string, unknown>>(out.puzzles).map((p, i) => ({

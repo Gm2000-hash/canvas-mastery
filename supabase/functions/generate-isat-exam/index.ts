@@ -26,6 +26,7 @@ serve(async (req) => {
       user: `Standards (spread coverage roughly ${perStd} per standard; already written: ${questions.length} of ${b.question_count}):\n${stds}\n\nWrite ${n} NEW items numbered ${questions.length + 1}-${questions.length + n}, mixing types from: ${TYPES.join(", ")}. Mostly DOK 2-3. For choice types provide 4 answers as [{"text","weight"}] with exactly one weight 100 (multiple_answers: 2 correct of 5). For constructed_response provide answers = [{"text":"<model answer / scoring notes>","weight":100}]. Data-analysis items must embed the data table in question_text as plain text. Each item gets a 1-sentence hint that nudges without giving the answer.
 Return JSON: {"questions":[{"question_number":number,"question_type":string,"question_text":string,"standard_code":string,"standard_description":string,"points_possible":number,"dok_level":1-4,"blooms_level":string,"hint":string,"answers":[{"text":string,"weight":number}]}]}`,
       maxTokens: 6000,
+      tier: "heavy",
     });
     const batch = arr<Record<string, unknown>>(out.questions);
     if (!batch.length) break;
