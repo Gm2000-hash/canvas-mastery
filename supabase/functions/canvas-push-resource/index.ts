@@ -75,9 +75,18 @@ Deno.serve(async (req) => {
       return text ? JSON.parse(text) : {};
     };
     const base = `/courses/${b.canvas_course_id}`;
+    const link = async (external_type: string, external_item_id: unknown, url: string | null) => {
+      const { error } = await admin.from("resource_links").upsert({
+        teacher_id: teacherId, library_item_id: b.library_item_id ?? null, question_set_key: b.question_set_key ?? null,
+        platform: "canvas", external_course_id: String(b.canvas_course_id), external_item_id: String(external_item_id), external_type,
+        url, direction: "exported", synced_at: new Date().toISOString(),
+      }, { onConflict: "teacher_id,platform,external_type,external_item_id" });
+      if (error) console.warn("resource_links", error.message);
+    };
 
     if (b.target === "page") {
       const page = await api(`${base}/pages`, { wiki_page: { title: b.title, body: b.html, published: b.published } });
+      await link("page", page.page_id ?? page.url, page.html_url ?? null);
       return json({ success: true, target: "page", id: page.page_id ?? page.url, html_url: page.html_url });
     }
 
@@ -91,6 +100,7 @@ Deno.serve(async (req) => {
           submission_types: ["online_text_entry", "online_upload"],
         },
       });
+      await link("assignment", a.id, a.html_url ?? null);
       return json({ success: true, target: "assignment", id: a.id, html_url: a.html_url });
     }
 
@@ -122,6 +132,7 @@ Deno.serve(async (req) => {
       });
       if (!res.ok) console.warn("quiz publish failed", res.status);
     }
+    await link("quiz", quiz.id, quiz.html_url ?? null);
     return json({ success: true, target: "quiz", id: quiz.id, html_url: quiz.html_url, questions: added });
   } catch (e) {
     console.error("canvas-push-resource error", e);
