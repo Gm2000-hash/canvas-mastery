@@ -115,12 +115,14 @@ Deno.serve(async (req) => {
     }
     return json({
       provider,
+      primary: order.primary,
+      fallback: order.fallback,
       keySource: source,
       keyHint: source === "admin" ? stored?.hint ?? null : key ? hintOf(key) : null,
       setBy: stored?.set_by ? names[stored.set_by] ?? "Admin" : null,
       setAt: source === "admin" ? stored?.set_at ?? null : null,
       keyError,
-      lovableAvailable: Boolean(Deno.env.get("LOVABLE_API_KEY")),
+      lovableAvailable,
       threshold: LOW_BALANCE_USD,
       credits,
       low: credits ? credits.remaining < LOW_BALANCE_USD : false,
