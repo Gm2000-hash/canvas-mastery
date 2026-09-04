@@ -35,6 +35,7 @@ serve(async (req) => {
       `Return JSON matching exactly: ${SCHEMA}`,
     ].filter((l) => l !== null).join("\n"),
     maxTokens: Math.min(4096 + b.numLessons * 1800, 12000),
+    tier: "heavy",
   });
 
   const lessons = arr<Record<string, unknown>>(out.lessons).map((l) => ({

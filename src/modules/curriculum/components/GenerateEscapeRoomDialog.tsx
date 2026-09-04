@@ -13,8 +13,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles, Loader2, Lock, Key, Copy, ChevronDown, ChevronUp, Lightbulb, FileText, FileDown, BookOpen, FlaskConical, ListOrdered, ArrowRight, Pencil, Check, Plus, X } from "lucide-react";
 import { useToast } from "@/modules/curriculum/config/toast";
 import { supabase } from "@/modules/curriculum/config/supabase";
+import { readEdgeError } from "@/lib/edgeError";
 import { exportEscapeRoomToDocx } from "@/modules/curriculum/lib/export-escape-room-docx";
-import { AiEngineSelect } from "@/modules/curriculum/components/AiEngineSelect";
 import { useAiPreferences } from "@/modules/curriculum/hooks/useAiPreferences";
 
 interface Puzzle {
@@ -76,7 +76,7 @@ export function GenerateEscapeRoomDialog({ open, onOpenChange, context }: Props)
   const [expandedPuzzle, setExpandedPuzzle] = useState<number | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [editingRoom, setEditingRoom] = useState<number | null>(null);
-  const [modelOverride, setModelOverride] = useState<string>("");
+  const modelOverride = "";
   const { preferences } = useAiPreferences();
 
   const updatePuzzleField = (roomNumber: number, field: keyof Puzzle, value: any) => {
@@ -127,7 +127,7 @@ export function GenerateEscapeRoomDialog({ open, onOpenChange, context }: Props)
 
       setProgress(90);
 
-      if (error) throw error;
+      if (error) throw new Error(await readEdgeError(error, "Generation failed"));
       if (!data?.puzzles) throw new Error("Invalid response from AI");
 
       setEscapeRoom(data);
@@ -223,7 +223,6 @@ export function GenerateEscapeRoomDialog({ open, onOpenChange, context }: Props)
               />
             </div>
             <div className="space-y-2">
-              <AiEngineSelect value={modelOverride} onChange={setModelOverride} tier="heavy" />
               <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 font-medium">UDL-aligned</span><span>Multiple solution paths and accessibility cues built in.</span></div>
             </div>
             {generating && (

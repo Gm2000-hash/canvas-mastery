@@ -13,3 +13,5 @@
 - [x] UI: Settings Google card, Export → Google Classroom dialog, Library import tab, badges + filters
 - [x] Secrets: GOOGLE_OAUTH_CLIENT_ID/SECRET, GOOGLE_TOKEN_ENC_KEY
 - [ ] Later: Classroom grades → mastery; two-way sync
+
+- [x] OpenRouter model fallback chain (Gemini → GPT → Claude), clear credit-exhausted messages, admin AI balance card

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
+import { AiBalanceCard } from "@/components/admin/AiBalanceCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +94,8 @@ export default function Admin() {
           </CardHeader>
         </Card>
       </div>
+
+      <AiBalanceCard />
 
       {pending.length > 0 && (
         <Card className="border-accent/50">

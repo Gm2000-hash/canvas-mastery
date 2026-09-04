@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Sparkles, CheckCircle2, FileText, BookOpen, Lightbulb } from "lucide-react";
 import { supabase } from "@/modules/curriculum/config/supabase";
+import { readEdgeError } from "@/lib/edgeError";
 import { toast } from "sonner";
 import { ALL_SUBSTANDARDS } from "@/modules/curriculum/lib/ngss-data";
 import { StandardsPickerDialog } from "@/modules/curriculum/components/StandardsPickerDialog";
-import { AiEngineSelect } from "@/modules/curriculum/components/AiEngineSelect";
 import { useAiPreferences } from "@/modules/curriculum/hooks/useAiPreferences";
 
 interface Props {
@@ -35,7 +35,7 @@ export default function GenerateISATExamDialog({ open, onOpenChange, onComplete 
   const [examId, setExamId] = useState<string | null>(null);
   const [selectedStandards, setSelectedStandards] = useState<Set<string>>(new Set());
   const [standardsPickerOpen, setStandardsPickerOpen] = useState(false);
-  const [modelOverride, setModelOverride] = useState<string>("");
+  const modelOverride = "";
   const { preferences } = useAiPreferences();
 
   const selectedStandardsList = useMemo(() => {
@@ -76,7 +76,7 @@ export default function GenerateISATExamDialog({ open, onOpenChange, onComplete 
         },
       });
 
-      if (error) throw new Error(error.message || "Generation failed");
+      if (error) throw new Error(await readEdgeError(error, "Generation failed"));
       if (data?.error) throw new Error(data.error);
 
       const questions = data?.questions || [];
@@ -221,7 +221,6 @@ export default function GenerateISATExamDialog({ open, onOpenChange, onComplete 
               </div>
 
               <div className="space-y-2">
-                <AiEngineSelect value={modelOverride} onChange={setModelOverride} tier="heavy" />
                 <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 font-medium">UDL-aligned</span><span>Engagement · Representation · Action & Expression baked into every question.</span></div>
               </div>
 

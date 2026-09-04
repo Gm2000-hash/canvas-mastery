@@ -1,4 +1,5 @@
 import { supabase } from "@/modules/curriculum/config/supabase";
+import { readEdgeError } from "@/lib/edgeError";
 
 export interface CreateUdlLessonInput {
   userId: string;
@@ -48,17 +49,7 @@ export async function createUdlLessonPlan(input: CreateUdlLessonInput): Promise<
     },
   });
 
-  if (error) {
-    let msg = error.message || "AI generation failed";
-    try {
-      const ctxBody = (error as any)?.context?.body;
-      if (ctxBody) {
-        const body = typeof ctxBody === "string" ? JSON.parse(ctxBody) : ctxBody;
-        if (body?.error) msg = body.error;
-      }
-    } catch { /* ignore */ }
-    throw new Error(msg);
-  }
+  if (error) throw new Error(await readEdgeError(error, "AI generation failed"));
 
   const ai = data?.lessons?.[0];
   if (!ai) throw new Error("AI did not return a lesson");

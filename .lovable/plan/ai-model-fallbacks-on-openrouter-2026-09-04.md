@@ -13,7 +13,7 @@ Default chain (exact ids confirmed against OpenRouter's model list at build time
 1. Google Gemini Flash (current default)
 2. OpenAI GPT mini-tier
 3. Anthropic Claude Haiku/Sonnet-tier
-4. An open-weights model (e.g. Llama / Qwen) as the last resort
+4. (OpenRouter caps the chain at 3 models)
 
 Heavy jobs (ISAT exam, escape room, lesson regeneration) use the same chain with the stronger tier of each family.
 

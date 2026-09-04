@@ -8,12 +8,12 @@ import { Switch } from "@/components/ui/switch";
 import { Sparkles, Loader2, RefreshCw, BookOpen, Tag, Layers } from "lucide-react";
 import { useToast } from "@/modules/curriculum/config/toast";
 import { supabase } from "@/modules/curriculum/config/supabase";
+import { readEdgeError } from "@/lib/edgeError";
 import { useAuth } from "@/modules/curriculum/config/auth";
 import { ALL_SUBSTANDARDS } from "@/modules/curriculum/lib/ngss-data";
 import { NGSS_DIMENSIONS, getDimensionByCode, formatDimensionsForPrompt } from "@/modules/curriculum/lib/ngss-dimensions";
 import { NgssDimensionPicker } from "@/modules/curriculum/components/NgssDimensionPicker";
 import { syncDisciplineToLibrary } from "@/modules/curriculum/lib/content-generator";
-import { AiEngineSelect } from "@/modules/curriculum/components/AiEngineSelect";
 import { useAiPreferences } from "@/modules/curriculum/hooks/useAiPreferences";
 
 interface LessonData {
@@ -53,7 +53,7 @@ export function RegenerateLessonDialog({ open, onOpenChange, lesson, discipline,
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("");
   const [regenerateReading, setRegenerateReading] = useState(false);
-  const [modelOverride, setModelOverride] = useState<string>("");
+  const modelOverride = "";
   const [dimensionPickerOpen, setDimensionPickerOpen] = useState(false);
   const unitDimsKey = lesson.unit_id ? `ngss-dims:unit:${lesson.unit_id}` : null;
   const [selectedDimensionCodes, setSelectedDimensionCodesState] = useState<string[]>(() => {
@@ -128,17 +128,7 @@ Improve and fill in any missing information. Keep the same general topic but mak
 
       setProgress(40);
 
-      if (error) {
-        // Try to extract error message from response context
-        let errorMsg = error.message;
-        try {
-          if (error.context?.body) {
-            const body = typeof error.context.body === 'string' ? JSON.parse(error.context.body) : error.context.body;
-            if (body?.error) errorMsg = body.error;
-          }
-        } catch {}
-        throw new Error(errorMsg);
-      }
+      if (error) throw new Error(await readEdgeError(error, "AI generation failed"));
       if (!data?.lessons?.[0]) throw new Error("Invalid response from AI");
 
       const newLesson = data.lessons[0];
@@ -432,7 +422,6 @@ Improve and fill in any missing information. Keep the same general topic but mak
           )}
 
           <div className="space-y-2">
-            <AiEngineSelect value={modelOverride} onChange={setModelOverride} tier="default" />
             <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 font-medium">UDL-aligned</span><span>Engagement · Representation · Action & Expression baked into the lesson.</span></div>
           </div>
 

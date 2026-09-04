@@ -6,6 +6,7 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   aiProviderErrorMessage,
+  type AiTier,
   fetchChatCompletion,
   getAiProviderConfig,
   isAiProviderHardError,
@@ -146,11 +147,14 @@ export interface AiCallOptions {
   maxTokens?: number;
   /** Request JSON mode from the provider. */
   json?: boolean;
+  /** `heavy` routes to the stronger model chain (long exams, escape rooms, full lesson plans). */
+  tier?: AiTier;
 }
 
 /** Call the chat model and return raw text. Throws HttpError with a user-facing message on provider errors. */
 export async function aiText(opts: AiCallOptions): Promise<string> {
-  const config = getAiProviderConfig();
+  const tier: AiTier = opts.tier ?? "default";
+  const config = getAiProviderConfig(tier);
   const messages = opts.messages
     ? [{ role: "system", content: opts.system }, ...opts.messages]
     : [{ role: "system", content: opts.system }, { role: "user", content: opts.user }];
@@ -163,13 +167,13 @@ export async function aiText(opts: AiCallOptions): Promise<string> {
   if (opts.json) body.response_format = { type: "json_object" };
 
   // fetchChatCompletion handles 429/5xx/in-flight-402 backoff centrally.
-  let res = await fetchChatCompletion(body);
+  let res = await fetchChatCompletion(body, { tier });
   // OpenRouter reserves credits for the full max_tokens up front; on a low
   // balance a large request 402s even though a smaller one would succeed.
   if (res.status === 402 && (body.max_tokens as number) > 4096) {
     console.warn("402 with max_tokens", body.max_tokens, "- retrying at 4096");
     body.max_tokens = 4096;
-    res = await fetchChatCompletion(body);
+    res = await fetchChatCompletion(body, { tier });
   }
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
