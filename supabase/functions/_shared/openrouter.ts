@@ -9,7 +9,7 @@ export type AiTier = "default" | "heavy";
 /**
  * Ordered fallback chains sent via OpenRouter's native `models` array. If the
  * first model is rate-limited, overloaded or down, OpenRouter tries the next one
- * inside the same request. (An empty account balance blocks every model, so a
+ * inside the same request. OpenRouter allows at most 3 models. (An empty account balance blocks every model, so a
  * real 402 is never rescued by the chain.)
  */
 export const OPENROUTER_MODEL_CHAINS: Record<AiTier, string[]> = {
@@ -17,13 +17,11 @@ export const OPENROUTER_MODEL_CHAINS: Record<AiTier, string[]> = {
     "google/gemini-3.7-flash",
     "openai/gpt-5.4-mini",
     "anthropic/claude-haiku-4.5",
-    "qwen/qwen3.8-flash",
   ],
   heavy: [
     "google/gemini-3.1-pro-preview",
     "openai/gpt-5.4",
     "anthropic/claude-sonnet-4.6",
-    "qwen/qwen3.8-max",
   ],
 };
 
