@@ -28,6 +28,7 @@ import { GenerateContentDialog } from "@/components/library/GenerateContentDialo
 import { DokBackfillCard } from "@/components/library/DokBackfillCard";
 import { ExportButton } from "@/components/library/ExportMenu";
 import { resourceFromLibraryItem } from "@/lib/export/resource";
+import { useGoogleConnection } from "@/hooks/useGoogleConnection";
 
 type SearchRow = {
   item_type: LibrarySection;
@@ -103,13 +104,14 @@ export default function Library() {
     setItems(null);
     setSelectedIds(new Set());
     const { data, error } = await supabase.from("library_items")
-      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, created_at, updated_at, library_item_standards(standard_id, standards(id, code, description))")
+      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, created_at, updated_at, library_item_standards(standard_id, standards(id, code, description)), resource_links(id, platform, external_course_id, external_course_name, external_item_id, external_type, url, direction, synced_at)")
       .eq("kind", kind).order("updated_at", { ascending: false });
     if (error) { toast.error(error.message); setItems([]); return; }
     setItems((data as any[]).map((r) => ({
       ...r,
       dok_levels: r.dok_levels ?? [],
       standards: (r.library_item_standards ?? []).map((l: any) => l.standards).filter(Boolean),
+      links: r.resource_links ?? [],
     })));
   }, []);
 
@@ -121,6 +123,18 @@ export default function Library() {
   const [editor, setEditor] = useState<{ draft: EditorDraft; mode: "create" | "upload" | "edit" } | null>(null);
   const [genKind, setGenKind] = useState<LibraryKind | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [googleImportOpen, setGoogleImportOpen] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<"ALL" | LibraryItem["source"]>("ALL");
+  const [destFilter, setDestFilter] = useState<"ANY" | "on_canvas" | "on_google" | "not_canvas" | "not_google">("ANY");
+  const visibleItems = useMemo(() => (items ?? []).filter((it) => {
+    if (sourceFilter !== "ALL" && it.source !== sourceFilter) return false;
+    const on = (p: string) => (it.links ?? []).some((l) => l.platform === p) || (p === "canvas" && it.source === "canvas") || (p === "google_classroom" && it.source === "google");
+    if (destFilter === "on_canvas") return on("canvas");
+    if (destFilter === "on_google") return on("google_classroom");
+    if (destFilter === "not_canvas") return !on("canvas");
+    if (destFilter === "not_google") return !on("google_classroom");
+    return true;
+  }), [items, sourceFilter, destFilter]);
   const [openQuestion, setOpenQuestion] = useState<QuestionRow | null>(null);
 
   const blankDraft = (kind: LibraryKind, source: EditorDraft["source"]): EditorDraft => ({
@@ -137,10 +151,10 @@ export default function Library() {
 
   async function openItemResult(id: string) {
     const { data } = await supabase.from("library_items")
-      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, created_at, updated_at, library_item_standards(standards(id, code, description))")
+      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, created_at, updated_at, library_item_standards(standards(id, code, description)), resource_links(id, platform, external_course_id, external_course_name, external_item_id, external_type, url, direction, synced_at)")
       .eq("id", id).maybeSingle();
     if (!data) return;
-    const it: LibraryItem = { ...(data as any), dok_levels: (data as any).dok_levels ?? [], standards: ((data as any).library_item_standards ?? []).map((l: any) => l.standards).filter(Boolean) };
+    const it: LibraryItem = { ...(data as any), dok_levels: (data as any).dok_levels ?? [], standards: ((data as any).library_item_standards ?? []).map((l: any) => l.standards).filter(Boolean), links: (data as any).resource_links ?? [] };
     setEditor({ draft: draftFromItem(it), mode: "edit" });
   }
 
@@ -279,6 +293,7 @@ export default function Library() {
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="sm">More <ChevronDown className="h-4 w-4 ml-1" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => setImportOpen(true)}><Download className="h-4 w-4 mr-2" /> Import from Canvas…</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setGoogleImportOpen(true)}><Download className="h-4 w-4 mr-2" /> Import from Google Classroom…</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setSection(null)}><X className="h-4 w-4 mr-2" /> Close section</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -291,9 +306,10 @@ export default function Library() {
                 <Card className="border-dashed">
                   <CardContent className="py-12 text-center space-y-3">
                     <HelpCircle className="h-8 w-8 mx-auto text-muted-foreground/60" />
-                    <p className="font-sans text-muted-foreground">No {currentMeta.label.toLowerCase()} yet. Upload a file, write one, generate a draft with AI, or import Canvas pages and files.</p>
+                    <p className="font-sans text-muted-foreground">No {currentMeta.label.toLowerCase()} yet. Upload a file, write one, generate a draft with AI, or import from Canvas or Google Classroom.</p>
                     <div className="flex justify-center gap-2 flex-wrap">
                       <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}><Download className="h-4 w-4 mr-1.5" /> Import from Canvas</Button>
+                      <Button variant="outline" size="sm" onClick={() => setGoogleImportOpen(true)}><Download className="h-4 w-4 mr-1.5" /> Import from Google Classroom</Button>
                       <Button size="sm" onClick={() => setGenKind(section)}><Sparkles className="h-4 w-4 mr-1.5" /> Generate with AI</Button>
                     </div>
                   </CardContent>
@@ -301,18 +317,42 @@ export default function Library() {
               ) : (
                 <>
                   <div className="flex items-center justify-between gap-2 flex-wrap rounded-lg border bg-card/60 px-3 py-2 text-sm">
-                    <div className="flex items-center gap-3 font-sans">
-                      <span className="text-muted-foreground tabular-nums">{selectedIds.size ? `${selectedIds.size} selected` : `${items.length} item${items.length === 1 ? "" : "s"}`}</span>
-                      {selectedIds.size < items.length && <button className="underline underline-offset-2 text-muted-foreground hover:text-foreground" onClick={() => setSelectedIds(new Set(items.map((i) => i.id)))}>Select all</button>}
+                    <div className="flex items-center gap-3 font-sans flex-wrap">
+                      <span className="text-muted-foreground tabular-nums">{selectedIds.size ? `${selectedIds.size} selected` : `${visibleItems.length} item${visibleItems.length === 1 ? "" : "s"}`}</span>
+                      {selectedIds.size < visibleItems.length && <button className="underline underline-offset-2 text-muted-foreground hover:text-foreground" onClick={() => setSelectedIds(new Set(visibleItems.map((i) => i.id)))}>Select all</button>}
                       {selectedIds.size > 0 && <button className="underline underline-offset-2 text-muted-foreground hover:text-foreground" onClick={() => setSelectedIds(new Set())}>Clear</button>}
                     </div>
-                    <ExportButton
-                      label={selectedIds.size ? `Export ${selectedIds.size}` : "Export all"}
-                      source={() => (selectedIds.size ? items.filter((i) => selectedIds.has(i.id)) : items).map(resourceFromLibraryItem)}
-                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as typeof sourceFilter)}>
+                        <SelectTrigger className="h-8 w-40 text-xs" aria-label="Source"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">Any source</SelectItem>
+                          <SelectItem value="canvas">From Canvas</SelectItem>
+                          <SelectItem value="google">From Google</SelectItem>
+                          <SelectItem value="created">Created here</SelectItem>
+                          <SelectItem value="ai">AI generated</SelectItem>
+                          <SelectItem value="upload">Uploaded</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={destFilter} onValueChange={(v) => setDestFilter(v as typeof destFilter)}>
+                        <SelectTrigger className="h-8 w-44 text-xs" aria-label="Where it lives"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ANY">Anywhere</SelectItem>
+                          <SelectItem value="not_canvas">Not yet on Canvas</SelectItem>
+                          <SelectItem value="not_google">Not yet on Google</SelectItem>
+                          <SelectItem value="on_canvas">On Canvas</SelectItem>
+                          <SelectItem value="on_google">On Google Classroom</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <ExportButton
+                        label={selectedIds.size ? `Export ${selectedIds.size}` : "Export all"}
+                        source={() => (selectedIds.size ? visibleItems.filter((i) => selectedIds.has(i.id)) : visibleItems).map(resourceFromLibraryItem)}
+                      />
+                    </div>
                   </div>
+                  {visibleItems.length === 0 && <p className="text-sm text-muted-foreground font-sans">Nothing matches these filters.</p>}
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {items.map((it) => <LibraryItemCard key={it.id} item={it} selected={selectedIds.has(it.id)} onToggleSelect={toggleSelect} onEdit={(x) => setEditor({ draft: draftFromItem(x), mode: "edit" })} onChanged={refresh} />)}
+                    {visibleItems.map((it) => <LibraryItemCard key={it.id} item={it} selected={selectedIds.has(it.id)} onToggleSelect={toggleSelect} onEdit={(x) => setEditor({ draft: draftFromItem(x), mode: "edit" })} onChanged={refresh} />)}
                   </div>
                 </>
               )}
@@ -340,6 +380,7 @@ export default function Library() {
         />
       )}
       <CanvasImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={refresh} />
+      <GoogleImportDialog open={googleImportOpen} onClose={() => setGoogleImportOpen(false)} onDone={refresh} />
       <QuestionDrawer question={openQuestion} onClose={() => setOpenQuestion(null)} />
       </>)}
     </div>
@@ -394,6 +435,76 @@ function CanvasImportDialog({ open, onClose, onDone }: { open: boolean; onClose:
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button onClick={run} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}{busy ? "Importing…" : "Import"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GoogleImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const google = useGoogleConnection();
+  const [courses, setCourses] = useState<{ id: string; name: string; section: string | null; state: string | null }[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open || !google.status?.connected) return;
+    setCourses(null); setErr(null);
+    supabase.functions.invoke("google-classroom-list-courses", { body: {} }).then(({ data, error }) => {
+      const msg = (error as any)?.message ?? (data as any)?.error;
+      if (msg) { setErr(String(msg)); setCourses([]); return; }
+      setCourses(((data as any)?.courses ?? []));
+    });
+  }, [open, google.status?.connected]);
+
+  async function run() {
+    if (!picked.size) { toast.error("Pick at least one course"); return; }
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("google-classroom-import", { body: { course_ids: Array.from(picked) } });
+      if (error) throw new Error((error as any).message ?? "Import failed");
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      const s = (data as any).stats;
+      toast.success(`Imported ${s.items} item${s.items === 1 ? "" : "s"}${s.quizzes ? `, ${s.quizzes} quiz${s.quizzes === 1 ? "" : "zes"} (${s.questions} questions)` : ""}${s.files ? `, ${s.files} file${s.files === 1 ? "" : "s"}` : ""}${s.skipped ? ` · ${s.skipped} skipped` : ""}`);
+      onDone();
+      onClose();
+    } catch (e: any) {
+      toast.error(e.message ?? "Import failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-2xl">Import from Google Classroom</DialogTitle>
+          <DialogDescription>Brings in assignments and materials (with the text of attached Docs and Slides), saves attached files, and converts quiz Forms into questions in your question bank. Re-running updates existing items.</DialogDescription>
+        </DialogHeader>
+        {google.status && !google.status.connected ? (
+          <div className="rounded-md border p-3 text-sm space-y-2">
+            <p>Connect your Google account first.</p>
+            <Button size="sm" onClick={google.connect} disabled={google.busy}>{google.busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Connect Google</Button>
+          </div>
+        ) : (
+          <div className="max-h-72 overflow-y-auto space-y-1.5">
+            {courses === null && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading your Classroom courses…</div>}
+            {err && <p className="text-sm text-destructive">{err}</p>}
+            {courses && courses.length === 0 && !err && <p className="text-sm text-muted-foreground">No Classroom courses found where you're a teacher.</p>}
+            {(courses ?? []).map((c) => (
+              <label key={c.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 cursor-pointer text-sm font-sans">
+                <Checkbox checked={picked.has(c.id)} onCheckedChange={(v) => setPicked((p) => { const n = new Set(p); v ? n.add(c.id) : n.delete(c.id); return n; })} />
+                <span className="flex-1">{c.name}{c.section ? <span className="text-muted-foreground"> · {c.section}</span> : null}</span>
+                {c.state && c.state !== "ACTIVE" && <Badge variant="outline" className="text-[10px] font-normal">{c.state.toLowerCase()}</Badge>}
+              </label>
+            ))}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={run} disabled={busy || !google.status?.connected || !picked.size}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}{busy ? "Importing…" : "Import"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
