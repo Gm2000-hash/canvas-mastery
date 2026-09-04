@@ -8,7 +8,18 @@ interface Activity {
   name: string;
   duration: number;
   description: string;
+  /** Kolb experiential-learning stage (set by the AI generators). */
+  type?: string;
+  /** "Why this works" instructional rationale. */
+  rationale?: string;
 }
+
+export const KOLB_STAGE_LABELS: Record<string, string> = {
+  concrete_experience: "Concrete Experience",
+  reflective_observation: "Reflective Observation",
+  abstract_conceptualization: "Abstract Conceptualization",
+  active_experimentation: "Active Experimentation",
+};
 
 interface Props {
   activities: Activity[];
