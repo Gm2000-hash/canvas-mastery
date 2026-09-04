@@ -237,18 +237,38 @@ export async function fetchChatCompletion(
   body: Record<string, unknown>,
   opts: RetryOptions = {},
 ): Promise<Response> {
-  const config = await getAiProviderConfig(opts.tier ?? "default");
-  const requestBody: Record<string, unknown> = config.overrideModel
-    ? { ...body, model: config.overrideModel }
-    : { ...body };
-  if (config.modelChain) requestBody.models = config.modelChain;
+  const configs = await getAiProviderConfigs(opts.tier ?? "default");
+  let last: Response | null = null;
+  let lastErr: unknown = null;
+  for (let i = 0; i < configs.length; i++) {
+    const config = configs[i];
+    const requestBody: Record<string, unknown> = config.overrideModel
+      ? { ...body, model: config.overrideModel }
+      : { ...body };
+    delete requestBody.models;
+    if (config.modelChain) requestBody.models = config.modelChain;
 
-  // OpenRouter bills against the requested max tokens, so cap it to avoid
-  // exhausting small credit balances on models with very high default limits.
-  if (config.provider === "openrouter" && !requestBody.max_tokens) {
-    requestBody.max_tokens = 4096;
+    // OpenRouter bills against the requested max tokens, so cap it to avoid
+    // exhausting small credit balances on models with very high default limits.
+    if (config.provider === "openrouter" && !requestBody.max_tokens) {
+      requestBody.max_tokens = 4096;
+    }
+    try {
+      const res = await postProviderWithBackoff(config, requestBody, opts);
+      // Success, or a request-shaped error (400) that the fallback would repeat → hand back.
+      if (res.ok || res.status === 400 || i === configs.length - 1) return res;
+      // Provider-side failure (auth, credits, policy, rate limit, outage): try the fallback provider.
+      console.warn(`AI provider ${config.provider} failed with ${res.status}; failing over to ${configs[i + 1].provider}`);
+      await res.body?.cancel().catch(() => {});
+      last = res;
+    } catch (e) {
+      lastErr = e;
+      if (i === configs.length - 1) throw e;
+      console.warn(`AI provider ${config.provider} unreachable; failing over to ${configs[i + 1].provider}`);
+    }
   }
-  return postProviderWithBackoff(config, requestBody, opts);
+  if (last) return last;
+  throw lastErr instanceof Error ? lastErr : new Error("AI request failed");
 }
 
 /** Low-level: POST an already-final body to the provider with bounded backoff. Use when the model must not be overridden (e.g. image models). */
