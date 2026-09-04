@@ -1,10 +1,13 @@
-// Shared AI provider switcher. Prefers OpenRouter when OPENROUTER_API_KEY is set;
+// Shared AI provider switcher. Prefers OpenRouter when a key is available
+// (admin-entered key in `app_secrets`, else the OPENROUTER_API_KEY env secret);
 // otherwise falls back to the Lovable AI Gateway using LOVABLE_API_KEY.
-// This keeps existing functions working during a partial rollout.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { decryptSecret } from "./crypto.ts";
 
 export type AiProvider = "openrouter" | "lovable";
 
-export type AiTier = "default" | "heavy";
+/** `default`: everyday tasks. `bulk`: high-volume tagging. `heavy`: long, complex generation. */
+export type AiTier = "default" | "bulk" | "heavy";
 
 /**
  * Ordered fallback chains sent via OpenRouter's native `models` array. If the
@@ -14,9 +17,14 @@ export type AiTier = "default" | "heavy";
  */
 export const OPENROUTER_MODEL_CHAINS: Record<AiTier, string[]> = {
   default: [
+    "google/gemini-3.1-flash-lite",
     "google/gemini-3.7-flash",
     "openai/gpt-5.4-mini",
-    "anthropic/claude-haiku-4.5",
+  ],
+  bulk: [
+    "google/gemini-3.1-flash-lite",
+    "qwen/qwen3-235b-a22b-2507",
+    "google/gemini-3.7-flash",
   ],
   heavy: [
     "google/gemini-3.1-pro-preview",
@@ -25,8 +33,54 @@ export const OPENROUTER_MODEL_CHAINS: Record<AiTier, string[]> = {
   ],
 };
 
+/** Same tiers on the built-in Lovable AI Gateway (single model per request). */
+export const LOVABLE_MODEL_CHAINS: Record<AiTier, string[]> = {
+  default: ["google/gemini-3.1-flash-lite"],
+  bulk: ["google/gemini-3.1-flash-lite"],
+  heavy: ["google/gemini-3.1-pro-preview"],
+};
+
 /** Backwards-compatible alias: first model of the default chain. */
 export const OPENROUTER_MODEL = OPENROUTER_MODEL_CHAINS.default[0];
+
+export const OPENROUTER_SECRET_NAME = "OPENROUTER_API_KEY";
+
+// ---- key resolution -------------------------------------------------------
+const KEY_CACHE_TTL_MS = 60_000;
+let keyCache: { value: string; source: "admin" | "env" | "none"; at: number } | null = null;
+
+export function invalidateOpenRouterKeyCache() { keyCache = null; }
+
+/**
+ * Active OpenRouter key: the admin-entered key stored (encrypted) in
+ * `app_secrets` wins; otherwise the OPENROUTER_API_KEY env secret. Cached
+ * per isolate for 60 s so hot paths don't hit the database on every call.
+ */
+export async function resolveOpenRouterKey(): Promise<{ key: string; source: "admin" | "env" | "none" }> {
+  if (keyCache && Date.now() - keyCache.at < KEY_CACHE_TTL_MS) return { key: keyCache.value, source: keyCache.source };
+  let key = "";
+  let source: "admin" | "env" | "none" = "none";
+  try {
+    const url = Deno.env.get("SUPABASE_URL");
+    const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (url && svc) {
+      const admin = createClient(url, svc, { auth: { persistSession: false } });
+      const { data } = await admin.from("app_secrets").select("value_ciphertext").eq("name", OPENROUTER_SECRET_NAME).maybeSingle();
+      if (data?.value_ciphertext) {
+        key = normalizeOpenRouterKey(await decryptSecret(data.value_ciphertext));
+        if (key) source = "admin";
+      }
+    }
+  } catch (e) {
+    console.warn("resolveOpenRouterKey: falling back to env", e instanceof Error ? e.message : e);
+  }
+  if (!key) {
+    key = normalizeOpenRouterKey(Deno.env.get("OPENROUTER_API_KEY"));
+    source = key ? "env" : "none";
+  }
+  keyCache = { value: key, source, at: Date.now() };
+  return { key, source };
+}
 
 export interface AiProviderConfig {
   provider: AiProvider;
@@ -50,8 +104,8 @@ export function normalizeOpenRouterKey(raw: string | undefined): string {
   return k;
 }
 
-export function getAiProviderConfig(tier: AiTier = "default"): AiProviderConfig {
-  const OPENROUTER_API_KEY = normalizeOpenRouterKey(Deno.env.get("OPENROUTER_API_KEY"));
+export async function getAiProviderConfig(tier: AiTier = "default"): Promise<AiProviderConfig> {
+  const { key: OPENROUTER_API_KEY } = await resolveOpenRouterKey();
   if (OPENROUTER_API_KEY) {
     return {
       provider: "openrouter",
@@ -70,7 +124,7 @@ export function getAiProviderConfig(tier: AiTier = "default"): AiProviderConfig 
 
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
-    throw new Error("No AI provider key configured. Add OPENROUTER_API_KEY or LOVABLE_API_KEY.");
+    throw new Error("No AI provider key configured. Add an OpenRouter key in Admin or configure LOVABLE_API_KEY.");
   }
 
   return {
@@ -80,7 +134,14 @@ export function getAiProviderConfig(tier: AiTier = "default"): AiProviderConfig 
       "Authorization": `Bearer ${LOVABLE_API_KEY}`,
       "Content-Type": "application/json",
     },
+    overrideModel: LOVABLE_MODEL_CHAINS[tier][0],
   };
+}
+
+/** Provider name only (cheap, cached). */
+export async function getAiProvider(): Promise<AiProvider> {
+  const { key } = await resolveOpenRouterKey();
+  return key ? "openrouter" : "lovable";
 }
 
 export interface RetryOptions {
@@ -118,7 +179,7 @@ export async function fetchChatCompletion(
   body: Record<string, unknown>,
   opts: RetryOptions = {},
 ): Promise<Response> {
-  const config = getAiProviderConfig(opts.tier ?? "default");
+  const config = await getAiProviderConfig(opts.tier ?? "default");
   const requestBody: Record<string, unknown> = config.overrideModel
     ? { ...body, model: config.overrideModel }
     : { ...body };
@@ -184,15 +245,32 @@ export function aiCreditsMessage(provider: AiProvider): string {
     : "AI is paused — the workspace AI balance is empty. An admin needs to add credits.";
 }
 
+/** Probe a key against OpenRouter: HTTP status plus balance when valid. */
+export async function checkOpenRouterKey(key: string): Promise<{ ok: boolean; status: number; credits: { total: number; used: number; remaining: number } | null }> {
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/credits", { headers: { Authorization: `Bearer ${normalizeOpenRouterKey(key)}` } });
+    if (!res.ok) return { ok: false, status: res.status, credits: null };
+    const j = await res.json();
+    const total = Number(j?.data?.total_credits ?? 0);
+    const used = Number(j?.data?.total_usage ?? 0);
+    return { ok: true, status: res.status, credits: { total, used, remaining: Math.max(0, total - used) } };
+  } catch {
+    return { ok: false, status: 0, credits: null };
+  }
+}
+
 /** OpenRouter account balance (USD). Returns null when not on OpenRouter or the call fails. */
-export async function getOpenRouterCredits(): Promise<{ total: number; used: number; remaining: number } | null> {
-  const key = normalizeOpenRouterKey(Deno.env.get("OPENROUTER_API_KEY"));
+export async function getOpenRouterCredits(overrideKey?: string): Promise<{ total: number; used: number; remaining: number } | null> {
+  const key = overrideKey ? normalizeOpenRouterKey(overrideKey) : (await resolveOpenRouterKey()).key;
   if (!key) return null;
   try {
     const res = await fetch("https://openrouter.ai/api/v1/credits", {
       headers: { Authorization: `Bearer ${key}` },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn("openrouter /credits", res.status, (await res.text().catch(() => "")).slice(0, 200));
+      return null;
+    }
     const j = await res.json();
     const total = Number(j?.data?.total_credits ?? 0);
     const used = Number(j?.data?.total_usage ?? 0);
@@ -204,7 +282,7 @@ export async function getOpenRouterCredits(): Promise<{ total: number; used: num
 
 export function aiAuthMessage(provider: AiProvider): string {
   return provider === "openrouter"
-    ? "OpenRouter API key is invalid. Check the OPENROUTER_API_KEY secret."
+    ? "OpenRouter API key is invalid. An admin needs to enter a valid key on the Admin page."
     : "AI gateway authentication failed.";
 }
 

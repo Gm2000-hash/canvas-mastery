@@ -37,7 +37,7 @@ Standards: ${lc.standards || "(none yet)"}`;
       max_tokens: 2048,
     });
     if (!upstream.ok || !upstream.body) {
-      const config = getAiProviderConfig();
+      const config = await getAiProviderConfig();
       const status = upstream.status;
       const txt = await upstream.text().catch(() => "");
       console.error("brainstorm upstream", status, txt.slice(0, 500));

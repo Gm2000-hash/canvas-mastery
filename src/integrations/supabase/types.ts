@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_secret_history: {
+        Row: {
+          action: string
+          hint: string | null
+          id: string
+          name: string
+          set_at: string
+          set_by: string | null
+        }
+        Insert: {
+          action: string
+          hint?: string | null
+          id?: string
+          name: string
+          set_at?: string
+          set_by?: string | null
+        }
+        Update: {
+          action?: string
+          hint?: string | null
+          id?: string
+          name?: string
+          set_at?: string
+          set_by?: string | null
+        }
+        Relationships: []
+      }
+      app_secrets: {
+        Row: {
+          hint: string | null
+          name: string
+          set_at: string
+          set_by: string | null
+          value_ciphertext: string
+        }
+        Insert: {
+          hint?: string | null
+          name: string
+          set_at?: string
+          set_by?: string | null
+          value_ciphertext: string
+        }
+        Update: {
+          hint?: string | null
+          name?: string
+          set_at?: string
+          set_by?: string | null
+          value_ciphertext?: string
+        }
+        Relationships: []
+      }
       assessment_match_suggestions: {
         Row: {
           applied_group_id: string | null

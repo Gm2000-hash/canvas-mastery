@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
       max_tokens: length === "long" ? 4000 : 2500,
     });
     if (!res.ok) {
-      const provider = getAiProviderConfig().provider;
+      const provider = (await getAiProviderConfig()).provider;
       const text = await res.text().catch(() => "");
       console.error("AI error", res.status, text.slice(0, 300));
       return json({ error: aiProviderErrorMessage(res.status, provider) }, isAiProviderHardError(res.status) ? res.status : 500);

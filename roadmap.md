@@ -15,3 +15,4 @@
 - [ ] Later: Classroom grades → mastery; two-way sync
 
 - [x] OpenRouter model fallback chain (Gemini → GPT → Claude), clear credit-exhausted messages, admin AI balance card
+- [x] Admin-managed OpenRouter key (encrypted app_secrets, overrides env secret, validated on save, key history); cheaper model tiers (default/bulk/heavy) with Lovable AI fallback when no key

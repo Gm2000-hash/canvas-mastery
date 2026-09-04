@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
 
     let verdicts: Verdict[] = [];
     try {
-      const { provider } = getAiProviderConfig();
+      const { provider } = await getAiProviderConfig();
       const res = await fetchChatCompletion({
         model: "google/gemini-2.5-flash",
         messages: [
