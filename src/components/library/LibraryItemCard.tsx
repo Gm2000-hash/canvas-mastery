@@ -6,11 +6,15 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Download, FileText, FolderInput, MoreHorizontal, Pencil, Sparkles, Trash2, Upload, Link2 } from "lucide-react";
+import { Download, FileText, FolderInput, MoreHorizontal, Pencil, Share2, Sparkles, Trash2, Upload, Link2 } from "lucide-react";
 import { SECTIONS, SOURCE_LABEL, dokLabel, dokName, type LibraryItem, type LibraryKind } from "./libraryTypes";
+import { ExportMenuItems, useExportActions } from "./ExportMenu";
+import { resourceFromLibraryItem } from "@/lib/export/resource";
+import { cn } from "@/lib/utils";
 
 export async function downloadItemFile(it: LibraryItem) {
   if (!it.file_path) return;
@@ -27,13 +31,16 @@ function SourceIcon({ source }: { source: LibraryItem["source"] }) {
   return <Pencil className={cls} />;
 }
 
-export function LibraryItemCard({ item, onEdit, onChanged }: {
+export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSelect }: {
   item: LibraryItem;
   onEdit: (it: LibraryItem) => void;
   onChanged: () => void;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const [viewing, setViewing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const exp = useExportActions(() => [resourceFromLibraryItem(item)]);
 
   async function remove() {
     if (item.file_path) await supabase.storage.from("library-files").remove([item.file_path]);
@@ -50,10 +57,21 @@ export function LibraryItemCard({ item, onEdit, onChanged }: {
 
   return (
     <>
-      <Card className="group hover:shadow-md transition-shadow cursor-pointer" onClick={() => setViewing(true)}>
+      <Card className={cn("group hover:shadow-md transition-shadow cursor-pointer", selected && "ring-2 ring-primary")} onClick={() => setViewing(true)}>
         <CardContent className="p-4 space-y-2">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-sans font-semibold text-base leading-snug line-clamp-2">{item.title}</h3>
+            <div className="flex items-start gap-2 min-w-0">
+              {onToggleSelect && (
+                <Checkbox
+                  checked={!!selected}
+                  onCheckedChange={() => onToggleSelect(item.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn("mt-1 shrink-0 transition-opacity", selected ? "opacity-100" : "opacity-40 group-hover:opacity-100")}
+                  aria-label={`Select ${item.title}`}
+                />
+              )}
+              <h3 className="font-sans font-semibold text-base leading-snug line-clamp-2">{item.title}</h3>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 opacity-60 group-hover:opacity-100" aria-label="Item actions"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -61,6 +79,10 @@ export function LibraryItemCard({ item, onEdit, onChanged }: {
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => onEdit(item)}><Pencil className="h-4 w-4 mr-2" /> Edit</DropdownMenuItem>
                 {item.file_path && <DropdownMenuItem onClick={() => downloadItemFile(item)}><Download className="h-4 w-4 mr-2" /> Download file</DropdownMenuItem>}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger><Share2 className="h-4 w-4 mr-2" /> Export</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent><ExportMenuItems run={exp.run} busy={exp.busy} /></DropdownMenuSubContent>
+                </DropdownMenuSub>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger><FolderInput className="h-4 w-4 mr-2" /> Move to…</DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
@@ -85,6 +107,7 @@ export function LibraryItemCard({ item, onEdit, onChanged }: {
           </div>
         </CardContent>
       </Card>
+      {exp.dialog}
 
       <Dialog open={viewing} onOpenChange={setViewing}>
         <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
@@ -107,6 +130,10 @@ export function LibraryItemCard({ item, onEdit, onChanged }: {
             </div>
           ) : !item.file_path ? <p className="text-sm text-muted-foreground">No content yet.</p> : null}
           <div className="flex justify-end gap-2 pt-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="outline"><Share2 className="h-4 w-4 mr-1.5" /> Export</Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end"><ExportMenuItems run={exp.run} busy={exp.busy} /></DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" onClick={() => { setViewing(false); onEdit(item); }}><Pencil className="h-4 w-4 mr-1.5" /> Edit</Button>
           </div>
         </DialogContent>

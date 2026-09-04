@@ -26,6 +26,8 @@ import { LibraryItemCard } from "@/components/library/LibraryItemCard";
 import { LibraryItemEditor, draftFromItem, type EditorDraft } from "@/components/library/LibraryItemEditor";
 import { GenerateContentDialog } from "@/components/library/GenerateContentDialog";
 import { DokBackfillCard } from "@/components/library/DokBackfillCard";
+import { ExportButton } from "@/components/library/ExportMenu";
+import { resourceFromLibraryItem } from "@/lib/export/resource";
 
 type SearchRow = {
   item_type: LibrarySection;
@@ -84,6 +86,8 @@ export default function Library() {
   // ---- Counts + items ----
   const [counts, setCounts] = useState<Record<LibrarySection, number | null>>({ question: null, reading: null, activity: null, lesson_plan: null });
   const [items, setItems] = useState<LibraryItem[] | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelect = (id: string) => setSelectedIds((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const loadCounts = useCallback(async () => {
     const [qc, li] = await Promise.all([
@@ -97,6 +101,7 @@ export default function Library() {
 
   const loadItems = useCallback(async (kind: LibraryKind) => {
     setItems(null);
+    setSelectedIds(new Set());
     const { data, error } = await supabase.from("library_items")
       .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, created_at, updated_at, library_item_standards(standard_id, standards(id, code, description))")
       .eq("kind", kind).order("updated_at", { ascending: false });
@@ -294,9 +299,22 @@ export default function Library() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {items.map((it) => <LibraryItemCard key={it.id} item={it} onEdit={(x) => setEditor({ draft: draftFromItem(x), mode: "edit" })} onChanged={refresh} />)}
-                </div>
+                <>
+                  <div className="flex items-center justify-between gap-2 flex-wrap rounded-lg border bg-card/60 px-3 py-2 text-sm">
+                    <div className="flex items-center gap-3 font-sans">
+                      <span className="text-muted-foreground tabular-nums">{selectedIds.size ? `${selectedIds.size} selected` : `${items.length} item${items.length === 1 ? "" : "s"}`}</span>
+                      {selectedIds.size < items.length && <button className="underline underline-offset-2 text-muted-foreground hover:text-foreground" onClick={() => setSelectedIds(new Set(items.map((i) => i.id)))}>Select all</button>}
+                      {selectedIds.size > 0 && <button className="underline underline-offset-2 text-muted-foreground hover:text-foreground" onClick={() => setSelectedIds(new Set())}>Clear</button>}
+                    </div>
+                    <ExportButton
+                      label={selectedIds.size ? `Export ${selectedIds.size}` : "Export all"}
+                      source={() => (selectedIds.size ? items.filter((i) => selectedIds.has(i.id)) : items).map(resourceFromLibraryItem)}
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {items.map((it) => <LibraryItemCard key={it.id} item={it} selected={selectedIds.has(it.id)} onToggleSelect={toggleSelect} onEdit={(x) => setEditor({ draft: draftFromItem(x), mode: "edit" })} onChanged={refresh} />)}
+                  </div>
+                </>
               )}
             </section>
           )}
