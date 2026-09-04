@@ -22,7 +22,6 @@ import {
 } from "@/modules/curriculum/lib/content-generator";
 import { useProfileDefaults } from "@/modules/curriculum/hooks/useProfileDefaults";
 import { useAiPreferences } from "@/modules/curriculum/hooks/useAiPreferences";
-import { AiEngineSelect } from "@/modules/curriculum/components/AiEngineSelect";
 import { toast } from "sonner";
 
 interface Props {
@@ -76,7 +75,7 @@ export default function GenerateContentDialog({ open, onOpenChange, onComplete, 
   const [selectedNgssSubs, setSelectedNgssSubs] = useState<Set<string>>(new Set());
   const [expandedCoreIdeas, setExpandedCoreIdeas] = useState<Set<string>>(new Set());
   const [targetDok, setTargetDok] = useState<string>("any");
-  const [modelOverride, setModelOverride] = useState<string>("");
+  const modelOverride = "";
   const abortRef = useRef(false);
   const latestProgressRef = useRef<GenerationProgress | null>(null);
 
@@ -304,12 +303,8 @@ export default function GenerateContentDialog({ open, onOpenChange, onComplete, 
           </div>
         )}
 
-        {/* AI Engine selector */}
         {!generating && !done && (
-          <div className="space-y-2">
-            <AiEngineSelect value={modelOverride} onChange={setModelOverride} tier="default" />
-            <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 font-medium">UDL-aligned</span><span>Engagement · Representation · Action & Expression baked in.</span></div>
-          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 font-medium">UDL-aligned</span><span>Engagement · Representation · Action & Expression baked in.</span></div>
         )}
 
         {/* Gap-click config form */}
