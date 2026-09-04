@@ -11,6 +11,7 @@ import { NGSS_DIMENSIONS, formatDimensionsForPrompt } from "@/modules/curriculum
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { normalizeAiLesson } from "@/modules/curriculum/lib/normalize-ai-lesson";
 
 interface Props {
   open: boolean;
@@ -138,7 +139,7 @@ export default function PrepopulateStandardsDialog({ open, onOpenChange, onCompl
 
         // 3. Save lessons to the unit
         for (let li = 0; li < lessons.length; li++) {
-          const lesson = lessons[li];
+          const lesson = normalizeAiLesson(lessons[li]);
           try {
             const { data: inserted, error: insertError } = await supabase
               .from("lesson_plans")

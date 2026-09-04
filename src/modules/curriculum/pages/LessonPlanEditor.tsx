@@ -49,6 +49,8 @@ interface Activity {
   name: string;
   duration: number;
   description: string;
+  type?: string;
+  rationale?: string;
 }
 
 interface VocabularyItem {
