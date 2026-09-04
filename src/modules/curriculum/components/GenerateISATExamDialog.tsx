@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Sparkles, CheckCircle2, FileText, BookOpen, Lightbulb } from "lucide-react";
 import { supabase } from "@/modules/curriculum/config/supabase";
+import { readEdgeError } from "@/lib/edgeError";
 import { toast } from "sonner";
 import { ALL_SUBSTANDARDS } from "@/modules/curriculum/lib/ngss-data";
 import { StandardsPickerDialog } from "@/modules/curriculum/components/StandardsPickerDialog";
@@ -75,7 +76,7 @@ export default function GenerateISATExamDialog({ open, onOpenChange, onComplete 
         },
       });
 
-      if (error) throw new Error(error.message || "Generation failed");
+      if (error) throw new Error(await readEdgeError(error, "Generation failed"));
       if (data?.error) throw new Error(data.error);
 
       const questions = data?.questions || [];

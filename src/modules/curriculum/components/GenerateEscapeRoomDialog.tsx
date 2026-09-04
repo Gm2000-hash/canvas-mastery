@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles, Loader2, Lock, Key, Copy, ChevronDown, ChevronUp, Lightbulb, FileText, FileDown, BookOpen, FlaskConical, ListOrdered, ArrowRight, Pencil, Check, Plus, X } from "lucide-react";
 import { useToast } from "@/modules/curriculum/config/toast";
 import { supabase } from "@/modules/curriculum/config/supabase";
+import { readEdgeError } from "@/lib/edgeError";
 import { exportEscapeRoomToDocx } from "@/modules/curriculum/lib/export-escape-room-docx";
 import { useAiPreferences } from "@/modules/curriculum/hooks/useAiPreferences";
 
@@ -126,7 +127,7 @@ export function GenerateEscapeRoomDialog({ open, onOpenChange, context }: Props)
 
       setProgress(90);
 
-      if (error) throw error;
+      if (error) throw new Error(await readEdgeError(error, "Generation failed"));
       if (!data?.puzzles) throw new Error("Invalid response from AI");
 
       setEscapeRoom(data);

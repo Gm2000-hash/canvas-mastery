@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Sparkles, Loader2, RefreshCw, BookOpen, Tag, Layers } from "lucide-react";
 import { useToast } from "@/modules/curriculum/config/toast";
 import { supabase } from "@/modules/curriculum/config/supabase";
+import { readEdgeError } from "@/lib/edgeError";
 import { useAuth } from "@/modules/curriculum/config/auth";
 import { ALL_SUBSTANDARDS } from "@/modules/curriculum/lib/ngss-data";
 import { NGSS_DIMENSIONS, getDimensionByCode, formatDimensionsForPrompt } from "@/modules/curriculum/lib/ngss-dimensions";
@@ -127,17 +128,7 @@ Improve and fill in any missing information. Keep the same general topic but mak
 
       setProgress(40);
 
-      if (error) {
-        // Try to extract error message from response context
-        let errorMsg = error.message;
-        try {
-          if (error.context?.body) {
-            const body = typeof error.context.body === 'string' ? JSON.parse(error.context.body) : error.context.body;
-            if (body?.error) errorMsg = body.error;
-          }
-        } catch {}
-        throw new Error(errorMsg);
-      }
+      if (error) throw new Error(await readEdgeError(error, "AI generation failed"));
       if (!data?.lessons?.[0]) throw new Error("Invalid response from AI");
 
       const newLesson = data.lessons[0];

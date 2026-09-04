@@ -1,4 +1,5 @@
 import { supabase } from "@/modules/curriculum/config/supabase";
+import { readEdgeError } from "@/lib/edgeError";
 import { ALL_SUBSTANDARDS } from "@/modules/curriculum/lib/ngss-data";
 
 export type ContentType = "questions" | "lesson_plan" | "reading";
@@ -51,7 +52,7 @@ async function generateForSubstandard(
     },
   });
 
-  if (error) return { saved: 0, error: error.message || "Edge function error" };
+  if (error) return { saved: 0, error: await readEdgeError(error, "AI generation failed") };
   if (data?.error) return { saved: 0, error: data.error };
 
   if (contentType === "questions") {
