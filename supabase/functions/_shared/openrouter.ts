@@ -52,7 +52,7 @@ export function normalizeOpenRouterKey(raw: string | undefined): string {
   return k;
 }
 
-export function getAiProviderConfig(): AiProviderConfig {
+export function getAiProviderConfig(tier: AiTier = "default"): AiProviderConfig {
   const OPENROUTER_API_KEY = normalizeOpenRouterKey(Deno.env.get("OPENROUTER_API_KEY"));
   if (OPENROUTER_API_KEY) {
     return {
@@ -65,7 +65,8 @@ export function getAiProviderConfig(): AiProviderConfig {
           "https://canvas-mastery.lovable.app",
         "X-Title": "Canvas Mastery",
       },
-      overrideModel: OPENROUTER_MODEL,
+      overrideModel: OPENROUTER_MODEL_CHAINS[tier][0],
+      modelChain: OPENROUTER_MODEL_CHAINS[tier],
     };
   }
 
@@ -85,6 +86,8 @@ export function getAiProviderConfig(): AiProviderConfig {
 }
 
 export interface RetryOptions {
+  /** Model tier: `default` (fast) or `heavy` (long, complex generation). */
+  tier?: AiTier;
   /** Max additional attempts after the first (default 3). Set 0 to disable. */
   maxRetries?: number;
   /** Upper bound for a single wait, in ms (default 15s). */
@@ -117,10 +120,11 @@ export async function fetchChatCompletion(
   body: Record<string, unknown>,
   opts: RetryOptions = {},
 ): Promise<Response> {
-  const config = getAiProviderConfig();
-  const requestBody = config.overrideModel
+  const config = getAiProviderConfig(opts.tier ?? "default");
+  const requestBody: Record<string, unknown> = config.overrideModel
     ? { ...body, model: config.overrideModel }
-    : body;
+    : { ...body };
+  if (config.modelChain) requestBody.models = config.modelChain;
 
   // OpenRouter bills against the requested max tokens, so cap it to avoid
   // exhausting small credit balances on models with very high default limits.
@@ -178,8 +182,26 @@ export function aiRateLimitMessage(provider: AiProvider): string {
 
 export function aiCreditsMessage(provider: AiProvider): string {
   return provider === "openrouter"
-    ? "OpenRouter credits exhausted. Add credits at openrouter.com."
-    : "AI credits exhausted. Add credits in Workspace Settings.";
+    ? "AI is paused — the OpenRouter balance is empty. An admin needs to add credits at openrouter.ai."
+    : "AI is paused — the workspace AI balance is empty. An admin needs to add credits.";
+}
+
+/** OpenRouter account balance (USD). Returns null when not on OpenRouter or the call fails. */
+export async function getOpenRouterCredits(): Promise<{ total: number; used: number; remaining: number } | null> {
+  const key = normalizeOpenRouterKey(Deno.env.get("OPENROUTER_API_KEY"));
+  if (!key) return null;
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/credits", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const total = Number(j?.data?.total_credits ?? 0);
+    const used = Number(j?.data?.total_usage ?? 0);
+    return { total, used, remaining: Math.max(0, total - used) };
+  } catch {
+    return null;
+  }
 }
 
 export function aiAuthMessage(provider: AiProvider): string {
