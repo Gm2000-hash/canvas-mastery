@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
     const user = [
       `Create ${KIND_GUIDE[kind]}.`,
       `Grade: ${effGrade}. Subject: ${effSubject}.`,
-      options?.reading_level ? `Reading level: ${options.reading_level}.` : "",
+      kind === "reading" ? READING_LEVEL_GUIDE : "",
       options?.format ? `Format preference: ${options.format}.` : "",
       options?.topic ? `Topic focus: ${options.topic}.` : "",
       dok.text,
