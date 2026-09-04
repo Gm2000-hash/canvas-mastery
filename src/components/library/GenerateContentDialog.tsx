@@ -12,8 +12,6 @@ import { DOK_LEVELS, SECTIONS, type LibraryKind } from "./libraryTypes";
 import type { EditorDraft } from "./LibraryItemEditor";
 import { GRADES } from "@/lib/frameworks";
 
-const READING_LEVELS = ["Below grade level", "On grade level", "Above grade level"];
-
 export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHint, gradeHint }: {
   open: boolean;
   kind: LibraryKind;
@@ -25,7 +23,6 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
   const [standardIds, setStandardIds] = useState<string[]>([]);
   const [grade, setGrade] = useState<string>(gradeHint ?? "none");
   const [length, setLength] = useState<"short" | "medium" | "long">("medium");
-  const [level, setLevel] = useState(READING_LEVELS[1]);
   const [dok, setDok] = useState<"1" | "2" | "3" | "4" | "mix">("mix");
   const [format, setFormat] = useState("");
   const [topic, setTopic] = useState("");
@@ -40,7 +37,7 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
         body: {
           kind, standard_ids: standardIds,
           grade: grade === "none" ? null : grade, subject: subjectHint ?? null,
-          options: { length, reading_level: level, dok, format: format || undefined, topic: topic || undefined },
+          options: { length, dok, format: format || undefined, topic: topic || undefined },
         },
       });
       if (error) throw new Error((error as any).message ?? "Generation failed");
@@ -91,13 +88,6 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="long">Long</SelectItem>
                 </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Reading level</Label>
-              <Select value={level} onValueChange={setLevel}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{READING_LEVELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">

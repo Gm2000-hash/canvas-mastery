@@ -1,5 +1,6 @@
 import { supabase } from "@/modules/curriculum/config/supabase";
 import { readEdgeError } from "@/lib/edgeError";
+import { normalizeAiLesson } from "@/modules/curriculum/lib/normalize-ai-lesson";
 
 export interface CreateUdlLessonInput {
   userId: string;
@@ -51,8 +52,9 @@ export async function createUdlLessonPlan(input: CreateUdlLessonInput): Promise<
 
   if (error) throw new Error(await readEdgeError(error, "AI generation failed"));
 
-  const ai = data?.lessons?.[0];
-  if (!ai) throw new Error("AI did not return a lesson");
+  const raw = data?.lessons?.[0];
+  if (!raw) throw new Error("AI did not return a lesson");
+  const ai = normalizeAiLesson(raw);
 
   const insertRow: Record<string, any> = {
     user_id: userId,

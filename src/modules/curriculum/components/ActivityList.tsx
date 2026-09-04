@@ -8,7 +8,18 @@ interface Activity {
   name: string;
   duration: number;
   description: string;
+  /** Kolb experiential-learning stage (set by the AI generators). */
+  type?: string;
+  /** "Why this works" instructional rationale. */
+  rationale?: string;
 }
+
+export const KOLB_STAGE_LABELS: Record<string, string> = {
+  concrete_experience: "Concrete Experience",
+  reflective_observation: "Reflective Observation",
+  abstract_conceptualization: "Abstract Conceptualization",
+  active_experimentation: "Active Experimentation",
+};
 
 interface Props {
   activities: Activity[];
@@ -90,6 +101,11 @@ export function ActivityList({ activities, onReorder, onUpdate, onRemove, onAdd 
                 placeholder="min"
               />
             </div>
+            {act.type && KOLB_STAGE_LABELS[act.type] && (
+              <span className="inline-flex items-center rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-medium text-foreground/80">
+                Kolb: {KOLB_STAGE_LABELS[act.type]}
+              </span>
+            )}
             <Textarea
               placeholder="Description..."
               value={act.description}
@@ -97,6 +113,15 @@ export function ActivityList({ activities, onReorder, onUpdate, onRemove, onAdd 
               rows={2}
               className="text-sm"
             />
+            {(act.rationale !== undefined || act.type) && (
+              <Textarea
+                placeholder="Why this works (rationale)…"
+                value={act.rationale ?? ""}
+                onChange={e => onUpdate(idx, "rationale", e.target.value)}
+                rows={1}
+                className="text-xs italic text-muted-foreground bg-background/50"
+              />
+            )}
           </div>
           <Button
             variant="ghost"

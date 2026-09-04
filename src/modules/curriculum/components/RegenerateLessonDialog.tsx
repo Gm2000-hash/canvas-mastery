@@ -15,6 +15,7 @@ import { NGSS_DIMENSIONS, getDimensionByCode, formatDimensionsForPrompt } from "
 import { NgssDimensionPicker } from "@/modules/curriculum/components/NgssDimensionPicker";
 import { syncDisciplineToLibrary } from "@/modules/curriculum/lib/content-generator";
 import { useAiPreferences } from "@/modules/curriculum/hooks/useAiPreferences";
+import { normalizeAiLesson } from "@/modules/curriculum/lib/normalize-ai-lesson";
 
 interface LessonData {
   id: string;
@@ -131,7 +132,7 @@ Improve and fill in any missing information. Keep the same general topic but mak
       if (error) throw new Error(await readEdgeError(error, "AI generation failed"));
       if (!data?.lessons?.[0]) throw new Error("Invalid response from AI");
 
-      const newLesson = data.lessons[0];
+      const newLesson = normalizeAiLesson(data.lessons[0]);
 
       // Update the lesson in the database
       setStatusText("Saving updated lesson...");

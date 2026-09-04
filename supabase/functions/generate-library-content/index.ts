@@ -23,7 +23,6 @@ const BodySchema = z.object({
   subject: z.string().max(60).optional().nullable(),
   options: z.object({
     length: z.enum(["short", "medium", "long"]).optional(),
-    reading_level: z.string().max(40).optional(),
     format: z.string().max(60).optional(),
     topic: z.string().max(300).optional(),
     /** Target Depth of Knowledge: a single level, or "mix" for a spread across levels. */
@@ -32,10 +31,12 @@ const BodySchema = z.object({
 });
 
 const KIND_GUIDE: Record<string, string> = {
-  reading: "an informational reading passage for students, written at the requested reading level, with a short title, 3-6 paragraphs, bolded key vocabulary, and 3-5 comprehension questions at the end",
+  reading: "an informational reading passage for students with a short title, 3-6 paragraphs that teach the concept with bolded key vocabulary, then a section headed \"## In the Real World\" (a case study or an actual documented event — real place, date, and people/organizations — that illustrates the concept, ending with 1-2 sentences tying it back to the main idea; never invent an event: if you cannot name a real one, label it clearly as a realistic case study), then 3-5 comprehension questions at the end",
   activity: "a hands-on classroom activity with sections: Overview, Materials, Time, Steps (numbered), Differentiation, and a short Exit Ticket",
-  lesson_plan: "a complete lesson plan with sections: Objective(s), Standards, Materials, Warm-up (5 min), Direct Instruction, Guided Practice, Independent Practice, Assessment / Check for Understanding, Differentiation, and Homework/Extension",
+  lesson_plan: "a complete lesson plan designed around Kolb's experiential learning cycle with sections in this order: Objective(s), Standards, Materials, Concrete Experience (students do or observe something first-hand), Reflective Observation (students discuss/journal what they noticed), Abstract Conceptualization (the concept, vocabulary and models are named and explained), Active Experimentation (students apply the idea to a new problem or design), Assessment / Check for Understanding, Differentiation, and Extension. Give each of the four Kolb sections a time allotment. End EVERY section with an italic line starting \"*Why this works:*\" giving a 1-2 sentence instructional rationale for that choice",
 };
+
+const READING_LEVEL_GUIDE = "Write at a 7th-grade reading level (Flesch-Kincaid grade ~7): mostly short sentences, familiar words, and any technical term defined in plain language when it first appears.";
 
 const LENGTH_GUIDE: Record<string, string> = {
   short: "Keep it concise (roughly 300-450 words).",
@@ -100,7 +101,7 @@ Deno.serve(async (req) => {
     const user = [
       `Create ${KIND_GUIDE[kind]}.`,
       `Grade: ${effGrade}. Subject: ${effSubject}.`,
-      options?.reading_level ? `Reading level: ${options.reading_level}.` : "",
+      kind === "reading" ? READING_LEVEL_GUIDE : "",
       options?.format ? `Format preference: ${options.format}.` : "",
       options?.topic ? `Topic focus: ${options.topic}.` : "",
       dok.text,

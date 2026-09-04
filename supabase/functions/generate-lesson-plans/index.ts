@@ -15,7 +15,9 @@ const Body = z.object({
   deemphasizeConcepts: z.string().max(2000).optional(),
 });
 
-const SCHEMA = `{"lessons":[{"title":string,"duration_minutes":number,"objectives":string,"activities":[{"name":string,"duration_minutes":number,"description":string,"type":"engage"|"explore"|"explain"|"elaborate"|"evaluate"}],"materials":string,"assessment":string,"differentiation":string,"notes":string,"vocabulary":[{"term":string,"definition":string}],"resources":[{"title":string,"url":string,"type":"video"|"article"|"simulation"|"worksheet"|"other"}],"udl_supports":{"representation":[string],"action_expression":[string],"engagement":[string]},"standards":[{"code":string,"description":string}]}]}`;
+const SCHEMA = `{"lessons":[{"title":string,"duration_minutes":number,"objectives":string,"activities":[{"name":string,"duration_minutes":number,"description":string,"type":"concrete_experience"|"reflective_observation"|"abstract_conceptualization"|"active_experimentation","rationale":string}],"materials":string,"assessment":string,"differentiation":string,"notes":string,"rationale":{"objectives":string,"materials":string,"assessment":string,"differentiation":string},"vocabulary":[{"term":string,"definition":string}],"resources":[{"title":string,"url":string,"type":"video"|"article"|"simulation"|"worksheet"|"other"}],"udl_supports":{"representation":[string],"action_expression":[string],"engagement":[string]},"standards":[{"code":string,"description":string}]}]}`;
+
+const KOLB_GUIDE = `Design each lesson around Kolb's experiential learning cycle, with activities in this order: (1) "concrete_experience" — students do or observe something first-hand (demo, phenomenon, hands-on task); (2) "reflective_observation" — students discuss, journal, or compare what they noticed; (3) "abstract_conceptualization" — the concept, vocabulary and models are named and explained, connecting to the observations; (4) "active_experimentation" — students apply the idea to a new problem, prediction, or design. You may split a stage into two activities but keep the cycle order. Every activity has a "rationale": 1-2 sentences of instructional reasoning ("Why this works"). Also fill the top-level "rationale" object with a 1-2 sentence rationale for the objectives, materials, assessment, and differentiation choices.`;
 
 serve(async (req) => {
   const parsed = Body.safeParse(await readBody(req));
@@ -31,7 +33,7 @@ serve(async (req) => {
       b.deemphasizeConcepts ? `De-emphasize: ${b.deemphasizeConcepts}` : "",
       b.additionalContext ? `Additional context / instructions:\n${b.additionalContext}` : "",
       "",
-      `Write ${b.numLessons} sequential lesson plan(s), each ~50 minutes, that build on each other. Objectives, materials, assessment, differentiation and notes are multi-sentence plain text (use newlines between items). Activities are 4-6 timed steps following a 5E flow. Include 5-8 vocabulary terms, 2-3 real resources with plausible URLs from reputable sources (PhET, Khan Academy, PBS, NASA, etc.), UDL supports, and 1-3 aligned standards (use the standard codes given in the context when present; otherwise choose the best-fit NGSS or state standard codes).`,
+      `Write ${b.numLessons} sequential lesson plan(s), each ~50 minutes, that build on each other. Objectives, materials, assessment, differentiation and notes are multi-sentence plain text (use newlines between items). Activities are 4-6 timed steps. ${KOLB_GUIDE} Include 5-8 vocabulary terms, 2-3 real resources with plausible URLs from reputable sources (PhET, Khan Academy, PBS, NASA, etc.), UDL supports, and 1-3 aligned standards (use the standard codes given in the context when present; otherwise choose the best-fit NGSS or state standard codes).`,
       `Return JSON matching exactly: ${SCHEMA}`,
     ].filter((l) => l !== null).join("\n"),
     maxTokens: Math.min(4096 + b.numLessons * 1800, 12000),
