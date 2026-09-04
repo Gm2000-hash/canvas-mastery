@@ -1,10 +1,13 @@
 import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer, BorderStyle } from "docx";
+import { KOLB_STAGE_LABELS } from "@/modules/curriculum/components/ActivityList";
 import { saveAs } from "file-saver";
 
 interface Activity {
   name: string;
   duration: number;
   description: string;
+  type?: string;
+  rationale?: string;
 }
 
 interface VocabScaffold {
@@ -149,6 +152,9 @@ function buildLessonParagraphs(lesson: LessonPlan, index: number): Paragraph[] {
           children: [
             new TextRun({ text: `${act.name}`, bold: true, size: 22 }),
             new TextRun({ text: ` (${act.duration} min)`, size: 20, color: "666666" }),
+            ...(act.type && KOLB_STAGE_LABELS[act.type]
+              ? [new TextRun({ text: `  ·  ${KOLB_STAGE_LABELS[act.type]}`, size: 18, color: "8A5A00" })]
+              : []),
           ],
         }));
         if (act.description) {
@@ -156,6 +162,13 @@ function buildLessonParagraphs(lesson: LessonPlan, index: number): Paragraph[] {
             indent: { left: 720 },
             spacing: { after: 60 },
             children: [new TextRun({ text: act.description, size: 20 })],
+          }));
+        }
+        if (act.rationale) {
+          paras.push(new Paragraph({
+            indent: { left: 720 },
+            spacing: { after: 80 },
+            children: [new TextRun({ text: `Why this works: ${act.rationale}`, size: 18, italics: true, color: "555555" })],
           }));
         }
       });
