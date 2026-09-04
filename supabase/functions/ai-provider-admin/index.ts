@@ -76,10 +76,28 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    if (action === "set_provider_order") {
+      const primary = body?.primary;
+      const fallback = body?.fallback ?? "none";
+      if (primary !== "openrouter" && primary !== "lovable") return json({ error: "Primary must be OpenRouter or Lovable AI." }, 400);
+      if (fallback !== "openrouter" && fallback !== "lovable" && fallback !== "none") return json({ error: "Invalid fallback." }, 400);
+      if (fallback === primary) return json({ error: "Fallback must differ from the primary provider." }, 400);
+      const { error: upErr } = await admin.from("app_settings").upsert({
+        key: PROVIDER_ORDER_SETTING, value: { primary, fallback }, updated_by: uid, updated_at: new Date().toISOString(),
+      });
+      if (upErr) return json({ error: upErr.message }, 500);
+      invalidateProviderOrderCache();
+      return json({ ok: true });
+    }
+
     // status
     invalidateOpenRouterKeyCache();
+    invalidateProviderOrderCache();
+    const order = await resolveProviderOrder();
     const { key, source } = await resolveOpenRouterKey();
-    const provider = key ? "openrouter" : "lovable";
+    const lovableAvailable = Boolean(Deno.env.get("LOVABLE_API_KEY"));
+    const available = (p: string) => (p === "openrouter" ? Boolean(key) : p === "lovable" ? lovableAvailable : false);
+    const provider = available(order.primary) ? order.primary : available(order.fallback) ? (order.fallback as "openrouter" | "lovable") : order.primary;
     const probe = key ? await checkOpenRouterKey(key) : null;
     const credits = probe?.credits ?? null;
     const keyError = probe && !probe.ok
