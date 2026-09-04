@@ -91,13 +91,6 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Reading level</Label>
-              <Select value={level} onValueChange={setLevel}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{READING_LEVELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
               <Label>Depth of Knowledge</Label>
               <Select value={dok} onValueChange={(v) => setDok(v as any)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
