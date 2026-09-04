@@ -33,7 +33,7 @@ serve(async (req) => {
       b.deemphasizeConcepts ? `De-emphasize: ${b.deemphasizeConcepts}` : "",
       b.additionalContext ? `Additional context / instructions:\n${b.additionalContext}` : "",
       "",
-      `Write ${b.numLessons} sequential lesson plan(s), each ~50 minutes, that build on each other. Objectives, materials, assessment, differentiation and notes are multi-sentence plain text (use newlines between items). Activities are 4-6 timed steps following a 5E flow. Include 5-8 vocabulary terms, 2-3 real resources with plausible URLs from reputable sources (PhET, Khan Academy, PBS, NASA, etc.), UDL supports, and 1-3 aligned standards (use the standard codes given in the context when present; otherwise choose the best-fit NGSS or state standard codes).`,
+      `Write ${b.numLessons} sequential lesson plan(s), each ~50 minutes, that build on each other. Objectives, materials, assessment, differentiation and notes are multi-sentence plain text (use newlines between items). Activities are 4-6 timed steps. ${KOLB_GUIDE} Include 5-8 vocabulary terms, 2-3 real resources with plausible URLs from reputable sources (PhET, Khan Academy, PBS, NASA, etc.), UDL supports, and 1-3 aligned standards (use the standard codes given in the context when present; otherwise choose the best-fit NGSS or state standard codes).`,
       `Return JSON matching exactly: ${SCHEMA}`,
     ].filter((l) => l !== null).join("\n"),
     maxTokens: Math.min(4096 + b.numLessons * 1800, 12000),
