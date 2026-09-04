@@ -23,7 +23,7 @@ Lesson objectives:\n${b.objectives || "(derive suitable objectives from the titl
 
 Return JSON exactly in this shape:
 {"title":string,"objectives":[string],"intro":[string],"explanation":[string],"key_terms":[{"term":string,"definition":string}],"reading":{"reading_title":string,"reading_paragraphs":[string]}}
-Requirements: 2-4 objectives; intro = 2 paragraphs that hook the reader with a phenomenon or question; explanation = 4-6 paragraphs that teach the concept with examples and connect back to the objectives; 6-8 key terms; the reading is a 5-7 paragraph narrative or case study applying the concept. Plain text paragraphs (no HTML).`,
+Requirements: 2-4 objectives; intro = 2 paragraphs that hook the reader with a phenomenon or question; explanation = 4-6 paragraphs that teach the concept with examples and connect back to the objectives; 6-8 key terms; the reading is an "In the Real World" section (reading_title names the event or case) of 5-7 paragraphs: a case study or an actual documented event — real place, date, and people/organizations — that illustrates the concept, ending with 1-2 sentences tying it back to the main idea; never invent an event, and if you cannot name a real one label it clearly as a realistic case study. Plain text paragraphs (no HTML). Write everything at a 7th-grade reading level (Flesch-Kincaid ~7): short sentences, familiar words, technical terms defined in plain language on first use.`,
     maxTokens: 6000,
   });
 
