@@ -4,8 +4,31 @@
 
 export type AiProvider = "openrouter" | "lovable";
 
-/** Default OpenRouter model. Keep this as one constant so future swaps are easy. */
-export const OPENROUTER_MODEL = "google/gemini-3.7-flash";
+export type AiTier = "default" | "heavy";
+
+/**
+ * Ordered fallback chains sent via OpenRouter's native `models` array. If the
+ * first model is rate-limited, overloaded or down, OpenRouter tries the next one
+ * inside the same request. (An empty account balance blocks every model, so a
+ * real 402 is never rescued by the chain.)
+ */
+export const OPENROUTER_MODEL_CHAINS: Record<AiTier, string[]> = {
+  default: [
+    "google/gemini-3.7-flash",
+    "openai/gpt-5.4-mini",
+    "anthropic/claude-haiku-4.5",
+    "qwen/qwen3.8-flash",
+  ],
+  heavy: [
+    "google/gemini-3.1-pro-preview",
+    "openai/gpt-5.4",
+    "anthropic/claude-sonnet-4.6",
+    "qwen/qwen3.8-max",
+  ],
+};
+
+/** Backwards-compatible alias: first model of the default chain. */
+export const OPENROUTER_MODEL = OPENROUTER_MODEL_CHAINS.default[0];
 
 export interface AiProviderConfig {
   provider: AiProvider;
@@ -13,6 +36,8 @@ export interface AiProviderConfig {
   headers: Record<string, string>;
   /** Set only when the provider should override the request body's model field. */
   overrideModel?: string;
+  /** OpenRouter only: full fallback chain for the tier. */
+  modelChain?: string[];
 }
 
 /**
