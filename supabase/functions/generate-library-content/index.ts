@@ -9,6 +9,8 @@ import {
   getAiProviderConfig,
   isAiProviderHardError,
 } from "../_shared/openrouter.ts";
+import { aiJson, HttpError } from "../_shared/curriculum-ai.ts";
+import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, chapterToMarkdown, normalizeChapterOut } from "../_shared/textbook-chapter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,6 +98,39 @@ Deno.serve(async (req) => {
     const effSubject = subject ?? stds[0].subject;
     const length = options?.length ?? "medium";
     const dok = dokGuide(options?.dok, kind);
+
+    // Readings are generated as structured textbook chapters; the markdown body
+    // is derived from the chapter so search/export keep working.
+    if (kind === "reading") {
+      try {
+        const out = await aiJson<Record<string, unknown>>({
+          system: CHAPTER_SYSTEM,
+          user: [
+            `Write a student-facing textbook chapter. Grade: ${effGrade}. Subject: ${effSubject}.`,
+            options?.format ? `Format preference: ${options.format}.` : "",
+            options?.topic ? `Topic focus: ${options.topic}.` : "",
+            dok.text ? dok.text.replace("Label each question/task", "Label each review question") : "",
+            LENGTH_GUIDE[length].replace("Aim for", "Total length: aim for").replace("Keep it concise", "Total length: keep it concise").replace("Be thorough", "Total length: be thorough"),
+            `Align tightly to these standards and reference their codes where relevant:\n${stdLines}`,
+            CHAPTER_RULES,
+            `Return JSON exactly in this shape:\n${CHAPTER_SCHEMA}`,
+          ].filter(Boolean).join("\n\n"),
+          maxTokens: length === "long" ? 9000 : 7000,
+          tier: "heavy",
+        });
+        const chapter = normalizeChapterOut(out, options?.topic ?? `${effSubject} chapter`);
+        if (!chapter.sections.length) return json({ error: "The AI returned an empty chapter. Try again." }, 500);
+        const levels = Array.from(new Set(chapter.review_questions.map((q) => q.dok))).sort();
+        return json({
+          title: chapter.title.slice(0, 200), body: chapterToMarkdown(chapter), chapter,
+          suggested_standard_ids: stds.map((s) => s.id), grade: effGrade, subject: effSubject,
+          dok_levels: levels.length ? levels : dok.levels,
+        });
+      } catch (e) {
+        if (e instanceof HttpError) return json({ error: e.message }, e.status);
+        throw e;
+      }
+    }
 
     const system = `You are an expert ${effSubject} teacher and curriculum designer. Write classroom-ready materials in clean Markdown. Never include preamble or commentary — output only the material itself.`;
     const user = [
