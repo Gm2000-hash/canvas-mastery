@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/modules/curriculum/config/supabase";
 import { useAuth } from "../config/auth";
 import { useToast } from "../config/toast";
+import type { TextbookChapter } from "@/modules/curriculum/lib/textbook-chapter";
 
 export interface CurriculumLesson {
   id: string;
@@ -18,6 +19,8 @@ export interface CurriculumLesson {
   reading_paragraphs: string[];
   interactive_activities: any[];
   image_url: string | null;
+  /** Textbook-chapter structure; null for readings not yet converted. */
+  chapter?: TextbookChapter | null;
   created_at: string;
   updated_at: string;
 }
