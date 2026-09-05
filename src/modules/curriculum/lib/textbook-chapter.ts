@@ -304,3 +304,54 @@ export function emptyChapter(title = "New chapter"): TextbookChapter {
     ],
   }, title);
 }
+
+/* ---------------- Reading template validation ----------------
+ * Mirrors the server-side checks in supabase/functions/_shared/textbook-chapter.ts.
+ * Works on a structured chapter or on legacy flat lesson fields.
+ */
+export interface TemplateCheck { key: string; label: string; pass: boolean; detail: string }
+export interface TemplateReport { pass: boolean; passed: number; total: number; checks: TemplateCheck[]; structured: boolean }
+
+const ROLE_ORDER: SectionRole[] = ["introduction", "historical_context", "key_elements"];
+function inferRole(sec: ChapterSection, i: number): SectionRole {
+  if (sec.role && ROLE_ORDER.includes(sec.role)) return sec.role;
+  const h = sec.heading.toLowerCase();
+  if (/histor|story of|biograph|who was|life of/.test(h)) return "historical_context";
+  if (/introduc|overview|what is|why .* matter/.test(h)) return "introduction";
+  if (/key element|how it works|steps|process|parts of|explanation/.test(h)) return "key_elements";
+  return i === 0 ? "introduction" : "key_elements";
+}
+const paraCount = (sec?: ChapterSection) => sec ? sec.blocks.filter((b) => b.type === "paragraph" && b.text.trim()).length : 0;
+
+export function validateReadingTemplate(input: { chapter?: unknown; legacy?: LegacyLessonFields | null }): TemplateReport {
+  const checks: TemplateCheck[] = [];
+  const add = (key: string, label: string, pass: boolean, detail: string) => checks.push({ key, label, pass, detail });
+  if (isChapter(input.chapter)) {
+    const ch = normalizeChapter(input.chapter);
+    const roles = ch.sections.map(inferRole);
+    const intro = ch.sections[roles.indexOf("introduction")];
+    const hist = ch.sections[roles.indexOf("historical_context")];
+    const key = ch.sections.filter((_, i) => roles[i] === "key_elements");
+    const keyParas = key.reduce((n, s) => n + paraCount(s), 0);
+    const ordered = roles.indexOf("introduction") < roles.indexOf("historical_context") && roles.indexOf("historical_context") < roles.indexOf("key_elements");
+    add("objectives", "3 learning objectives", ch.objectives.length === 3, `${ch.objectives.length} objective${ch.objectives.length === 1 ? "" : "s"}`);
+    add("introduction", "General introduction", paraCount(intro) >= 1, intro ? `${paraCount(intro)} paragraph(s)` : "No Introduction section");
+    add("historical_context", "Historical context (a real person's story)", paraCount(hist) >= 2, hist ? `${paraCount(hist)} paragraph(s)` : "No Historical Context section");
+    add("key_elements", "In-depth explanation of key elements", keyParas >= 2 && ordered, key.length ? `${keyParas} paragraph(s)${ordered ? "" : " · out of order"}` : "No Key Elements section");
+    add("real_world", "Real-world example or case study", ch.real_world.paragraphs.length >= 3, ch.real_world.paragraphs.length ? `${ch.real_world.paragraphs.length} paragraph(s)` : "Missing");
+    add("key_terms", "4-12 key terms with explanations", ch.glossary.length >= 4 && ch.glossary.length <= 12 && ch.glossary.every((g) => g.definition.trim()), `${ch.glossary.length} term(s)`);
+    add("questions", "5 comprehension questions", ch.review_questions.length === 5, `${ch.review_questions.length} question(s)`);
+  } else {
+    const l: Partial<LegacyLessonFields> = input.legacy ?? {};
+    const obj = l.objectives ?? [], intro = l.intro ?? [], expl = l.explanation ?? [], terms = l.key_terms ?? [], rw = l.reading_paragraphs ?? [];
+    add("objectives", "3 learning objectives", obj.length === 3, `${obj.length} objective(s)`);
+    add("introduction", "General introduction", intro.length >= 1, `${intro.length} paragraph(s)`);
+    add("historical_context", "Historical context (a real person's story)", false, "Not part of the old reading layout");
+    add("key_elements", "In-depth explanation of key elements", expl.length >= 2, `${expl.length} paragraph(s)`);
+    add("real_world", "Real-world example or case study", rw.length >= 3, `${rw.length} paragraph(s)`);
+    add("key_terms", "4-12 key terms with explanations", terms.length >= 4 && terms.length <= 12, `${terms.length} term(s)`);
+    add("questions", "5 comprehension questions", false, "Not part of the old reading layout");
+  }
+  const passed = checks.filter((c) => c.pass).length;
+  return { pass: passed === checks.length, passed, total: checks.length, checks, structured: isChapter(input.chapter) };
+}

@@ -17,7 +17,8 @@ import { resourceFromLibraryItem } from "@/lib/export/resource";
 import { cn } from "@/lib/utils";
 import { ChapterViewer } from "@/modules/curriculum/components/textbook/ChapterViewer";
 import { useConvertToChapter } from "@/modules/curriculum/components/textbook/useConvertToChapter";
-import { chapterDokLevels, chapterToMarkdown, isChapter, normalizeChapter } from "@/modules/curriculum/lib/textbook-chapter";
+import { chapterDokLevels, chapterToMarkdown, isChapter, normalizeChapter, validateReadingTemplate } from "@/modules/curriculum/lib/textbook-chapter";
+import { TemplateBadge } from "@/modules/curriculum/components/textbook/TemplateBadge";
 import { BookOpen, Loader2 } from "lucide-react";
 
 export async function downloadItemFile(it: LibraryItem) {
@@ -144,6 +145,7 @@ export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSel
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <Badge variant="outline" className="gap-1 text-[11px] font-normal"><SourceIcon source={item.source} /> {SOURCE_LABEL[item.source]}</Badge>
             {chapter && <Badge variant="outline" className="gap-1 text-[11px] font-normal border-primary/40 text-primary"><BookOpen className="h-3 w-3" /> Chapter</Badge>}
+            {item.kind === "reading" && <TemplateBadge report={validateReadingTemplate({ chapter: item.chapter })} onFix={item.body && !chapter ? convertToChapter : undefined} fixing={converting} />}
             <PlatformBadges links={item.links} compact />
             {item.grade && <Badge variant="outline" className="text-[11px] font-normal">Gr {item.grade}</Badge>}
             {dokLabel(item.dok_levels) && <Badge variant="outline" className="text-[11px] font-normal bg-primary/5 border-primary/30 text-primary">{dokLabel(item.dok_levels)}</Badge>}
