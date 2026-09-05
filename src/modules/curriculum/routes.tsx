@@ -32,6 +32,8 @@ const UnitDetail = L(() => import("./pages/UnitDetail"));
 const LessonPlanEditor = L(() => import("./pages/LessonPlanEditor"));
 const LessonsBrowser = L(() => import("./pages/LessonsBrowser"));
 const ReadingLibrary = L(() => import("./pages/ReadingLibrary"));
+const Textbooks = L(() => import("./pages/Textbooks"));
+const TextbookDetail = L(() => import("./pages/TextbookDetail"));
 const StandardsBrowser = L(() => import("./pages/StandardsBrowser"));
 const ActivityBuilder = L(() => import("./pages/ActivityBuilder"));
 const ActivityEditor = L(() => import("./pages/ActivityEditorPage"));
@@ -45,6 +47,7 @@ const ISATReview = L(() => import("./pages/ISATReviewPage"));
 
 const SharedNote = L(() => import("./pages/SharedNote"));
 const SharedReading = L(() => import("./pages/SharedReading"));
+const TextbookReader = L(() => import("./pages/TextbookReader"));
 const PublicActivityPlayer = L(() => import("./pages/PublicActivityPlayer"));
 const ISATExamPlayer = L(() => import("./pages/ISATExamPlayer"));
 
@@ -60,6 +63,8 @@ export function curriculumAppRoutes() {
       <Route path="curriculum/lessons/:id" element={<UnitDetail />} />
       <Route path="curriculum/library" element={<Navigate to="/app/curriculum/reading-library" replace />} />
       <Route path="curriculum/reading-library" element={<ReadingLibrary />} />
+      <Route path="curriculum/textbooks" element={<Textbooks />} />
+      <Route path="curriculum/textbooks/:id" element={<TextbookDetail />} />
       <Route path="curriculum/standards" element={<StandardsBrowser />} />
       <Route path="curriculum/activities" element={<ActivityBuilder />} />
       <Route path="curriculum/activities/:id" element={<ActivityEditor />} />
@@ -84,6 +89,7 @@ export function curriculumPublicRoutes() {
     <>
       <Route path="/curriculum/share/:token" element={<SharedNote />} />
       <Route path="/curriculum/shared-reading/:token" element={<SharedReading />} />
+      <Route path="/book/:token" element={<TextbookReader />} />
       <Route path="/curriculum/activities/:id/play" element={<PublicActivityPlayer />} />
       <Route path="/curriculum/isat-exams/:id/play" element={<ISATExamPlayer />} />
     </>
