@@ -489,6 +489,7 @@ export type Database = {
       }
       curriculum_lessons: {
         Row: {
+          chapter: Json | null
           created_at: string
           explanation: Json
           id: string
@@ -506,6 +507,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          chapter?: Json | null
           created_at?: string
           explanation?: Json
           id?: string
@@ -523,6 +525,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          chapter?: Json | null
           created_at?: string
           explanation?: Json
           id?: string
@@ -1134,6 +1137,7 @@ export type Database = {
           canvas_course_id: number | null
           canvas_item_id: number | null
           canvas_item_type: string | null
+          chapter: Json | null
           created_at: string
           dok_levels: number[]
           file_mime: string | null
@@ -1154,6 +1158,7 @@ export type Database = {
           canvas_course_id?: number | null
           canvas_item_id?: number | null
           canvas_item_type?: string | null
+          chapter?: Json | null
           created_at?: string
           dok_levels?: number[]
           file_mime?: string | null
@@ -1174,6 +1179,7 @@ export type Database = {
           canvas_course_id?: number | null
           canvas_item_id?: number | null
           canvas_item_type?: string | null
+          chapter?: Json | null
           created_at?: string
           dok_levels?: number[]
           file_mime?: string | null
@@ -2316,6 +2322,106 @@ export type Database = {
         }
         Relationships: []
       }
+      textbook_chapters: {
+        Row: {
+          created_at: string
+          id: string
+          lesson_id: string | null
+          library_item_id: string | null
+          part_title: string | null
+          sort_order: number
+          source: string
+          teacher_id: string
+          textbook_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lesson_id?: string | null
+          library_item_id?: string | null
+          part_title?: string | null
+          sort_order?: number
+          source: string
+          teacher_id: string
+          textbook_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lesson_id?: string | null
+          library_item_id?: string | null
+          part_title?: string | null
+          sort_order?: number
+          source?: string
+          teacher_id?: string
+          textbook_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "textbook_chapters_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "curriculum_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "textbook_chapters_library_item_id_fkey"
+            columns: ["library_item_id"]
+            isOneToOne: false
+            referencedRelation: "library_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "textbook_chapters_textbook_id_fkey"
+            columns: ["textbook_id"]
+            isOneToOne: false
+            referencedRelation: "textbooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      textbooks: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          description: string | null
+          grade: string | null
+          id: string
+          is_published: boolean
+          share_token: string | null
+          subject: string | null
+          teacher_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          grade?: string | null
+          id?: string
+          is_published?: boolean
+          share_token?: string | null
+          subject?: string | null
+          teacher_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          grade?: string | null
+          id?: string
+          is_published?: boolean
+          share_token?: string | null
+          subject?: string | null
+          teacher_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       units: {
         Row: {
           created_at: string
@@ -3068,6 +3174,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_shared_textbook: { Args: { _share_token: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
