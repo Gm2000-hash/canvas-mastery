@@ -113,8 +113,9 @@ export function ChapterEditor({ chapter, onChange, standards = [], className }: 
     const path = `${uid}/chapter-figures/${crypto.randomUUID()}-${file.name.replace(/[^\w.\-]+/g, "_")}`;
     const { error } = await supabase.storage.from("activity-media").upload(path, file, { contentType: file.type || undefined });
     if (error) { toast.error(error.message); return; }
-    const { data } = supabase.storage.from("activity-media").getPublicUrl(path);
-    setBlock(si, bi, { ...b, image_url: data.publicUrl });
+    const { data } = await supabase.storage.from("activity-media").createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+    if (!data?.signedUrl) { toast.error("Could not link the uploaded image"); return; }
+    setBlock(si, bi, { ...b, image_url: data.signedUrl });
   }
 
   const AiBtn = ({ kind, si, label }: { kind: InsertKind; si?: number; label: string }) => (
