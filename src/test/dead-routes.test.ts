@@ -106,6 +106,16 @@ function extractRoutes(): RoutePattern[] {
     }
   }
 
+  // Curriculum suite routes live in src/modules/curriculum/routes.tsx and are
+  // mounted by App.tsx: app routes under /app, public routes at the root.
+  const curriculumSrc = readFileSync(join(SRC_DIR, "modules", "curriculum", "routes.tsx"), "utf8");
+  for (const raw of curriculumSrc.split("\n")) {
+    const m = raw.match(/<Route\b[^>]*?\bpath="([^"]*)"/);
+    if (m) paths.add(m[1].startsWith("/") ? m[1] : `/app/${m[1]}`);
+    const nav = raw.match(/<Navigate\s+[^>]*to="([^"]+)"/);
+    if (nav) paths.add(nav[1].split(/[?#]/)[0]);
+  }
+
   // Always-valid sentinel paths.
   paths.add("/"); // landing
   paths.add("*"); // catch-all NotFound
