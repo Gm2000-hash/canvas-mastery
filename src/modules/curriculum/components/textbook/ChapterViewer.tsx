@@ -51,8 +51,8 @@ export function ChapterViewer({ chapter: ch, teacherMode, showToc = true, standa
     ...ch.sections.map((s, i) => ({ id: `sec-${i}`, label: `${s.number ? s.number + " " : ""}${s.heading}` })),
     ...(ch.real_world.paragraphs.length ? [{ id: "real-world", label: "In the Real World" }] : []),
     ...(ch.summary.length ? [{ id: "summary", label: "Chapter Summary" }] : []),
-    ...(ch.review_questions.length ? [{ id: "review", label: "Review Questions" }] : []),
-    ...(ch.glossary.length ? [{ id: "glossary", label: "Glossary" }] : []),
+    ...(ch.review_questions.length ? [{ id: "review", label: "Comprehension Questions" }] : []),
+    ...(ch.glossary.length ? [{ id: "glossary", label: "Key Terms" }] : []),
   ];
 
   return (
@@ -154,7 +154,7 @@ export function ChapterViewer({ chapter: ch, teacherMode, showToc = true, standa
         {ch.review_questions.length > 0 && (
           <section id="review" className="mb-10 scroll-mt-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-display text-2xl">Review Questions</h2>
+              <h2 className="font-display text-2xl">Reading Comprehension Questions</h2>
               {teacherMode && (
                 <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => setAllAnswers((v) => !v)}>
                   {allAnswers ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />} {allAnswers ? "Hide answer key" : "Show answer key"}
@@ -190,7 +190,7 @@ export function ChapterViewer({ chapter: ch, teacherMode, showToc = true, standa
 
         {ch.glossary.length > 0 && (
           <section id="glossary" className="mb-10 scroll-mt-4">
-            <h2 className="font-display text-2xl mb-3">Glossary</h2>
+            <h2 className="font-display text-2xl mb-3">Key Terms</h2>
             <dl className="grid sm:grid-cols-2 gap-3">
               {ch.glossary.map((g, i) => (
                 <div key={i} className="rounded-xl border border-border bg-muted/30 p-3">

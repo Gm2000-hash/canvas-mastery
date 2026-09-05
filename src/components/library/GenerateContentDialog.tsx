@@ -62,7 +62,7 @@ export function GenerateContentDialog({ open, kind, onClose, onDraft, subjectHin
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> Generate a {meta.singular}</DialogTitle>
-          <DialogDescription>{kind === "reading" ? "The AI writes a full textbook chapter (opener, numbered sections, callouts, figures, case study, summary, review questions, glossary) from your chosen standards. You review and edit before it's saved." : "The AI drafts it from your chosen standards. You review and edit before it's saved."}</DialogDescription>
+          <DialogDescription>{kind === "reading" ? "The AI writes a textbook chapter in the standard flow: 3 objectives, Introduction, Historical Context (a real person's story), Key Elements, a real-world case study, 4-12 key terms and 5 comprehension questions. You review and edit before it's saved." : "The AI drafts it from your chosen standards. You review and edit before it's saved."}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div className="space-y-1.5">

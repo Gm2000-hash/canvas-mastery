@@ -202,7 +202,8 @@ export function ChapterEditor({ chapter, onChange, standards = [], className }: 
         </section>
       ))}
       <div className="flex gap-2">
-        <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => set({ sections: [...ch.sections, { heading: "", blocks: [{ type: "paragraph", text: "" }] }] })}><Plus className="h-3.5 w-3.5" /> Add section</Button>
+        <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => set({ sections: [...ch.sections, { role: "key_elements", heading: "", blocks: [{ type: "paragraph", text: "" }] }] })}><Plus className="h-3.5 w-3.5" /> Add section</Button>
+        <AiBtn kind="historical_context" label="AI Historical Context" />
         <AiBtn kind="section" label="AI section" />
       </div>
 
@@ -242,7 +243,7 @@ export function ChapterEditor({ chapter, onChange, standards = [], className }: 
 
       {/* Glossary */}
       <section className="space-y-2">
-        <div className="flex items-center justify-between"><Label>Glossary</Label><AiBtn kind="key_term" label="AI term" /></div>
+        <div className="flex items-center justify-between"><Label>Key Terms (4-12)</Label><AiBtn kind="key_term" label="AI term" /></div>
         {ch.glossary.map((g, i) => (
           <div key={i} className="flex items-start gap-1">
             <Input value={g.term} onChange={(e) => set({ glossary: ch.glossary.map((x, k) => (k === i ? { ...x, term: e.target.value } : x)) })} placeholder="Term" className="w-44 text-sm font-semibold" />
