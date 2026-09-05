@@ -879,7 +879,7 @@ function ReadingPreviewDialog({
         </DialogHeader>
 
         {chapter ? (
-          <ChapterViewer chapter={chapter} />
+          <ChapterViewer chapter={chapter} teacherMode showToc={false} />
         ) : !hasContent ? (
           <div className="py-12 text-center">
             <BookOpen className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
