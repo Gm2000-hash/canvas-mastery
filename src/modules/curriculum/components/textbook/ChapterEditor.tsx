@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDown, ArrowUp, Image as ImageIcon, Loader2, Plus, Sparkles, Trash2, Upload } from "lucide-react";
-import { CALLOUT_LABEL, renumberChapter, type CalloutKind, type ChapterBlock, type ChapterSection, type TextbookChapter } from "@/modules/curriculum/lib/textbook-chapter";
+import { CALLOUT_LABEL, SECTION_ROLE_LABEL, renumberChapter, type CalloutKind, type ChapterBlock, type ChapterSection, type TextbookChapter } from "@/modules/curriculum/lib/textbook-chapter";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -18,7 +18,7 @@ interface Props {
   className?: string;
 }
 
-type InsertKind = "section" | "callout" | "figure" | "review_question" | "summary_point" | "guiding_question" | "objective" | "key_term" | "paragraph";
+type InsertKind = "section" | "historical_context" | "callout" | "figure" | "review_question" | "summary_point" | "guiding_question" | "objective" | "key_term" | "paragraph";
 
 function RowTools({ onUp, onDown, onDelete, canUp, canDown }: { onUp: () => void; onDown: () => void; onDelete: () => void; canUp: boolean; canDown: boolean }) {
   return (
@@ -70,7 +70,13 @@ export function ChapterEditor({ chapter, onChange, standards = [], className }: 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const r = data?.data ?? {};
-      if (kind === "section") set({ sections: [...ch.sections, { heading: r.heading ?? "New section", blocks: Array.isArray(r.blocks) ? r.blocks : [] }] });
+      if (kind === "section") set({ sections: [...ch.sections, { role: "key_elements", heading: r.heading ?? "New section", blocks: Array.isArray(r.blocks) ? r.blocks : [] }] });
+      else if (kind === "historical_context") {
+        const sec: ChapterSection = { role: "historical_context", heading: r.heading ?? "Historical Context", blocks: Array.isArray(r.blocks) ? r.blocks : [] };
+        // Slot it right after the Introduction so the standard flow holds.
+        const at = ch.sections.findIndex((x) => x.role === "introduction");
+        const next = [...ch.sections]; next.splice(at >= 0 ? at + 1 : 1, 0, sec); set({ sections: next });
+      }
       else if (kind === "callout" && sectionIdx != null) setSection(sectionIdx, { blocks: [...ch.sections[sectionIdx].blocks, { type: "callout", kind: r.kind ?? "stop_and_think", text: r.text ?? "" }] });
       else if (kind === "figure" && sectionIdx != null) setSection(sectionIdx, { blocks: [...ch.sections[sectionIdx].blocks, { type: "figure", caption: r.caption ?? "", description: r.description ?? "", alt: r.alt ?? "", image_url: null }] });
       else if (kind === "paragraph" && sectionIdx != null) setSection(sectionIdx, { blocks: [...ch.sections[sectionIdx].blocks, { type: "paragraph", text: r.text ?? r.html ?? "" }] });
@@ -149,7 +155,10 @@ export function ChapterEditor({ chapter, onChange, standards = [], className }: 
       {ch.sections.map((sec, si) => (
         <section key={si} className="rounded-2xl border border-border p-4 space-y-3">
           <div className="flex items-start gap-2">
-            <Badge variant="outline" className="mt-2 tabular-nums">{sec.number}</Badge>
+            <div className="mt-2 flex flex-col items-start gap-1">
+              <Badge variant="outline" className="tabular-nums">{sec.number}</Badge>
+              {sec.role && <Badge variant="secondary" className="text-[10px]">{SECTION_ROLE_LABEL[sec.role]}</Badge>}
+            </div>
             <Input value={sec.heading} onChange={(e) => setSection(si, { heading: e.target.value })} className="font-semibold" placeholder="Section heading" />
             <RowTools canUp={si > 0} canDown={si < ch.sections.length - 1} onUp={() => set({ sections: move(ch.sections, si, -1) })} onDown={() => set({ sections: move(ch.sections, si, 1) })} onDelete={() => set({ sections: ch.sections.filter((_, k) => k !== si) })} />
           </div>
@@ -222,7 +231,7 @@ export function ChapterEditor({ chapter, onChange, standards = [], className }: 
 
       {/* Review questions */}
       <section className="space-y-2">
-        <div className="flex items-center justify-between"><Label>Review questions</Label><AiBtn kind="review_question" label="AI question" /></div>
+        <div className="flex items-center justify-between"><Label>Reading comprehension questions (5)</Label><AiBtn kind="review_question" label="AI question" /></div>
         {ch.review_questions.map((q, i) => (
           <div key={i} className="flex items-start gap-1">
             <div className="flex-1 rounded-xl border border-border p-3 space-y-2">

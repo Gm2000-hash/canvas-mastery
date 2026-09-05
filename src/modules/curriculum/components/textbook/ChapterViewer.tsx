@@ -105,6 +105,7 @@ export function ChapterViewer({ chapter: ch, teacherMode, showToc = true, standa
             <h2 className="font-display text-2xl text-foreground mb-3 flex items-baseline gap-3">
               {sec.number && <span className="text-primary text-lg font-semibold tabular-nums">{sec.number}</span>}
               {sec.heading}
+              {sec.role && <span className="ml-2 align-middle text-xs font-medium uppercase tracking-wide text-muted-foreground">{SECTION_ROLE_LABEL[sec.role]}</span>}
             </h2>
             <div className="space-y-4">
               {sec.blocks.map((b, bi) => {
