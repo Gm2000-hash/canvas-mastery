@@ -31,7 +31,8 @@ import GoogleImportDialog from '@/modules/curriculum/components/GoogleImportDial
 import { ChapterViewer } from '@/modules/curriculum/components/textbook/ChapterViewer';
 import { ChapterEditor } from '@/modules/curriculum/components/textbook/ChapterEditor';
 import { useConvertToChapter } from '@/modules/curriculum/components/textbook/useConvertToChapter';
-import { chapterToLegacyFields, isChapter, normalizeChapter, type TextbookChapter } from '@/modules/curriculum/lib/textbook-chapter';
+import { chapterToLegacyFields, isChapter, normalizeChapter, validateReadingTemplate, type TextbookChapter } from '@/modules/curriculum/lib/textbook-chapter';
+import { TemplateBadge } from '@/modules/curriculum/components/textbook/TemplateBadge';
 
 interface CurriculumReadingViewerProps {
   discipline: string;
@@ -649,6 +650,7 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
           {/* Edit / Save toggle */}
           {lesson && !editing && (
             <>
+              <TemplateBadge report={validateReadingTemplate({ chapter: lesson.chapter, legacy: lesson as any })} onFix={handleConvertCurrent} fixing={converting} />
               <Button variant="outline" size="sm" className="gap-2" onClick={() => setStandardsPickerOpen(true)}>
                 <Target className="h-3.5 w-3.5" /> Edit Standards
               </Button>
@@ -965,7 +967,7 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
                             <span className="text-xs text-muted-foreground/60 w-6 shrink-0 text-right">{index + 1}.</span>
                             <div className="min-w-0 flex-1">
                               <span className="text-foreground group-hover:text-primary transition-colors">{l.title}</span>
-                              {isChapter(l.chapter) && <Badge variant="outline" className="ml-2 text-[10px] font-normal border-primary/40 text-primary align-middle">Chapter</Badge>}
+                              <TemplateBadge compact className="ml-2 align-middle" report={validateReadingTemplate({ chapter: l.chapter, legacy: l as any })} />
                               {l.reading_title && (
                                 <span className="block text-[11px] text-muted-foreground mt-0.5">📖 {l.reading_title}</span>
                               )}

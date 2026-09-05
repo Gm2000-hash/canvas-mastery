@@ -25,6 +25,9 @@ import { exportCurriculumUnitToDocx, exportCurriculumLessonToDocx } from "@/modu
 import { LessonStandardsPicker } from "@/modules/curriculum/components/LessonStandardsPicker";
 import { toast as sonnerToast } from "sonner";
 import GenerateContentDialog from "@/modules/curriculum/components/GenerateContentDialog";
+import { ChapterViewer } from "@/modules/curriculum/components/textbook/ChapterViewer";
+import { TemplateBadge } from "@/modules/curriculum/components/textbook/TemplateBadge";
+import { isChapter, normalizeChapter, validateReadingTemplate } from "@/modules/curriculum/lib/textbook-chapter";
 
 /** Convert a string[] (from DB) into a single HTML string for TipTap */
 function arrayToHtml(arr: string[]): string {
@@ -370,6 +373,9 @@ function UnitSection({
                       <span className="text-[11px] text-muted-foreground">{(lesson.objectives as any[])?.length || 0} objectives</span>
                       {lesson.reading_title && (
                         <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Reading</span>
+                      )}
+                      {(lesson.reading_title || (lesson.objectives as any[])?.length > 0) && (
+                        <TemplateBadge compact report={validateReadingTemplate({ chapter: lesson.chapter, legacy: lesson as any })} />
                       )}
                     </div>
                   </div>
@@ -858,18 +864,23 @@ function ReadingPreviewDialog({
   const hasIntro = introHtml && introHtml !== "<p></p>";
   const hasExplanation = explanationHtml && explanationHtml !== "<p></p>";
   const hasContent = hasReading || hasIntro || hasExplanation || (lesson.objectives as any[])?.length > 0;
+  const chapter = isChapter(lesson.chapter) ? normalizeChapter(lesson.chapter, lesson.title) : null;
+  const report = validateReadingTemplate({ chapter: lesson.chapter, legacy: lesson as any });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className={chapter ? "max-w-4xl max-h-[85vh] overflow-y-auto" : "max-w-2xl max-h-[85vh] overflow-y-auto"}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5 text-primary" />
             Reading Preview
+            {hasContent && <TemplateBadge report={report} />}
           </DialogTitle>
         </DialogHeader>
 
-        {!hasContent ? (
+        {chapter ? (
+          <ChapterViewer chapter={chapter} teacherMode showToc={false} />
+        ) : !hasContent ? (
           <div className="py-12 text-center">
             <BookOpen className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground">No reading content yet. Edit the lesson to add content.</p>
