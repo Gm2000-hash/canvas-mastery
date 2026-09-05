@@ -1,6 +1,6 @@
 import { useMemo, useState, type MouseEvent } from "react";
 import { sanitizeRichHtml } from "@/modules/curriculum/lib/sanitize-rich-html";
-import { CALLOUT_LABEL, inlineToHtml, type CalloutKind, type TextbookChapter } from "@/modules/curriculum/lib/textbook-chapter";
+import { CALLOUT_LABEL, SECTION_ROLE_LABEL, inlineToHtml, type CalloutKind, type TextbookChapter } from "@/modules/curriculum/lib/textbook-chapter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BookOpen, ChevronLeft, ChevronRight, Eye, EyeOff, HelpCircle, Lightbulb, Link2, X } from "lucide-react";
