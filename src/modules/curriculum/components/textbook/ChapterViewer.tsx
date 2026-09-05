@@ -56,7 +56,7 @@ export function ChapterViewer({ chapter: ch, teacherMode, showToc = true, standa
   ];
 
   return (
-    <div className={cn("relative lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-10", className)}>
+    <div className={cn("relative", showToc && "lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-10", className)}>
       {showToc && (
         <nav className="hidden lg:block sticky top-4 self-start text-sm" aria-label="In this chapter">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">In this chapter</p>
