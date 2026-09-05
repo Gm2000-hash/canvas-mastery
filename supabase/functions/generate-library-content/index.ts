@@ -10,7 +10,7 @@ import {
   isAiProviderHardError,
 } from "../_shared/openrouter.ts";
 import { aiJson, HttpError } from "../_shared/curriculum-ai.ts";
-import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, chapterToMarkdown, normalizeChapterOut } from "../_shared/textbook-chapter.ts";
+import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, chapterToMarkdown, generateChapterStrict } from "../_shared/textbook-chapter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
     // is derived from the chapter so search/export keep working.
     if (kind === "reading") {
       try {
-        const out = await aiJson<Record<string, unknown>>({
+        const chapter = await generateChapterStrict({
           system: CHAPTER_SYSTEM,
           user: [
             `Write a student-facing textbook chapter. Grade: ${effGrade}. Subject: ${effSubject}.`,
@@ -116,10 +116,8 @@ Deno.serve(async (req) => {
             `Return JSON exactly in this shape:\n${CHAPTER_SCHEMA}`,
           ].filter(Boolean).join("\n\n"),
           maxTokens: length === "long" ? 9000 : 7000,
-          tier: "heavy",
+          fallbackTitle: options?.topic ?? `${effSubject} chapter`,
         });
-        const chapter = normalizeChapterOut(out, options?.topic ?? `${effSubject} chapter`);
-        if (!chapter.sections.length) return json({ error: "The AI returned an empty chapter. Try again." }, 500);
         const levels = Array.from(new Set(chapter.review_questions.map((q) => q.dok))).sort();
         return json({
           title: chapter.title.slice(0, 200), body: chapterToMarkdown(chapter), chapter,
