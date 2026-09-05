@@ -248,6 +248,7 @@ Improve and fill in any missing information. Keep the same general topic but mak
                 key_terms: reading.key_terms || [],
                 reading_title: reading.reading?.reading_title || null,
                 reading_paragraphs: reading.reading?.reading_paragraphs || [],
+                chapter: readingData.chapter ?? null,
                 updated_at: new Date().toISOString(),
               }).eq("id", existingReading[0].id);
             } else {
@@ -267,6 +268,7 @@ Improve and fill in any missing information. Keep the same general topic but mak
                 key_terms: reading.key_terms || [],
                 reading_title: reading.reading?.reading_title || null,
                 reading_paragraphs: reading.reading?.reading_paragraphs || [],
+                chapter: readingData.chapter ?? null,
               } as any);
             }
           }
