@@ -140,8 +140,8 @@ export default function TextbookDetail() {
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Input value={book.subject ?? ""} placeholder="Subject" onChange={(e) => setBook({ ...book, subject: e.target.value })} onBlur={() => patchBook({ subject: book.subject || null })} className="h-7 w-32 text-xs" />
               <Input value={book.grade ?? ""} placeholder="Grade" onChange={(e) => setBook({ ...book, grade: e.target.value })} onBlur={() => patchBook({ grade: book.grade || null })} className="h-7 w-20 text-xs" />
-              <Badge variant="outline" className="font-normal">{flat.length} chapters · {parts.length} parts</Badge>
-              {unconverted > 0 && <Badge variant="outline" className="font-normal border-accent text-accent-foreground">{unconverted} not yet in chapter format</Badge>}
+              <Badge variant="outline" className="font-normal whitespace-nowrap">{flat.length} chapters · {parts.length} parts</Badge>
+              {unconverted > 0 && <Badge variant="outline" className="font-normal whitespace-nowrap border-accent text-accent-foreground">{unconverted} not yet in chapter format</Badge>}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
