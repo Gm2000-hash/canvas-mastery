@@ -25,6 +25,7 @@ const TOOLS = [
   { label: "Curriculum", path: "/app/curriculum/lesson-planner", icon: Layers },
   { label: "Activities", path: "/app/curriculum/activities", icon: Puzzle },
   { label: "Reading Library", path: "/app/curriculum/reading-library", icon: BookOpenCheck },
+  { label: "Textbooks", path: "/app/curriculum/textbooks", icon: BookOpenCheck },
   { label: "Standards Browser", path: "/app/curriculum/standards", icon: Library },
   { label: "ISAT Practice", path: "/app/curriculum/question-bank?tab=isat", icon: ClipboardCheck },
   { label: "All Notes", path: "/app/curriculum/notes", icon: FileText },

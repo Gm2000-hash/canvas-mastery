@@ -278,9 +278,10 @@ export default function ReadingLibrary() {
             },
             {
               variant: "coral",
-              eyebrow: "Share",
-              title: "Public links",
-              body: "Click the link icon on any tile to copy a share URL.",
+              eyebrow: "Compile",
+              title: "Digital textbooks",
+              body: "Arrange chapter-format readings into parts, share a student link, or send to Canvas / Google Classroom.",
+              action: { label: "Open Textbooks", onClick: () => navigate("/app/curriculum/textbooks"), icon: BookOpen },
             },
           ]}
         />

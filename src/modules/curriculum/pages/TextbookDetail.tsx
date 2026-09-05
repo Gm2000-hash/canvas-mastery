@@ -131,7 +131,7 @@ export default function TextbookDetail() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 h-14 border-b border-border/60 bg-background/90 backdrop-blur flex items-center px-4 gap-4">
         <AppNavSheet />
-        <Breadcrumbs items={[{ label: "Textbooks", href: "/app/curriculum/textbooks" }, { label: book.title }]} />
+        <Breadcrumbs items={[{ label: "Textbooks", path: "/app/curriculum/textbooks" }, { label: book.title }]} />
       </header>
       <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full space-y-6">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
