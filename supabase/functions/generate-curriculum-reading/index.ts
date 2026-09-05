@@ -1,44 +1,37 @@
-// Curriculum suite: regenerate a full textbook-style reading for one lesson.
-// Input: { subject_area, objectives, format?, ngss_standard? }
-// Output: { lesson: { title, objectives[], intro[], explanation[], key_terms[], reading: { reading_title, reading_paragraphs[] } } }
+// Curriculum suite: regenerate a full textbook-style chapter for one lesson.
+// Input: { subject_area, objectives, format?, ngss_standard?, standards?: string[] }
+// Output: { chapter, lesson: { title, objectives[], intro[], explanation[], key_terms[], reading: { reading_title, reading_paragraphs[] } } }
 import { z } from "https://esm.sh/zod@3.23.8";
-import { aiJson, arr, json, readBody, serve, str, HttpError } from "../_shared/curriculum-ai.ts";
+import { aiJson, json, readBody, serve, HttpError } from "../_shared/curriculum-ai.ts";
+import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, chapterToLegacy, normalizeChapterOut } from "../_shared/textbook-chapter.ts";
 
 const Body = z.object({
   subject_area: z.string().min(1).max(300),
   objectives: z.string().max(4000).optional().default(""),
   format: z.string().max(40).optional().default("textbook"),
   ngss_standard: z.string().max(60).optional().nullable(),
+  standards: z.array(z.string().max(400)).max(12).optional().default([]),
 });
 
 serve(async (req) => {
   const parsed = Body.safeParse(await readBody(req));
   if (!parsed.success) throw new HttpError(400, JSON.stringify(parsed.error.flatten().fieldErrors));
   const b = parsed.data;
+  const stds = [b.ngss_standard, ...b.standards].filter(Boolean);
 
   const out = await aiJson<Record<string, unknown>>({
-    system: "You are an expert science and humanities textbook author for grades 6-12. Write clear, engaging, accurate student-facing text. Respond with one valid JSON object only.",
-    user: `Write a ${b.format}-style reading for a lesson titled "${b.subject_area}".${b.ngss_standard ? ` Aligned standard: ${b.ngss_standard}.` : ""}
-Lesson objectives:\n${b.objectives || "(derive suitable objectives from the title)"}
+    system: CHAPTER_SYSTEM,
+    user: `Write a ${b.format}-style chapter for a lesson titled "${b.subject_area}".${stds.length ? `\nAligned standards (reference their codes where relevant):\n${stds.map((x) => `- ${x}`).join("\n")}` : ""}
+Lesson objectives to build on:\n${b.objectives || "(derive suitable objectives from the title)"}
 
-Return JSON exactly in this shape:
-{"title":string,"objectives":[string],"intro":[string],"explanation":[string],"key_terms":[{"term":string,"definition":string}],"reading":{"reading_title":string,"reading_paragraphs":[string]}}
-Requirements: 2-4 objectives; intro = 2 paragraphs that hook the reader with a phenomenon or question; explanation = 4-6 paragraphs that teach the concept with examples and connect back to the objectives; 6-8 key terms; the reading is an "In the Real World" section (reading_title names the event or case) of 5-7 paragraphs: a case study or an actual documented event — real place, date, and people/organizations — that illustrates the concept, ending with 1-2 sentences tying it back to the main idea; never invent an event, and if you cannot name a real one label it clearly as a realistic case study. Plain text paragraphs (no HTML). Write everything at a 7th-grade reading level (Flesch-Kincaid ~7): short sentences, familiar words, technical terms defined in plain language on first use.`,
-    maxTokens: 6000,
+${CHAPTER_RULES}
+
+Return JSON exactly in this shape:\n${CHAPTER_SCHEMA}`,
+    maxTokens: 8000,
+    tier: "heavy",
   });
 
-  const reading = (out.reading ?? {}) as Record<string, unknown>;
-  return json({
-    lesson: {
-      title: str(out.title, b.subject_area),
-      objectives: arr(out.objectives),
-      intro: arr(out.intro),
-      explanation: arr(out.explanation),
-      key_terms: arr(out.key_terms),
-      reading: {
-        reading_title: str(reading.reading_title ?? out.reading_title),
-        reading_paragraphs: arr(reading.reading_paragraphs ?? out.reading_paragraphs),
-      },
-    },
-  });
+  const chapter = normalizeChapterOut(out, b.subject_area);
+  if (!chapter.sections.length) throw new HttpError(502, "The AI returned an empty chapter. Please try again.");
+  return json({ chapter, lesson: chapterToLegacy(chapter) });
 });
