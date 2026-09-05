@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePageTitle } from "@/modules/curriculum/config/page-title";
+import { useNavigate } from "@/modules/curriculum/config/router";
 import { AppNavSheet } from "@/modules/curriculum/config/chrome-nav-sheet";
 import { BentoHero } from "@/modules/curriculum/config/chrome-bento-hero";
 import { Breadcrumbs } from "@/modules/curriculum/config/chrome-breadcrumbs";
@@ -14,7 +15,7 @@ import { supabase } from "@/modules/curriculum/config/supabase";
 import { useToast } from "@/modules/curriculum/config/toast";
 import GenerateContentDialog from "@/modules/curriculum/components/GenerateContentDialog";
 import {
-  Sparkles, Search, FileText, BookOpenCheck, Share2, Copy, Check, Link2, Loader2,
+  Sparkles, Search, FileText, BookOpenCheck, BookOpen, Share2, Copy, Check, Link2, Loader2,
   LayoutGrid, List, LayoutDashboard, Upload, ImageIcon, Trash2, FileDown,
 } from "lucide-react";
 import { generatePdfThumbnail } from "@/modules/curriculum/lib/pdf-thumbnail";
@@ -35,6 +36,7 @@ interface LibraryBook {
 }
 
 export default function ReadingLibrary() {
+  const navigate = useNavigate();
   usePageTitle("Reading Library");
   const { user } = useAuth();
   const { layout: savedLayout, loading: layoutLoading, saveLayout, resetLayout: resetDashboardLayout } = useDashboardLayout(user?.id);
