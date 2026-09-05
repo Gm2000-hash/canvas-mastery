@@ -6,7 +6,7 @@ export const CHAPTER_SCHEMA = `{
  "hook": string,
  "before_you_read": {"preview": string, "prior_knowledge_prompt": string, "guiding_questions": [string]},
  "objectives": [string],
- "sections": [{"heading": string, "blocks": [
+ "sections": [{"role":"introduction"|"historical_context"|"key_elements","heading": string, "blocks": [
     {"type":"paragraph","text":string} |
     {"type":"callout","kind":"stop_and_think"|"did_you_know"|"connect_it","text":string} |
     {"type":"figure","caption":string,"description":string,"alt":string}
@@ -17,14 +17,18 @@ export const CHAPTER_SCHEMA = `{
  "glossary": [{"term": string, "definition": string}]
 }`;
 
-export const CHAPTER_RULES = `Write it as ONE textbook chapter with these parts, in this order:
-1. Chapter opener: "title"; "hook" = one paragraph that opens with a phenomenon, surprising fact or question. "before_you_read": "preview" = 2-3 sentences previewing what the chapter covers (so students can preview before reading); "prior_knowledge_prompt" = one prompt asking what students already know; "guiding_questions" = 2-3 questions, one per main section heading, that the section answers.
-2. "objectives": 2-4 measurable learning objectives ("Students will be able to …").
-3. "sections": 3-5 numbered sections. Each "heading" is a short phrase a student could turn into a question. Each section has 2-4 "paragraph" blocks (3-6 sentences each; bold key vocabulary on first use with **term**), and exactly one "callout" block placed after a relevant paragraph — rotate kinds across sections: "stop_and_think" (a quick check question), "did_you_know" (a striking fact), "connect_it" (a link to daily life or another subject). Include 1-2 "figure" blocks in the whole chapter: "description" is a 30-60 word brief for an illustrator (labeled diagram or realistic scene, no text in image), "caption" is one sentence explaining what the figure shows, "alt" is short alt text.
-4. "real_world": an "In the Real World" case study — a real documented event or place (real names, dates, organizations) that illustrates the concept, 4-6 paragraphs, ending with 1-2 sentences tying it back to the main idea. Never invent an event; if you cannot name a real one, label it clearly as a realistic case study.
+export const CHAPTER_RULES = `Write it as ONE textbook chapter. EVERY reading, in EVERY content area, follows this exact flow, in this order:
+1. Chapter opener: "title"; "hook" = one paragraph that opens with a phenomenon, surprising fact or question. "before_you_read": "preview" = 2-3 sentences previewing what the chapter covers; "prior_knowledge_prompt" = one prompt asking what students already know; "guiding_questions" = 3 questions, one per main section, that the section answers.
+2. "objectives": EXACTLY 3 measurable learning objectives ("Students will be able to …").
+3. "sections" — exactly these, in this order (set "role" on each):
+   - role "introduction", heading "Introduction": what the concept is, why it matters, and where students meet it (2-3 paragraphs).
+   - role "historical_context", heading "Historical Context: <person's name>": the story of ONE real, named person tied to the idea — a scientist, inventor, ruler, political figure, author, artist, explorer, etc. Who they were, when and where they lived (real dates/places), what they did, what problem they faced, and how their work shaped this concept. 3-4 narrative paragraphs. Never invent a person or event.
+   - role "key_elements", heading "Key Elements of <topic>": the parts, steps or processes of the topic explained in order (3-5 paragraphs; use numbered steps in prose where there is a sequence). For a long topic you may split this into TWO consecutive "key_elements" sections with distinct headings.
+   Each paragraph block is 3-6 sentences; bold key vocabulary on first use with **term**. Each section has exactly one "callout" block placed after a relevant paragraph — rotate kinds: "stop_and_think" (a quick check question), "did_you_know" (a striking fact), "connect_it" (a link to daily life or another subject). Include 1-2 "figure" blocks in the whole chapter: "description" is a 30-60 word brief for an illustrator (labeled diagram or realistic scene, no text in image), "caption" is one sentence explaining what the figure shows, "alt" is short alt text.
+4. "real_world": an "In the Real World" case study — a real documented event, place, or organization (real names, dates) that shows the concept in action, 4-6 paragraphs, ending with 1-2 sentences tying it back to the main idea. It must be different from the historical-context story. Never invent an event; if you cannot name a real one, label it clearly as a realistic case study.
 5. "summary": 4-6 one-sentence bullet points, one per main idea, in order.
-6. "review_questions": 5-8 questions spanning DOK 1 (recall), DOK 2 (apply/compare) and DOK 3 (explain with evidence), each with a short model "answer".
-7. "glossary": every bolded term (6-10) with a student-friendly definition.
+6. "glossary" (shown to students as "Key Terms"): 4-12 terms — every bolded term — each with a plain-language explanation a 7th grader understands.
+7. "review_questions" (shown as "Reading Comprehension Questions"): EXACTLY 5 questions — two at DOK 1 (recall), two at DOK 2 (apply/compare/explain), one at DOK 3 (reason with evidence from the reading) — each with a short model "answer".
 Reading level: 7th grade (Flesch-Kincaid ~7) — short sentences, familiar words, technical terms defined in plain language on first use. Plain text (no HTML) except **bold** for vocabulary. Respond with one valid JSON object only.`;
 
 export const CHAPTER_SYSTEM = "You are an expert textbook author for grades 6-12 who writes clear, accurate, engaging student-facing chapters. Respond with one valid JSON object only — no markdown fences, no commentary.";
@@ -46,6 +50,7 @@ export function normalizeChapterOut(raw: unknown, fallbackTitle: string) {
     objectives: sa(r.objectives),
     sections: (Array.isArray(r.sections) ? r.sections : []).map((sec: any, i: number) => ({
       number: String(i + 1),
+      role: ["introduction", "historical_context", "key_elements"].includes(sec?.role) ? sec.role : (i === 0 ? "introduction" : i === 1 ? "historical_context" : "key_elements"),
       heading: s(sec?.heading, `Section ${i + 1}`),
       blocks: (Array.isArray(sec?.blocks) ? sec.blocks : []).map((b: any) => {
         if (typeof b === "string") return { type: "paragraph", text: b };
@@ -100,7 +105,7 @@ export function chapterToMarkdown(ch: ChapterOut): string {
   }
   if (ch.real_world.paragraphs.length) out.push(`## In the Real World${ch.real_world.title ? `: ${ch.real_world.title}` : ""}\n\n` + ch.real_world.paragraphs.join("\n\n"));
   if (ch.summary.length) out.push("## Chapter Summary\n" + ch.summary.map((x) => `- ${x}`).join("\n"));
-  if (ch.review_questions.length) out.push("## Review Questions\n" + ch.review_questions.map((q, i) => `${i + 1}. ${q.question} [DOK ${q.dok}]`).join("\n"));
-  if (ch.glossary.length) out.push("## Glossary\n" + ch.glossary.map((g) => `- **${g.term}** — ${g.definition}`).join("\n"));
+  if (ch.review_questions.length) out.push("## Reading Comprehension Questions\n" + ch.review_questions.map((q, i) => `${i + 1}. ${q.question} [DOK ${q.dok}]`).join("\n"));
+  if (ch.glossary.length) out.push("## Key Terms\n" + ch.glossary.map((g) => `- **${g.term}** — ${g.definition}`).join("\n"));
   return out.join("\n\n");
 }

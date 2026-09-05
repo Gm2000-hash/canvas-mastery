@@ -33,7 +33,7 @@ serve(async (req) => {
 
   const out = await aiJson<Record<string, unknown>>({
     system: CHAPTER_SYSTEM,
-    user: `Restructure the following existing reading titled "${b.title}" into a textbook chapter. Keep ALL of the original ideas, examples, vocabulary and the real-world story (reword only for flow and reading level; do not drop content). Add the missing textbook parts (hook, Before You Read, guiding questions, callouts, figure briefs, summary, review questions, glossary) so the result is complete.
+    user: `Restructure the following existing reading titled "${b.title}" into a textbook chapter. Keep ALL of the original ideas, examples, vocabulary and the real-world story (reword only for flow and reading level; do not drop content), but REORGANIZE it into the required flow below: exactly 3 objectives; sections Introduction -> Historical Context (write this section if the original lacks a real, named person's story) -> Key Elements; the real-world case study; 4-12 key terms; exactly 5 reading comprehension questions. Add any missing parts (hook, Before You Read, guiding questions, callouts, figure briefs, summary) so the result is complete.
 ${b.standards.length ? `Aligned standards:\n${b.standards.map((s) => `- ${s.code}: ${s.description}`).join("\n")}\n` : ""}
 ${CHAPTER_RULES}
 

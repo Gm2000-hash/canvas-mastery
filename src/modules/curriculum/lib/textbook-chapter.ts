@@ -5,7 +5,8 @@
 // Structure (modeled on how students preview & study a textbook):
 //   opener (hook, Before You Read, guiding questions, objectives)
 //   numbered sections with paragraphs, callouts and captioned figures
-//   In the Real World (case study), Chapter Summary, Review Questions, Glossary
+//   fixed flow: Introduction -> Historical Context -> Key Elements sections,
+//   In the Real World (case study), Chapter Summary, Key Terms, 5 Reading Comprehension Questions
 
 export type CalloutKind = "stop_and_think" | "did_you_know" | "connect_it";
 
@@ -14,8 +15,16 @@ export type ChapterBlock =
   | { type: "callout"; kind: CalloutKind; title?: string; text: string }
   | { type: "figure"; caption: string; description: string; alt?: string; image_url?: string | null };
 
+export type SectionRole = "introduction" | "historical_context" | "key_elements";
+export const SECTION_ROLE_LABEL: Record<SectionRole, string> = {
+  introduction: "Introduction",
+  historical_context: "Historical Context",
+  key_elements: "Key Elements",
+};
+
 export interface ChapterSection {
   number?: string;
+  role?: SectionRole;
   heading: string;
   blocks: ChapterBlock[];
 }
@@ -58,6 +67,7 @@ export function normalizeChapter(raw: unknown, fallbackTitle = "Chapter"): Textb
   const rw = (r.real_world ?? {}) as Record<string, any>;
   const sections: ChapterSection[] = (Array.isArray(r.sections) ? r.sections : []).map((sec: any) => ({
     number: sec?.number ? s(sec.number) : undefined,
+    role: (["introduction", "historical_context", "key_elements"] as const).includes(sec?.role) ? sec.role : undefined,
     heading: s(sec?.heading, "Section"),
     blocks: (Array.isArray(sec?.blocks) ? sec.blocks : []).map((b: any): ChapterBlock | null => {
       if (!b || typeof b !== "object") return typeof b === "string" && b.trim() ? { type: "paragraph", text: b } : null;
@@ -127,8 +137,8 @@ export function chapterFromLegacyLesson(l: LegacyLessonFields): TextbookChapter 
   const intro = l.intro ?? [];
   const expl = l.explanation ?? [];
   const sections: ChapterSection[] = [];
-  if (intro.length) sections.push({ heading: "Introduction", blocks: intro.map((t) => ({ type: "paragraph", text: t })) });
-  if (expl.length) sections.push({ heading: "Explanation", blocks: expl.map((t) => ({ type: "paragraph", text: t })) });
+  if (intro.length) sections.push({ role: "introduction", heading: "Introduction", blocks: intro.map((t) => ({ type: "paragraph", text: t })) });
+  if (expl.length) sections.push({ role: "key_elements", heading: "Key Elements", blocks: expl.map((t) => ({ type: "paragraph", text: t })) });
   return normalizeChapter({
     title: l.title,
     hook: intro[0] ? stripTags(intro[0]).slice(0, 400) : "",
@@ -192,8 +202,8 @@ export function chapterToMarkdown(ch: TextbookChapter): string {
   }
   if (ch.real_world.paragraphs.length) out.push(`## In the Real World${ch.real_world.title ? `: ${ch.real_world.title}` : ""}\n\n` + ch.real_world.paragraphs.map(mdInline).join("\n\n"));
   if (ch.summary.length) out.push("## Chapter Summary\n" + ch.summary.map((x) => `- ${mdInline(x)}`).join("\n"));
-  if (ch.review_questions.length) out.push("## Review Questions\n" + ch.review_questions.map((q, i) => `${i + 1}. ${mdInline(q.question)} [DOK ${q.dok}]`).join("\n"));
-  if (ch.glossary.length) out.push("## Glossary\n" + ch.glossary.map((g) => `- **${g.term}** — ${mdInline(g.definition)}`).join("\n"));
+  if (ch.review_questions.length) out.push("## Reading Comprehension Questions\n" + ch.review_questions.map((q, i) => `${i + 1}. ${mdInline(q.question)} [DOK ${q.dok}]`).join("\n"));
+  if (ch.glossary.length) out.push("## Key Terms\n" + ch.glossary.map((g) => `- **${g.term}** — ${mdInline(g.definition)}`).join("\n"));
   return out.join("\n\n");
 }
 
@@ -224,8 +234,8 @@ export function chapterToHtml(ch: TextbookChapter, opts: { includeAnswers?: bool
   }
   if (ch.real_world.paragraphs.length) out.push(H(h + 1, esc(`In the Real World${ch.real_world.title ? `: ${ch.real_world.title}` : ""}`)) + ch.real_world.paragraphs.map((p) => `<p>${inlineToHtml(p)}</p>`).join(""));
   if (ch.summary.length) out.push(H(h + 1, "Chapter Summary") + `<ul>${ch.summary.map((x) => `<li>${inlineToHtml(x)}</li>`).join("")}</ul>`);
-  if (ch.review_questions.length) out.push(H(h + 1, "Review Questions") + `<ol>${ch.review_questions.map((q) => `<li>${inlineToHtml(q.question)} <em>[DOK ${q.dok}]</em>${opts.includeAnswers && q.answer ? `<br/><span style="color:#475569;"><strong>Answer:</strong> ${inlineToHtml(q.answer)}</span>` : ""}</li>`).join("")}</ol>`);
-  if (ch.glossary.length) out.push(H(h + 1, "Glossary") + `<dl>${ch.glossary.map((g) => `<dt><strong>${esc(g.term)}</strong></dt><dd>${inlineToHtml(g.definition)}</dd>`).join("")}</dl>`);
+  if (ch.review_questions.length) out.push(H(h + 1, "Reading Comprehension Questions") + `<ol>${ch.review_questions.map((q) => `<li>${inlineToHtml(q.question)} <em>[DOK ${q.dok}]</em>${opts.includeAnswers && q.answer ? `<br/><span style="color:#475569;"><strong>Answer:</strong> ${inlineToHtml(q.answer)}</span>` : ""}</li>`).join("")}</ol>`);
+  if (ch.glossary.length) out.push(H(h + 1, "Key Terms") + `<dl>${ch.glossary.map((g) => `<dt><strong>${esc(g.term)}</strong></dt><dd>${inlineToHtml(g.definition)}</dd>`).join("")}</dl>`);
   return out.join("\n");
 }
 
@@ -259,11 +269,11 @@ export function chapterToBlocks(ch: TextbookChapter, opts: { includeAnswers?: bo
   if (ch.real_world.paragraphs.length) { out.push({ type: sub, text: `In the Real World${ch.real_world.title ? `: ${ch.real_world.title}` : ""}` }); ch.real_world.paragraphs.forEach((p) => out.push({ type: "p", text: mdInline(p) })); }
   if (ch.summary.length) { out.push({ type: sub, text: "Chapter Summary" }); out.push({ type: "ul", items: ch.summary.map(mdInline) }); }
   if (ch.review_questions.length) {
-    out.push({ type: sub, text: "Review Questions" });
+    out.push({ type: sub, text: "Reading Comprehension Questions" });
     out.push({ type: "ol", items: ch.review_questions.map((q) => `${mdInline(q.question)} _[DOK ${q.dok}]_`) });
     if (opts.includeAnswers && ch.review_questions.some((q) => q.answer)) { out.push({ type: "p", text: "**Answer key (teacher)**" }); out.push({ type: "ol", items: ch.review_questions.map((q) => mdInline(q.answer ?? "—")) }); }
   }
-  if (ch.glossary.length) { out.push({ type: sub, text: "Glossary" }); out.push({ type: "ul", items: ch.glossary.map((g) => `**${g.term}** — ${mdInline(g.definition)}`) }); }
+  if (ch.glossary.length) { out.push({ type: sub, text: "Key Terms" }); out.push({ type: "ul", items: ch.glossary.map((g) => `**${g.term}** — ${mdInline(g.definition)}`) }); }
   return out;
 }
 
@@ -285,5 +295,12 @@ export function mergeGlossary(chapters: { number?: number | null; title: string;
 }
 
 export function emptyChapter(title = "New chapter"): TextbookChapter {
-  return normalizeChapter({ title, sections: [{ heading: "Section", blocks: [{ type: "paragraph", text: "" }] }] }, title);
+  return normalizeChapter({
+    title,
+    sections: [
+      { role: "introduction", heading: "Introduction", blocks: [{ type: "paragraph", text: "" }] },
+      { role: "historical_context", heading: "Historical Context", blocks: [{ type: "paragraph", text: "" }] },
+      { role: "key_elements", heading: "Key Elements", blocks: [{ type: "paragraph", text: "" }] },
+    ],
+  }, title);
 }

@@ -6,7 +6,7 @@ import { z } from "https://esm.sh/zod@3.23.8";
 import { aiJson, json, readBody, serve, HttpError } from "../_shared/curriculum-ai.ts";
 
 const Body = z.object({
-  kind: z.enum(["paragraph", "objective", "key_term", "activity", "video", "section", "callout", "figure", "review_question", "summary_point", "guiding_question"]),
+  kind: z.enum(["paragraph", "objective", "key_term", "activity", "video", "section", "callout", "figure", "review_question", "summary_point", "guiding_question", "historical_context"]),
   section: z.string().max(200).optional(),
   lesson: z.record(z.unknown()).default({}),
   standards: z.array(z.object({ code: z.string(), description: z.string() })).max(20).default([]),
@@ -20,6 +20,7 @@ const SHAPES: Record<string, string> = {
   activity: `{"html":"<h4>Activity title</h4><p>instructions...</p><ol><li>step</li></ol>"}`,
   video: `{"title":string,"source":string,"rationale":string,"search_url":"https://www.youtube.com/results?search_query=...","youtube_search":"query string"}`,
   section: `{"heading":string,"blocks":[{"type":"paragraph","text":string},{"type":"callout","kind":"stop_and_think"|"did_you_know"|"connect_it","text":string}]}`,
+  historical_context: `{"role":"historical_context","heading":string,"blocks":[{"type":"paragraph","text":string},{"type":"callout","kind":"stop_and_think"|"did_you_know"|"connect_it","text":string}]}`,
   callout: `{"kind":"stop_and_think"|"did_you_know"|"connect_it","text":string}`,
   figure: `{"caption":string,"description":string,"alt":string}`,
   review_question: `{"question":string,"dok":1|2|3,"answer":string}`,
@@ -34,6 +35,7 @@ const GUIDE: Record<string, string> = {
   activity: "Design ONE short (10-15 minute) classroom activity or check-for-understanding tied to this reading, as clean HTML.",
   video: "Recommend ONE well-known, classroom-appropriate video (e.g. from Crash Course, TED-Ed, PBS, Khan Academy, Amoeba Sisters) that supports this lesson, with a rationale and a YouTube search URL.",
   section: "Write ONE new textbook section that covers an idea the chapter is missing: a heading a student could turn into a question, 2-3 paragraphs (3-6 sentences each, **bold** new vocabulary) and one callout block.",
+  historical_context: "Write ONE 'Historical Context' section: the true story of one real, named person (scientist, inventor, ruler, political figure, author, etc.) tied to this concept — real dates and places, the problem they faced, what they did, and how it shaped the idea. Heading 'Historical Context: <name>', 3-4 narrative paragraphs (3-6 sentences each, **bold** new vocabulary) and one callout. Never invent a person or event.",
   callout: "Write ONE callout box for the requested section: 'stop_and_think' (a quick check question), 'did_you_know' (a striking accurate fact) or 'connect_it' (a link to daily life). 1-3 sentences.",
   figure: "Propose ONE figure for the requested section: a 30-60 word illustrator brief (labeled diagram or realistic scene, no text in the image), a one-sentence caption, and short alt text.",
   review_question: "Write ONE new end-of-chapter review question not already present, with its DOK level (1 recall, 2 apply/compare, 3 explain with evidence) and a short model answer.",
