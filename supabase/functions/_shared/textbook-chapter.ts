@@ -135,7 +135,7 @@ export function chapterTemplateProblems(ch: ChapterOut): string[] {
   const p: string[] = [];
   if (ch.objectives.length !== 3) p.push(`"objectives" must contain exactly 3 items (has ${ch.objectives.length}).`);
   const roles = ch.sections.map((s, i) => inferRole(s, i));
-  const paras = (s: ChapterOut["sections"][number]) => s.blocks.filter((b) => b.type === "paragraph").length;
+  const paras = (s: ChapterOut["sections"][number]) => s.blocks.filter((b: { type: string }) => b.type === "paragraph").length;
   const intro = ch.sections.findIndex((_, i) => roles[i] === "introduction");
   const hist = ch.sections.findIndex((_, i) => roles[i] === "historical_context");
   const keyEl = ch.sections.findIndex((_, i) => roles[i] === "key_elements");

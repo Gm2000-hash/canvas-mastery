@@ -2,7 +2,7 @@
 // Input: { subject_area, objectives, format?, ngss_standard?, standards?: string[] }
 // Output: { chapter, lesson: { title, objectives[], intro[], explanation[], key_terms[], reading: { reading_title, reading_paragraphs[] } } }
 import { z } from "https://esm.sh/zod@3.23.8";
-import { json, readBody, serve } from "../_shared/curriculum-ai.ts";
+import { json, readBody, serve, HttpError } from "../_shared/curriculum-ai.ts";
 import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, chapterToLegacy, generateChapterStrict } from "../_shared/textbook-chapter.ts";
 
 const Body = z.object({
