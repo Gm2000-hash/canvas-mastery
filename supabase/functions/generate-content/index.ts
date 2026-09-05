@@ -3,7 +3,7 @@
 // Output: { questions } | { lessons } | { readings }
 import { z } from "https://esm.sh/zod@3.23.8";
 import { aiJson, arr, json, readBody, serve, HttpError } from "../_shared/curriculum-ai.ts";
-import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, chapterToLegacy, normalizeChapterOut } from "../_shared/textbook-chapter.ts";
+import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, chapterToLegacy, generateChapterStrict } from "../_shared/textbook-chapter.ts";
 
 const Body = z.object({
   content_type: z.enum(["questions", "lesson_plan", "reading"]),
@@ -49,14 +49,12 @@ serve(async (req) => {
   const readings: unknown[] = [];
   const count = Math.min(b.count, 4);
   for (let i = 0; i < count; i++) {
-    const out = await aiJson<Record<string, unknown>>({
+    const chapter = await generateChapterStrict({
       system: CHAPTER_SYSTEM,
       user: `${ctx}\n\nWrite student-facing textbook chapter ${i + 1} of ${count} for this standard${count > 1 ? ` (each chapter covers a different facet of the standard; this one should be distinct from the others and use a different real-world case)` : ""}. Reference the standard code where relevant.\n\n${CHAPTER_RULES}\n\nReturn JSON exactly in this shape:\n${CHAPTER_SCHEMA}`,
       maxTokens: 8000,
-      tier: "heavy",
+      fallbackTitle: b.standard_code,
     });
-    const chapter = normalizeChapterOut(out, b.standard_code);
-    if (!chapter.sections.length) continue;
     const legacy = chapterToLegacy(chapter);
     readings.push({ ...legacy, reading_title: legacy.reading.reading_title, reading_paragraphs: legacy.reading.reading_paragraphs, chapter });
   }

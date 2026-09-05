@@ -10,7 +10,7 @@ import {
   isAiProviderHardError,
 } from "../_shared/openrouter.ts";
 import { aiJson, HttpError } from "../_shared/curriculum-ai.ts";
-import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, chapterToMarkdown, normalizeChapterOut } from "../_shared/textbook-chapter.ts";
+import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, chapterToMarkdown, generateChapterStrict } from "../_shared/textbook-chapter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,7 +38,6 @@ const KIND_GUIDE: Record<string, string> = {
   lesson_plan: "a complete lesson plan designed around Kolb's experiential learning cycle with sections in this order: Objective(s), Standards, Materials, Concrete Experience (students do or observe something first-hand), Reflective Observation (students discuss/journal what they noticed), Abstract Conceptualization (the concept, vocabulary and models are named and explained), Active Experimentation (students apply the idea to a new problem or design), Assessment / Check for Understanding, Differentiation, and Extension. Give each of the four Kolb sections a time allotment. End EVERY section with an italic line starting \"*Why this works:*\" giving a 1-2 sentence instructional rationale for that choice",
 };
 
-const READING_LEVEL_GUIDE = "Write at a 7th-grade reading level (Flesch-Kincaid grade ~7): mostly short sentences, familiar words, and any technical term defined in plain language when it first appears.";
 
 const LENGTH_GUIDE: Record<string, string> = {
   short: "Keep it concise (roughly 300-450 words).",
@@ -103,7 +102,7 @@ Deno.serve(async (req) => {
     // is derived from the chapter so search/export keep working.
     if (kind === "reading") {
       try {
-        const out = await aiJson<Record<string, unknown>>({
+        const chapter = await generateChapterStrict({
           system: CHAPTER_SYSTEM,
           user: [
             `Write a student-facing textbook chapter. Grade: ${effGrade}. Subject: ${effSubject}.`,
@@ -116,10 +115,8 @@ Deno.serve(async (req) => {
             `Return JSON exactly in this shape:\n${CHAPTER_SCHEMA}`,
           ].filter(Boolean).join("\n\n"),
           maxTokens: length === "long" ? 9000 : 7000,
-          tier: "heavy",
+          fallbackTitle: options?.topic ?? `${effSubject} chapter`,
         });
-        const chapter = normalizeChapterOut(out, options?.topic ?? `${effSubject} chapter`);
-        if (!chapter.sections.length) return json({ error: "The AI returned an empty chapter. Try again." }, 500);
         const levels = Array.from(new Set(chapter.review_questions.map((q) => q.dok))).sort();
         return json({
           title: chapter.title.slice(0, 200), body: chapterToMarkdown(chapter), chapter,
@@ -136,7 +133,6 @@ Deno.serve(async (req) => {
     const user = [
       `Create ${KIND_GUIDE[kind]}.`,
       `Grade: ${effGrade}. Subject: ${effSubject}.`,
-      kind === "reading" ? READING_LEVEL_GUIDE : "",
       options?.format ? `Format preference: ${options.format}.` : "",
       options?.topic ? `Topic focus: ${options.topic}.` : "",
       dok.text,

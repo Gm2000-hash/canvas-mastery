@@ -109,3 +109,93 @@ export function chapterToMarkdown(ch: ChapterOut): string {
   if (ch.glossary.length) out.push("## Key Terms\n" + ch.glossary.map((g) => `- **${g.term}** — ${g.definition}`).join("\n"));
   return out.join("\n\n");
 }
+
+/* ---------------- Template enforcement ----------------
+ * Every generated reading must match the fixed template:
+ * 3 objectives · Introduction · Historical Context · Key Elements · real-world
+ * case study · 4-12 key terms · exactly 5 comprehension questions.
+ * We validate, ask the model to repair once, then hard-coerce counts.
+ */
+import { aiJson, HttpError } from "./curriculum-ai.ts";
+
+const ROLE_ORDER = ["introduction", "historical_context", "key_elements"] as const;
+
+/** Guess a role from a heading when the model forgot to set one. */
+function inferRole(sec: { heading: string; role?: string }, i: number): string {
+  if (ROLE_ORDER.includes(sec.role as any)) return sec.role!;
+  const h = sec.heading.toLowerCase();
+  if (/histor|story of|biograph|who was|life of/.test(h)) return "historical_context";
+  if (/introduc|overview|what is|why .* matter/.test(h)) return "introduction";
+  if (/key element|how it works|steps|process|parts of|explanation/.test(h)) return "key_elements";
+  return i === 0 ? "introduction" : "key_elements";
+}
+
+/** Returns a list of human-readable template violations (empty = compliant). */
+export function chapterTemplateProblems(ch: ChapterOut): string[] {
+  const p: string[] = [];
+  if (ch.objectives.length !== 3) p.push(`"objectives" must contain exactly 3 items (has ${ch.objectives.length}).`);
+  const roles = ch.sections.map((s, i) => inferRole(s, i));
+  const paras = (s: ChapterOut["sections"][number]) => s.blocks.filter((b: { type: string }) => b.type === "paragraph").length;
+  const intro = ch.sections.findIndex((_, i) => roles[i] === "introduction");
+  const hist = ch.sections.findIndex((_, i) => roles[i] === "historical_context");
+  const keyEl = ch.sections.findIndex((_, i) => roles[i] === "key_elements");
+  if (intro < 0 || paras(ch.sections[intro]) < 1) p.push(`Missing a "sections" entry with role "introduction" (heading "Introduction", 2-3 paragraphs).`);
+  if (hist < 0 || paras(ch.sections[hist]) < 2) p.push(`Missing a "sections" entry with role "historical_context": the true story of ONE real, named person tied to this concept (heading "Historical Context: <name>", 3-4 paragraphs with real dates and places).`);
+  if (keyEl < 0 || paras(ch.sections[keyEl]) < 2) p.push(`Missing a "sections" entry with role "key_elements" explaining the parts/steps/processes (heading "Key Elements of <topic>", 3-5 paragraphs).`);
+  if (intro >= 0 && hist >= 0 && keyEl >= 0 && !(intro < hist && hist < keyEl)) p.push(`Sections must be in the order introduction -> historical_context -> key_elements.`);
+  if (ch.sections.length > 4) p.push(`Too many sections (${ch.sections.length}); use Introduction, Historical Context and one or two Key Elements sections only.`);
+  if (ch.real_world.paragraphs.length < 3) p.push(`"real_world" must be a documented real-world case study or event with 4-6 paragraphs (has ${ch.real_world.paragraphs.length}).`);
+  if (ch.glossary.length < 4 || ch.glossary.length > 12) p.push(`"glossary" must contain 4-12 key terms with explanations (has ${ch.glossary.length}).`);
+  if (ch.review_questions.length !== 5) p.push(`"review_questions" must contain exactly 5 reading-comprehension questions with answers (has ${ch.review_questions.length}).`);
+  return p;
+}
+
+/** Tidy the parts that can be fixed without new content: roles, order, counts. */
+export function coerceChapterTemplate(ch: ChapterOut): ChapterOut {
+  const roles = ch.sections.map((s, i) => inferRole(s, i));
+  const withRoles = ch.sections.map((s, i) => ({ ...s, role: roles[i] }));
+  const ordered = [
+    ...withRoles.filter((s) => s.role === "introduction").slice(0, 1),
+    ...withRoles.filter((s) => s.role === "historical_context").slice(0, 1),
+    ...withRoles.filter((s) => s.role === "key_elements").slice(0, 2),
+  ];
+  // Anything that did not fit (extra intros, etc.) is folded into Key Elements so no content is lost.
+  const leftovers = withRoles.filter((s) => !ordered.includes(s));
+  const keyIdx = ordered.map((s) => s.role).lastIndexOf("key_elements");
+  if (leftovers.length && keyIdx >= 0) ordered[keyIdx] = { ...ordered[keyIdx], blocks: [...ordered[keyIdx].blocks, ...leftovers.flatMap((s) => s.blocks)] };
+  const sections = ordered.map((s, i) => ({ ...s, number: String(i + 1) }));
+  const pickQuestions = () => {
+    // Prefer the DOK 1,1,2,2,3 spread when trimming.
+    const want = [1, 1, 2, 2, 3];
+    const pool = [...ch.review_questions];
+    const out: typeof pool = [];
+    for (const d of want) { const k = pool.findIndex((q) => q.dok === d); if (k >= 0) out.push(pool.splice(k, 1)[0]); }
+    while (out.length < 5 && pool.length) out.push(pool.shift()!);
+    return out.sort((a, b) => a.dok - b.dok);
+  };
+  return { ...ch, objectives: ch.objectives.slice(0, 3), sections, glossary: ch.glossary.slice(0, 12), review_questions: pickQuestions() };
+}
+
+/**
+ * Generate a chapter and enforce the template: validate → one AI repair pass →
+ * coerce → reject if still non-compliant. Used by every reading generator.
+ */
+export async function generateChapterStrict(opts: { system: string; user: string; maxTokens: number; fallbackTitle: string }): Promise<ChapterOut> {
+  const first = await aiJson<Record<string, unknown>>({ system: opts.system, user: opts.user, maxTokens: opts.maxTokens, tier: "heavy" });
+  let ch = normalizeChapterOut(first, opts.fallbackTitle);
+  let problems = chapterTemplateProblems(ch);
+  if (problems.length) {
+    const repaired = await aiJson<Record<string, unknown>>({
+      system: opts.system,
+      user: `The chapter JSON below does NOT follow the required reading template. Fix ONLY these problems, keep everything else, and return the complete corrected chapter JSON in the same shape:\n- ${problems.join("\n- ")}\n\nTemplate reminder:\n${CHAPTER_RULES}\n\n=== CHAPTER JSON ===\n${JSON.stringify(ch)}`,
+      maxTokens: opts.maxTokens,
+      tier: "heavy",
+    });
+    const next = normalizeChapterOut(repaired, opts.fallbackTitle);
+    if (next.sections.length) ch = next;
+  }
+  ch = coerceChapterTemplate(ch);
+  problems = chapterTemplateProblems(ch);
+  if (problems.length) throw new HttpError(502, `The AI could not produce a reading that matches the required template (${problems[0].replace(/"/g, "")}). Please try again.`);
+  return ch;
+}

@@ -3,8 +3,8 @@
 // Input: { title, lesson?: {...legacy fields}, markdown?: string, standards?: [{code, description}] , chapter_number? }
 // Output: { chapter }
 import { z } from "https://esm.sh/zod@3.23.8";
-import { aiJson, json, readBody, serve, stripHtml, HttpError } from "../_shared/curriculum-ai.ts";
-import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, normalizeChapterOut } from "../_shared/textbook-chapter.ts";
+import { json, readBody, serve, stripHtml, HttpError } from "../_shared/curriculum-ai.ts";
+import { CHAPTER_RULES, CHAPTER_SCHEMA, CHAPTER_SYSTEM, generateChapterStrict } from "../_shared/textbook-chapter.ts";
 
 const Body = z.object({
   title: z.string().min(1).max(300),
@@ -31,7 +31,7 @@ serve(async (req) => {
   const source = b.markdown?.trim() ? b.markdown : b.lesson ? legacyText(b.lesson) : "";
   if (!source.trim()) throw new HttpError(400, "Nothing to convert");
 
-  const out = await aiJson<Record<string, unknown>>({
+  const chapter = await generateChapterStrict({
     system: CHAPTER_SYSTEM,
     user: `Restructure the following existing reading titled "${b.title}" into a textbook chapter. Keep ALL of the original ideas, examples, vocabulary and the real-world story (reword only for flow and reading level; do not drop content), but REORGANIZE it into the required flow below: exactly 3 objectives; sections Introduction -> Historical Context (write this section if the original lacks a real, named person's story) -> Key Elements; the real-world case study; 4-12 key terms; exactly 5 reading comprehension questions. Add any missing parts (hook, Before You Read, guiding questions, callouts, figure briefs, summary) so the result is complete.
 ${b.standards.length ? `Aligned standards:\n${b.standards.map((s) => `- ${s.code}: ${s.description}`).join("\n")}\n` : ""}
@@ -42,10 +42,7 @@ Return JSON exactly in this shape:\n${CHAPTER_SCHEMA}
 === ORIGINAL READING ===
 ${source.slice(0, 40000)}`,
     maxTokens: 8000,
-    tier: "heavy",
+    fallbackTitle: b.title,
   });
-
-  const chapter = normalizeChapterOut(out, b.title);
-  if (!chapter.sections.length) throw new HttpError(502, "The AI returned an empty chapter. Please try again.");
   return json({ chapter });
 });
