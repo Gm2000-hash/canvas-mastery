@@ -16,6 +16,10 @@ import { StandardsPicker } from "./StandardsPicker";
 import { DOK_LEVELS, SECTIONS, type LibraryItem, type LibraryKind, type LibrarySource } from "./libraryTypes";
 import { GRADES } from "@/lib/frameworks";
 import { cn } from "@/lib/utils";
+import { ChapterEditor } from "@/modules/curriculum/components/textbook/ChapterEditor";
+import { useConvertToChapter } from "@/modules/curriculum/components/textbook/useConvertToChapter";
+import { chapterDokLevels, chapterToMarkdown, isChapter, normalizeChapter, type TextbookChapter } from "@/modules/curriculum/lib/textbook-chapter";
+import { Sparkles } from "lucide-react";
 
 export type EditorDraft = {
   id?: string;
@@ -30,6 +34,8 @@ export type EditorDraft = {
   file_path?: string | null;
   file_name?: string | null;
   file_mime?: string | null;
+  /** Structured textbook chapter (readings). When set, `body` is derived from it on save. */
+  chapter?: TextbookChapter | null;
 };
 
 export function draftFromItem(it: LibraryItem): EditorDraft {
@@ -38,6 +44,7 @@ export function draftFromItem(it: LibraryItem): EditorDraft {
     grade: it.grade, subject: it.subject, standardIds: it.standards.map((s) => s.id),
     dokLevels: it.dok_levels ?? [],
     file_path: it.file_path, file_name: it.file_name, file_mime: it.file_mime,
+    chapter: isChapter(it.chapter) ? normalizeChapter(it.chapter, it.title) : null,
   };
 }
 
@@ -55,11 +62,29 @@ export function LibraryItemEditor({ draft, open, onClose, onSaved, subjectHint, 
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { convert, converting } = useConvertToChapter();
+  const [standardMeta, setStandardMeta] = useState<{ code: string; description: string }[]>([]);
 
   useEffect(() => { setD(draft); setFile(null); }, [draft, open]);
   if (!d) return null;
 
   const set = (patch: Partial<EditorDraft>) => setD((p) => (p ? { ...p, ...patch } : p));
+  const useChapter = d.kind === "reading" && isChapter(d.chapter);
+
+  async function loadStandardMeta() {
+    if (!d?.standardIds.length) return [];
+    const { data } = await supabase.from("standards").select("code, description").in("id", d.standardIds);
+    const meta = (data ?? []).map((s) => ({ code: s.code, description: s.description }));
+    setStandardMeta(meta);
+    return meta;
+  }
+
+  async function convertToChapter() {
+    if (!d) return;
+    const standards = await loadStandardMeta();
+    const ch = await convert({ title: d.title || "Reading", markdown: d.body, standards });
+    if (ch) set({ chapter: ch, title: ch.title || d.title, dokLevels: chapterDokLevels(ch).length ? chapterDokLevels(ch) : d.dokLevels });
+  }
 
   async function save() {
     if (!d) return;
@@ -80,10 +105,13 @@ export function LibraryItemEditor({ draft, open, onClose, onSaved, subjectHint, 
         file_path = path; file_name = file.name; file_mime = file.type || null;
       }
 
+      const chapter = d.kind === "reading" && isChapter(d.chapter) ? { ...d.chapter, title: d.title.trim() || d.chapter.title } : null;
+      const body = chapter ? chapterToMarkdown(chapter) : d.body.trim() || null;
       const row = {
-        teacher_id: uid, kind: d.kind, title: d.title.trim(), body: d.body.trim() || null,
+        teacher_id: uid, kind: d.kind, title: d.title.trim(), body,
         source: d.source, grade: d.grade, subject: d.subject, file_path, file_name, file_mime,
         dok_levels: Array.from(new Set(d.dokLevels)).sort(),
+        chapter: chapter as any,
       };
       let id = d.id;
       if (id) {
@@ -194,8 +222,26 @@ export function LibraryItemEditor({ draft, open, onClose, onSaved, subjectHint, 
             </div>
           )}
 
+          {useChapter ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">Textbook chapter <Badge variant="outline" className="text-[10px] font-normal border-primary/40 text-primary">Chapter format</Badge></Label>
+                <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => set({ chapter: null, body: d.body || chapterToMarkdown(d.chapter!) })}>Switch to plain Markdown</Button>
+              </div>
+              <div className="rounded-xl border border-border p-4 max-h-[60vh] overflow-y-auto">
+                <ChapterEditor chapter={d.chapter!} onChange={(c) => set({ chapter: c, title: c.title || d.title })} standards={standardMeta} />
+              </div>
+            </div>
+          ) : (
           <div className="space-y-1.5">
-            <Label>{mode === "upload" ? "Notes (optional)" : "Content"}</Label>
+            <div className="flex items-center justify-between">
+              <Label>{mode === "upload" ? "Notes (optional)" : "Content"}</Label>
+              {d.kind === "reading" && mode !== "upload" && d.body.trim() && (
+                <Button type="button" variant="outline" size="sm" className="text-xs gap-1 border-primary/40 text-primary" disabled={converting} onClick={convertToChapter}>
+                  {converting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Convert to textbook chapter
+                </Button>
+              )}
+            </div>
             <Tabs defaultValue="write">
               <TabsList className="h-8">
                 <TabsTrigger value="write" className="text-xs">Write</TabsTrigger>
@@ -217,6 +263,7 @@ export function LibraryItemEditor({ draft, open, onClose, onSaved, subjectHint, 
               </TabsContent>
             </Tabs>
           </div>
+          )}
         </div>
 
         <DialogFooter>

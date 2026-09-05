@@ -8,6 +8,7 @@ const NAV = [
   { label: "Units", to: "/app/curriculum/lesson-planner" },
   { label: "Lessons", to: "/app/curriculum/lessons" },
   { label: "Library", to: "/app/curriculum/library" },
+  { label: "Textbooks", to: "/app/curriculum/textbooks" },
   { label: "Standards", to: "/app/curriculum/standards" },
   { label: "Activities", to: "/app/curriculum/activities" },
   { label: "Question Bank", to: "/app/curriculum/question-bank" },

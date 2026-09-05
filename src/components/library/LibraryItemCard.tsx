@@ -15,6 +15,10 @@ import { SECTIONS, SOURCE_LABEL, PLATFORM_LABEL, dokLabel, dokName, type Library
 import { ExportMenuItems, useExportActions } from "./ExportMenu";
 import { resourceFromLibraryItem } from "@/lib/export/resource";
 import { cn } from "@/lib/utils";
+import { ChapterViewer } from "@/modules/curriculum/components/textbook/ChapterViewer";
+import { useConvertToChapter } from "@/modules/curriculum/components/textbook/useConvertToChapter";
+import { chapterDokLevels, chapterToMarkdown, isChapter, normalizeChapter } from "@/modules/curriculum/lib/textbook-chapter";
+import { BookOpen, Loader2 } from "lucide-react";
 
 export async function downloadItemFile(it: LibraryItem) {
   if (!it.file_path) return;
@@ -63,6 +67,17 @@ export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSel
   const [viewing, setViewing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const exp = useExportActions(() => [resourceFromLibraryItem(item)]);
+  const { convert, converting } = useConvertToChapter();
+  const chapter = item.kind === "reading" && isChapter(item.chapter) ? normalizeChapter(item.chapter, item.title) : null;
+
+  /** AI-restructure this reading into the textbook chapter format and save it. */
+  async function convertToChapter() {
+    const ch = await convert({ title: item.title, markdown: item.body ?? "", standards: item.standards.map((s) => ({ code: s.code, description: s.description })) });
+    if (!ch) return;
+    const dok = chapterDokLevels(ch);
+    const { error } = await supabase.from("library_items").update({ chapter: ch as any, body: chapterToMarkdown(ch), dok_levels: dok.length ? dok : item.dok_levels }).eq("id", item.id);
+    if (error) toast.error(error.message); else { toast.success("Saved as a textbook chapter"); onChanged(); }
+  }
 
   async function remove() {
     if (item.file_path) await supabase.storage.from("library-files").remove([item.file_path]);
@@ -103,6 +118,9 @@ export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSel
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => onEdit(item)}><Pencil className="h-4 w-4 mr-2" /> Edit</DropdownMenuItem>
+                {item.kind === "reading" && !chapter && item.body && (
+                  <DropdownMenuItem onClick={convertToChapter} disabled={converting}>{converting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BookOpen className="h-4 w-4 mr-2" />} Convert to textbook chapter</DropdownMenuItem>
+                )}
                 {item.file_path && <DropdownMenuItem onClick={() => downloadItemFile(item)}><Download className="h-4 w-4 mr-2" /> Download file</DropdownMenuItem>}
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger><Share2 className="h-4 w-4 mr-2" /> Export</DropdownMenuSubTrigger>
@@ -125,6 +143,7 @@ export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSel
             : item.file_name ? <p className="text-sm text-muted-foreground flex items-center gap-1.5 font-sans"><FileText className="h-3.5 w-3.5" /> {item.file_name}</p> : null}
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <Badge variant="outline" className="gap-1 text-[11px] font-normal"><SourceIcon source={item.source} /> {SOURCE_LABEL[item.source]}</Badge>
+            {chapter && <Badge variant="outline" className="gap-1 text-[11px] font-normal border-primary/40 text-primary"><BookOpen className="h-3 w-3" /> Chapter</Badge>}
             <PlatformBadges links={item.links} compact />
             {item.grade && <Badge variant="outline" className="text-[11px] font-normal">Gr {item.grade}</Badge>}
             {dokLabel(item.dok_levels) && <Badge variant="outline" className="text-[11px] font-normal bg-primary/5 border-primary/30 text-primary">{dokLabel(item.dok_levels)}</Badge>}
@@ -151,7 +170,9 @@ export function LibraryItemCard({ item, onEdit, onChanged, selected, onToggleSel
               <Download className="h-4 w-4 mr-1.5" /> Open {item.file_name ?? "file"}
             </Button>
           )}
-          {item.body ? (
+          {chapter ? (
+            <ChapterViewer chapter={chapter} teacherMode showToc={false} standards={item.standards} />
+          ) : item.body ? (
             <div className="prose prose-sm max-w-none font-sans">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.body}</ReactMarkdown>
             </div>

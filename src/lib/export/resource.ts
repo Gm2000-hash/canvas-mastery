@@ -8,6 +8,7 @@
 
 import type { LibraryItem } from "@/components/library/libraryTypes";
 import type { QuestionRow } from "@/pages/app/standards/QuestionsTab";
+import { chapterToBlocks, isChapter, normalizeChapter } from "@/modules/curriculum/lib/textbook-chapter";
 
 export type ExportBlock =
   | { type: "h1" | "h2" | "h3" | "p" | "quote"; text: string }
@@ -231,7 +232,7 @@ export function resourceFromLibraryItem(it: LibraryItem): ExportResource {
     id: it.id,
     kind: it.kind,
     title: it.title,
-    blocks: markdownToBlocks(it.body),
+    blocks: it.kind === "reading" && isChapter(it.chapter) ? chapterToBlocks(normalizeChapter(it.chapter, it.title), { includeAnswers: true }) : markdownToBlocks(it.body),
     standards: it.standards.map((s) => ({ code: s.code, description: s.description })),
     dokLevels: it.dok_levels ?? [],
     grade: it.grade,

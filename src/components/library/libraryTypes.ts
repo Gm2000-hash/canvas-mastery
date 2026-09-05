@@ -2,6 +2,7 @@ import questionsImg from "@/assets/library-questions.jpg";
 import readingsImg from "@/assets/library-readings.jpg";
 import activitiesImg from "@/assets/library-activities.jpg";
 import lessonPlansImg from "@/assets/library-lesson-plans.jpg";
+import type { TextbookChapter } from "@/modules/curriculum/lib/textbook-chapter";
 
 export type LibraryKind = "reading" | "activity" | "lesson_plan";
 export type LibrarySection = "question" | LibraryKind;
@@ -37,6 +38,8 @@ export type LibraryItem = {
   created_at: string;
   updated_at: string;
   dok_levels: number[];
+  /** Textbook-chapter structure for readings (null until generated/converted). */
+  chapter?: TextbookChapter | null;
   standards: { id: string; code: string; description: string }[];
   links?: ResourceLink[];
 };
