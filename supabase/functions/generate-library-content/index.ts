@@ -38,7 +38,6 @@ const KIND_GUIDE: Record<string, string> = {
   lesson_plan: "a complete lesson plan designed around Kolb's experiential learning cycle with sections in this order: Objective(s), Standards, Materials, Concrete Experience (students do or observe something first-hand), Reflective Observation (students discuss/journal what they noticed), Abstract Conceptualization (the concept, vocabulary and models are named and explained), Active Experimentation (students apply the idea to a new problem or design), Assessment / Check for Understanding, Differentiation, and Extension. Give each of the four Kolb sections a time allotment. End EVERY section with an italic line starting \"*Why this works:*\" giving a 1-2 sentence instructional rationale for that choice",
 };
 
-const READING_LEVEL_GUIDE = "Write at a 7th-grade reading level (Flesch-Kincaid grade ~7): mostly short sentences, familiar words, and any technical term defined in plain language when it first appears.";
 
 const LENGTH_GUIDE: Record<string, string> = {
   short: "Keep it concise (roughly 300-450 words).",
@@ -134,7 +133,6 @@ Deno.serve(async (req) => {
     const user = [
       `Create ${KIND_GUIDE[kind]}.`,
       `Grade: ${effGrade}. Subject: ${effSubject}.`,
-      kind === "reading" ? READING_LEVEL_GUIDE : "",
       options?.format ? `Format preference: ${options.format}.` : "",
       options?.topic ? `Topic focus: ${options.topic}.` : "",
       dok.text,
