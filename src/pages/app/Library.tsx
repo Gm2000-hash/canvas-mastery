@@ -104,7 +104,7 @@ export default function Library() {
     setItems(null);
     setSelectedIds(new Set());
     const { data, error } = await supabase.from("library_items")
-      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, created_at, updated_at, library_item_standards(standard_id, standards(id, code, description)), resource_links(id, platform, external_course_id, external_course_name, external_item_id, external_type, url, direction, synced_at)")
+      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, chapter, created_at, updated_at, library_item_standards(standard_id, standards(id, code, description)), resource_links(id, platform, external_course_id, external_course_name, external_item_id, external_type, url, direction, synced_at)")
       .eq("kind", kind).order("updated_at", { ascending: false });
     if (error) { toast.error(error.message); setItems([]); return; }
     setItems((data as any[]).map((r) => ({
@@ -151,7 +151,7 @@ export default function Library() {
 
   async function openItemResult(id: string) {
     const { data } = await supabase.from("library_items")
-      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, created_at, updated_at, library_item_standards(standards(id, code, description)), resource_links(id, platform, external_course_id, external_course_name, external_item_id, external_type, url, direction, synced_at)")
+      .select("id, kind, title, body, source, file_path, file_mime, file_name, grade, subject, canvas_course_id, dok_levels, chapter, created_at, updated_at, library_item_standards(standards(id, code, description)), resource_links(id, platform, external_course_id, external_course_name, external_item_id, external_type, url, direction, synced_at)")
       .eq("id", id).maybeSingle();
     if (!data) return;
     const it: LibraryItem = { ...(data as any), dok_levels: (data as any).dok_levels ?? [], standards: ((data as any).library_item_standards ?? []).map((l: any) => l.standards).filter(Boolean), links: (data as any).resource_links ?? [] };
