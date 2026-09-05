@@ -1,6 +1,6 @@
 import { useMemo, useState, type MouseEvent } from "react";
 import { sanitizeRichHtml } from "@/modules/curriculum/lib/sanitize-rich-html";
-import { CALLOUT_LABEL, inlineToHtml, type ChapterBlock, type TextbookChapter } from "@/modules/curriculum/lib/textbook-chapter";
+import { CALLOUT_LABEL, inlineToHtml, type CalloutKind, type TextbookChapter } from "@/modules/curriculum/lib/textbook-chapter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BookOpen, ChevronLeft, ChevronRight, Eye, EyeOff, HelpCircle, Lightbulb, Link2, X } from "lucide-react";
@@ -17,7 +17,7 @@ interface Props {
   className?: string;
 }
 
-const CALLOUT_STYLE: Record<ChapterBlock extends { type: "callout"; kind: infer K } ? K & string : string, { icon: typeof Lightbulb; cls: string }> = {
+const CALLOUT_STYLE: Record<CalloutKind, { icon: typeof Lightbulb; cls: string }> = {
   stop_and_think: { icon: HelpCircle, cls: "border-primary/40 bg-primary/5" },
   did_you_know: { icon: Lightbulb, cls: "border-accent/60 bg-accent/10" },
   connect_it: { icon: Link2, cls: "border-secondary-foreground/30 bg-secondary/40" },
