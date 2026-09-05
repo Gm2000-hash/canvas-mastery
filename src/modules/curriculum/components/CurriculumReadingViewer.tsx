@@ -28,6 +28,10 @@ import { useGoogleConnection } from '@/modules/curriculum/config/google-connecti
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ReadingResourceInsertDialog } from '@/modules/curriculum/components/ReadingResourceInsertDialog';
 import GoogleImportDialog from '@/modules/curriculum/components/GoogleImportDialog';
+import { ChapterViewer } from '@/modules/curriculum/components/textbook/ChapterViewer';
+import { ChapterEditor } from '@/modules/curriculum/components/textbook/ChapterEditor';
+import { useConvertToChapter } from '@/modules/curriculum/components/textbook/useConvertToChapter';
+import { chapterToLegacyFields, isChapter, normalizeChapter, type TextbookChapter } from '@/modules/curriculum/lib/textbook-chapter';
 
 interface CurriculumReadingViewerProps {
   discipline: string;
@@ -72,6 +76,52 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
   const [exportingGdoc, setExportingGdoc] = useState(false);
   const [googleImportOpen, setGoogleImportOpen] = useState(false);
   const { status: googleStatus } = useGoogleConnection();
+  const { convert: convertToChapter, converting } = useConvertToChapter();
+  const [bulkConverting, setBulkConverting] = useState<string | null>(null);
+
+  /** AI-restructure the current reading into the textbook chapter format and open it for review. */
+  const handleConvertCurrent = async () => {
+    if (!lesson) return;
+    const ch = await convertToChapter({
+      title: lesson.title,
+      lesson: { title: lesson.title, objectives: lesson.objectives, intro: lesson.intro, explanation: lesson.explanation, key_terms: lesson.key_terms, reading_title: lesson.reading_title, reading_paragraphs: lesson.reading_paragraphs },
+      standards: lessonStandards.map(s => ({ code: s.ngss_code, description: s.ngss_description })),
+    });
+    if (!ch) return;
+    resetEditData({ ...chapterToLegacyFields(ch), chapter: ch } as any);
+    setEditing(true);
+  };
+
+  /** Convert every unconverted reading in a unit, one after another, saving each. */
+  const handleConvertUnit = async (unitId: string) => {
+    if (!user) return;
+    const targets = lessons.filter(l => l.unit_id === unitId && !isChapter(l.chapter));
+    if (!targets.length) { toast.info('Every reading in this unit is already a chapter'); return; }
+    setBulkConverting(unitId);
+    let done = 0;
+    const tId = toast.loading(`Converting 0 / ${targets.length} readings…`);
+    try {
+      for (const l of targets) {
+        const { data: stds } = await (supabase.from('curriculum_lesson_standards' as any) as any).select('ngss_code, ngss_description').eq('lesson_id', l.id);
+        const { data, error } = await supabase.functions.invoke('convert-reading-to-chapter', {
+          body: { title: l.title, lesson: { title: l.title, objectives: l.objectives, intro: l.intro, explanation: l.explanation, key_terms: l.key_terms, reading_title: l.reading_title, reading_paragraphs: l.reading_paragraphs }, standards: (stds || []).map((s: any) => ({ code: s.ngss_code, description: s.ngss_description })) },
+        });
+        if (error || data?.error) throw new Error(data?.error || (error as any)?.message || 'Conversion failed');
+        const ch = normalizeChapter(data.chapter, l.title);
+        const legacy = chapterToLegacyFields(ch);
+        const { error: uErr } = await supabase.from('curriculum_lessons').update({ ...legacy, chapter: ch, updated_at: new Date().toISOString() } as any).eq('id', l.id).eq('user_id', user.id);
+        if (uErr) throw uErr;
+        setLessons(prev => prev.map(x => x.id === l.id ? { ...x, ...legacy, chapter: ch } as CurriculumLesson : x));
+        done++;
+        toast.loading(`Converting ${done} / ${targets.length} readings…`, { id: tId });
+      }
+      toast.success(`Converted ${done} reading${done === 1 ? '' : 's'} to textbook chapters`, { id: tId });
+    } catch (err: any) {
+      toast.error(`${err?.message || 'Conversion failed'} (${done} of ${targets.length} done)`, { id: tId });
+    } finally {
+      setBulkConverting(null);
+    }
+  };
 
   const handleDeleteReading = async (lessonId: string) => {
     setDeletingId(lessonId);
@@ -219,6 +269,7 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
         explanation: [...(lesson.explanation as string[])],
         reading_title: lesson.reading_title,
         reading_paragraphs: [...(lesson.reading_paragraphs as string[] || [])],
+        chapter: isChapter(lesson.chapter) ? normalizeChapter(lesson.chapter, lesson.title) : null,
       });
       setEditing(true);
     }
@@ -300,6 +351,7 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
       explanation: [...(lesson.explanation as string[])],
       reading_title: lesson.reading_title,
       reading_paragraphs: [...(lesson.reading_paragraphs as string[] || [])],
+      chapter: isChapter(lesson.chapter) ? normalizeChapter(lesson.chapter, lesson.title) : null,
     });
     setEditing(true);
   };
@@ -313,18 +365,23 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
     if (!lesson || !editData || !user) return;
     setSaving(true);
     try {
+      const ch = isChapter(editData.chapter) ? editData.chapter : null;
+      const payload = ch
+        ? { ...chapterToLegacyFields(ch), chapter: ch }
+        : {
+          title: editData.title,
+          objectives: editData.objectives,
+          key_terms: editData.key_terms,
+          intro: editData.intro,
+          explanation: editData.explanation,
+          reading_title: editData.reading_title,
+          reading_paragraphs: editData.reading_paragraphs,
+          chapter: null,
+        };
+      if (ch) Object.assign(editData, payload);
       const { error } = await supabase
         .from('curriculum_lessons')
-        .update({
-          title: editData.title,
-          objectives: editData.objectives as any,
-          key_terms: editData.key_terms as any,
-          intro: editData.intro as any,
-          explanation: editData.explanation as any,
-          reading_title: editData.reading_title,
-          reading_paragraphs: editData.reading_paragraphs as any,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ ...(payload as any), updated_at: new Date().toISOString() })
         .eq('id', lesson.id)
         .eq('user_id', user.id);
 
@@ -599,6 +656,12 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
                 {aiTagging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                 {aiTagging ? 'Tagging…' : 'AI Tag'}
               </Button>
+              {!isChapter(lesson.chapter) && (
+                <Button variant="outline" size="sm" className="gap-2 border-primary/40 text-primary" onClick={handleConvertCurrent} disabled={converting} title="Restructure this reading into the textbook chapter format">
+                  {converting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {converting ? 'Converting…' : 'Convert to chapter'}
+                </Button>
+              )}
               <Button variant="outline" size="sm" className="gap-2" onClick={startEditing}>
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </Button>
@@ -886,6 +949,11 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
                         {gi + 1}
                       </span>
                       {group.unitTitle}
+                      {group.lessons.some(({ lesson: l }) => !isChapter(l.chapter)) && (
+                        <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs gap-1 normal-case tracking-normal text-primary" disabled={!!bulkConverting} onClick={() => handleConvertUnit(group.unitId)}>
+                          {bulkConverting === group.unitId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Convert all to chapters
+                        </Button>
+                      )}
                     </h2>
                     <div className="ml-8 space-y-0.5">
                       {group.lessons.map(({ index, lesson: l }) => (
@@ -897,6 +965,7 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
                             <span className="text-xs text-muted-foreground/60 w-6 shrink-0 text-right">{index + 1}.</span>
                             <div className="min-w-0 flex-1">
                               <span className="text-foreground group-hover:text-primary transition-colors">{l.title}</span>
+                              {isChapter(l.chapter) && <Badge variant="outline" className="ml-2 text-[10px] font-normal border-primary/40 text-primary align-middle">Chapter</Badge>}
                               {l.reading_title && (
                                 <span className="block text-[11px] text-muted-foreground mt-0.5">📖 {l.reading_title}</span>
                               )}
@@ -931,7 +1000,14 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
                 }
               }}
             >
-              {editing && editData ? (
+              {editing && editData && isChapter(editData.chapter) ? (
+                /* ─── EDIT MODE (textbook chapter) ─── */
+                <ChapterEditor
+                  chapter={editData.chapter}
+                  onChange={(c: TextbookChapter) => setEditData({ ...editData, chapter: c, title: c.title })}
+                  standards={lessonStandards.map(s => ({ code: s.ngss_code, description: s.ngss_description }))}
+                />
+              ) : editing && editData ? (
                 /* ─── EDIT MODE ─── */
                 <div className={`${editFont} ${editFontSize} ${editLineSpacing}`}>
                   <ReadingEditToolbar
@@ -1135,6 +1211,14 @@ export function CurriculumReadingViewer({ discipline, title, onClose, initialLes
                   </div>
 
                 </div>
+              ) : isChapter(lesson.chapter) ? (
+                /* ─── READ MODE (textbook chapter) ─── */
+                <ChapterViewer
+                  chapter={normalizeChapter(lesson.chapter, lesson.title)}
+                  teacherMode={!!user}
+                  showToc={false}
+                  standards={lessonStandards.map(s => ({ code: s.ngss_code, description: s.ngss_description }))}
+                />
               ) : (
                 /* ─── READ MODE ─── */
                 <>

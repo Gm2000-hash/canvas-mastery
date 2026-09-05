@@ -203,6 +203,7 @@ async function saveReadings(
         key_terms: reading.key_terms || [],
         reading_title: reading.reading_title || null,
         reading_paragraphs: reading.reading_paragraphs || [],
+        chapter: reading.chapter ?? null,
       };
 
       // unit_id is required for curriculum_lessons
